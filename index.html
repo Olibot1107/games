@@ -3,56 +3,115 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Games</title>
+  <title>Games Directory</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     h1 { color: #333; }
-    ul { list-style-type: none; padding-left: 20px; }
-    li.folder { font-weight: bold; color: #1a73e8; cursor: pointer; }
-    li.folder:hover { text-decoration: underline; }
-    li.file { color: #333; }
+    input { margin: 10px 0; padding: 5px; width: 100%; max-width: 300px; }
+    ul { list-style-type: none; padding-left: 0; }
+    li { display: flex; align-items: center; margin: 5px 0; }
+    a.folder { font-weight: bold; color: #1a73e8; text-decoration: none; flex: 1; }
+    a.folder:hover { text-decoration: underline; }
+    button.favorite { background: none; border: none; cursor: pointer; font-size: 18px; }
+    button.favorite.fav { color: gold; }
+    #favorites { margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h1>Games</h1>
+  <h1>Games Directory</h1>
+  <input type="text" id="search" placeholder="Search folders...">
   <ul id="file-list"></ul>
+
+  <h2>⭐ Favorites</h2>
+  <ul id="favorites"></ul>
 
   <script>
     const apiUrl = 'https://api.github.com/repos/Olibot1107/games/contents/games';
     const fileList = document.getElementById('file-list');
+    const favoritesList = document.getElementById('favorites');
+    const searchInput = document.getElementById('search');
+
+    // Load favorites from localStorage
+    let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
+
+    function saveFavorites() {
+      localStorage.setItem('favorites', JSON.stringify(favorites));
+      renderFavorites();
+    }
+
+    function toggleFavorite(folderName) {
+      if (favorites.includes(folderName)) {
+        favorites = favorites.filter(f => f !== folderName);
+      } else {
+        favorites.push(folderName);
+      }
+      saveFavorites();
+      renderList(lastData); // re-render list to update star state
+    }
+
+    function renderFavorites() {
+      favoritesList.innerHTML = '';
+      favorites.forEach(folderName => {
+        const li = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = `/games/${folderName}/index.html`;
+        link.textContent = folderName;
+        link.className = 'folder';
+        li.appendChild(link);
+        favoritesList.appendChild(li);
+      });
+    }
 
     function createListItem(item) {
       const li = document.createElement('li');
-      li.textContent = item.name;
+      const link = document.createElement('a');
+      link.textContent = item.name;
+      link.href = `/games/${item.name}/index.html`;
+      link.className = 'folder';
 
-      if (item.type === 'dir') {
-        li.className = 'folder';
-        li.addEventListener('click', () => {
-          // Navigate to /games/<foldername>/index.html
-          window.location.href = `/games/${item.name}/index.html`;
-        });
-      } else {
-        li.className = 'file';
-      }
+      const favBtn = document.createElement('button');
+      favBtn.innerHTML = favorites.includes(item.name) ? '★' : '☆';
+      favBtn.className = 'favorite' + (favorites.includes(item.name) ? ' fav' : '');
+      favBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        toggleFavorite(item.name);
+      });
 
+      li.appendChild(link);
+      li.appendChild(favBtn);
       return li;
+    }
+
+    let lastData = [];
+
+    function renderList(data) {
+      lastData = data;
+      fileList.innerHTML = '';
+      const search = searchInput.value.toLowerCase();
+      data
+        .filter(item => item.type === 'dir')
+        .filter(item => item.name.toLowerCase().includes(search))
+        .forEach(item => {
+          fileList.appendChild(createListItem(item));
+        });
     }
 
     fetch(apiUrl)
       .then(response => response.json())
       .then(data => {
-        if (Array.isArray(data)) {
-          data.forEach(item => {
-            fileList.appendChild(createListItem(item));
-          });
-        } else {
-          fileList.innerHTML = '<li>No files or folders found.</li>';
-        }
+        renderList(data);
       })
       .catch(err => {
         fileList.innerHTML = '<li>Error loading data.</li>';
         console.error(err);
       });
+
+    searchInput.addEventListener('input', () => {
+      renderList(lastData);
+    });
+
+    renderFavorites();
   </script>
 </body>
 </html>
