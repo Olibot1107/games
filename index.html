@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Games</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h1 { color: #333; }
+    ul { list-style-type: none; padding-left: 20px; }
+    li.folder { font-weight: bold; color: #1a73e8; cursor: pointer; }
+    li.folder:hover { text-decoration: underline; }
+    li.file { color: #333; }
+  </style>
+</head>
+<body>
+  <h1>Games</h1>
+  <ul id="file-list"></ul>
+
+  <script>
+    const apiUrl = 'https://api.github.com/repos/Olibot1107/games/contents/games';
+    const fileList = document.getElementById('file-list');
+
+    function createListItem(item) {
+      const li = document.createElement('li');
+      li.textContent = item.name;
+
+      if (item.type === 'dir') {
+        li.className = 'folder';
+        li.addEventListener('click', () => {
+          // Navigate to /games/<foldername>/index.html
+          window.location.href = `/games/${item.name}/index.html`;
+        });
+      } else {
+        li.className = 'file';
+      }
+
+      return li;
+    }
+
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          data.forEach(item => {
+            fileList.appendChild(createListItem(item));
+          });
+        } else {
+          fileList.innerHTML = '<li>No files or folders found.</li>';
+        }
+      })
+      .catch(err => {
+        fileList.innerHTML = '<li>Error loading data.</li>';
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
