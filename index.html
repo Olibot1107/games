@@ -14,24 +14,34 @@
     a.folder:hover { text-decoration: underline; }
     button.favorite { background: none; border: none; cursor: pointer; font-size: 18px; }
     button.favorite.fav { color: gold; }
-    #favorites { margin-top: 20px; }
+    #favorites, #good-games { margin-top: 20px; }
   </style>
 </head>
 <body>
   <h1>Games Directory</h1>
   <input type="text" id="search" placeholder="Search folders...">
+
   <h2>⭐ Favorites</h2>
   <ul id="favorites"></ul>
+
+  <h2>🔥 Good Games</h2>
+  <ul id="good-games"></ul>
+
   <h2>Games</h2>
   <ul id="file-list"></ul>
+
   <script>
-    const apiUrl = 'https://api.github.com/repos/Olibot1107/games/contents/games';
+    const gamesApiUrl = 'https://api.github.com/repos/Olibot1107/games/contents/games';
+    const goodApiUrl = 'https://api.github.com/repos/Olibot1107/games/contents/good';
+
     const fileList = document.getElementById('file-list');
+    const goodGamesList = document.getElementById('good-games');
     const favoritesList = document.getElementById('favorites');
     const searchInput = document.getElementById('search');
 
-    // Load favorites from localStorage
     let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
+    let lastGamesData = [];
+    let lastGoodData = [];
 
     function saveFavorites() {
       localStorage.setItem('favorites', JSON.stringify(favorites));
@@ -45,7 +55,7 @@
         favorites.push(folderName);
       }
       saveFavorites();
-      renderList(lastData); // re-render list to update star state
+      renderLists();
     }
 
     function renderFavorites() {
@@ -53,7 +63,12 @@
       favorites.forEach(folderName => {
         const li = document.createElement('li');
         const link = document.createElement('a');
-        link.href = `/games/${folderName}/index.html`;
+        // default link: try in /games first, fallback to /good
+        if (lastGamesData.find(item => item.name === folderName)) {
+          link.href = `/games/${folderName}/index.html`;
+        } else {
+          link.href = `/good/${folderName}/index.html`;
+        }
         link.textContent = folderName;
         link.className = 'folder';
         li.appendChild(link);
@@ -61,11 +76,11 @@
       });
     }
 
-    function createListItem(item) {
+    function createListItem(item, basePath) {
       const li = document.createElement('li');
       const link = document.createElement('a');
       link.textContent = item.name;
-      link.href = `/games/${item.name}/index.html`;
+      link.href = `/${basePath}/${item.name}/index.html`;
       link.className = 'folder';
 
       const favBtn = document.createElement('button');
@@ -82,34 +97,42 @@
       return li;
     }
 
-    let lastData = [];
-
-    function renderList(data) {
-      lastData = data;
-      fileList.innerHTML = '';
+    function renderLists() {
       const search = searchInput.value.toLowerCase();
-      data
+
+      fileList.innerHTML = '';
+      lastGamesData
         .filter(item => item.type === 'dir')
         .filter(item => item.name.toLowerCase().includes(search))
         .forEach(item => {
-          fileList.appendChild(createListItem(item));
+          fileList.appendChild(createListItem(item, 'games'));
+        });
+
+      goodGamesList.innerHTML = '';
+      lastGoodData
+        .filter(item => item.type === 'dir')
+        .filter(item => item.name.toLowerCase().includes(search))
+        .forEach(item => {
+          goodGamesList.appendChild(createListItem(item, 'good'));
         });
     }
 
-    fetch(apiUrl)
-      .then(response => response.json())
-      .then(data => {
-        renderList(data);
-      })
-      .catch(err => {
-        fileList.innerHTML = '<li>Error loading data.</li>';
-        console.error(err);
-      });
-
-    searchInput.addEventListener('input', () => {
-      renderList(lastData);
+    // Fetch both games + good games
+    Promise.all([
+      fetch(gamesApiUrl).then(r => r.json()),
+      fetch(goodApiUrl).then(r => r.json())
+    ])
+    .then(([gamesData, goodData]) => {
+      lastGamesData = gamesData;
+      lastGoodData = goodData;
+      renderLists();
+    })
+    .catch(err => {
+      fileList.innerHTML = '<li>Error loading data.</li>';
+      console.error(err);
     });
 
+    searchInput.addEventListener('input', renderLists);
     renderFavorites();
   </script>
 </body>
