@@ -5,49 +5,273 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Games Directory</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    h1 { color: #333; }
-    input { margin: 10px 0; padding: 5px; width: 100%; max-width: 300px; }
-    ul { list-style-type: none; padding-left: 0; }
-    li { display: flex; align-items: center; margin: 5px 0; }
-    a.folder { font-weight: bold; color: #1a73e8; text-decoration: none; flex: 1; }
-    a.folder:hover { text-decoration: underline; }
-    button.favorite { background: none; border: none; cursor: pointer; font-size: 18px; }
-    button.favorite.fav { color: gold; }
-    #favorites, #good-games { margin-top: 20px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #ddd;
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    h1 {
+      color: #2c3e50;
+      margin-bottom: 10px;
+    }
+    
+    .subtitle {
+      color: #7f8c8d;
+      font-size: 1.1em;
+      margin-bottom: 20px;
+    }
+    
+    .search-container {
+      max-width: 500px;
+      margin: 0 auto 30px;
+    }
+    
+    #search {
+      width: 100%;
+      padding: 12px 15px;
+      border: 1px solid #ddd;
+      border-radius: 25px;
+      font-size: 16px;
+      box-sizing: border-box;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    #search:focus {
+      outline: none;
+      border-color: #3498db;
+      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+    }
+    
+    .section {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 25px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .section-title {
+      color: #2c3e50;
+      margin-top: 0;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: center;
+    }
+    
+    .section-title::before {
+      content: "⭐";
+      margin-right: 10px;
+    }
+    
+    .emulators-title::before {
+      content: "🕹️";
+    }
+    
+    .good-games-title::before {
+      content: "🔥";
+    }
+    
+    .games-title::before {
+      content: "🎮";
+    }
+    
+    ul {
+      list-style-type: none;
+      padding-left: 0;
+    }
+    
+    li {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+      padding: 10px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    
+    li:hover {
+      background-color: #f8f9fa;
+    }
+    
+    a.folder {
+      font-weight: 500;
+      color: #3498db;
+      text-decoration: none;
+      flex: 1;
+      padding: 5px 0;
+    }
+    
+    a.folder:hover {
+      text-decoration: underline;
+    }
+    
+    button.favorite {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 5px;
+      border-radius: 3px;
+      transition: background-color 0.2s;
+    }
+    
+    button.favorite:hover {
+      background-color: #f1c40f;
+    }
+    
+    button.favorite.fav {
+      color: #f1c40f;
+    }
+    
+    .about-section {
+      text-align: center;
+      padding: 15px;
+      background-color: #e8f4fc;
+      border-radius: 8px;
+      margin-bottom: 25px;
+    }
+    
+    .about-section a {
+      color: #3498db;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    
+    .about-section a:hover {
+      text-decoration: underline;
+    }
+    
+    .version-info {
+      font-size: 0.9em;
+      color: #7f8c8d;
+      margin-top: 5px;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #777;
+    }
+    
+    .error {
+      background-color: #ffebee;
+      color: #c62828;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+    
+    @media (max-width: 768px) {
+      body {
+        padding: 10px;
+      }
+      
+      .section {
+        padding: 15px;
+      }
+      
+      li {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      
+      a.folder {
+        margin-bottom: 5px;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>Games Directory</h1>
-  <input type="text" id="search" placeholder="Search folders...">
-
-  <-- Bit saying where to goto the Emulators -->
-
-  <h2>🕹️ Emulators</h2>
-  <ul>
-    <li><a href="/tools/rarch/index.html" class="folder">Webretro (All in 1 Emulator)</a></li>
-  </ul>
-  <h2>⭐ Favorites</h2>
-  <ul id="favorites"></ul>
-
-  <h2>🔥 Good Games</h2>
-  <ul id="good-games"></ul>
-
-  <h2>Games</h2>
-  <ul id="file-list"></ul>
+  <header>
+    <h1>Games Directory</h1>
+    <p class="subtitle">A collection of web-based games</p>
+  </header>
+  
+  <div class="search-container">
+    <input type="text" id="search" placeholder="Search games...">
+  </div>
+  
+  <div class="about-section">
+    <p>Made with 🤓 | <a href="/updates.html">View Recent Updates</a></p>
+    <div class="version-info" id="version-info">Version: Loading...</div>
+  </div>
+  
+  <div class="section">
+    <h2 class="section-title emulators-title">Emulators</h2>
+    <ul>
+      <li><a href="/tools/rarch/index.html" class="folder">Webretro (All in 1 Emulator)</a></li>
+    </ul>
+  </div>
+  
+  <div class="section">
+    <h2 class="section-title">Favorites</h2>
+    <ul id="favorites">
+      <li class="loading">Loading favorites...</li>
+    </ul>
+  </div>
+  
+  <div class="section">
+    <h2 class="section-title good-games-title">Good Games</h2>
+    <ul id="good-games">
+      <li class="loading">Loading good games...</li>
+    </ul>
+  </div>
+  
+  <div class="section">
+    <h2 class="section-title games-title">All Games</h2>
+    <ul id="file-list">
+      <li class="loading">Loading games...</li>
+    </ul>
+  </div>
 
   <script>
     const gamesApiUrl = 'https://api.github.com/repos/Olibot1107/games/contents/games';
     const goodApiUrl = 'https://api.github.com/repos/Olibot1107/games/contents/good';
+    const commitsApiUrl = 'https://api.github.com/repos/Olibot1107/games/commits';
 
     const fileList = document.getElementById('file-list');
     const goodGamesList = document.getElementById('good-games');
     const favoritesList = document.getElementById('favorites');
     const searchInput = document.getElementById('search');
+    const versionInfo = document.getElementById('version-info');
 
     let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
     let lastGamesData = [];
     let lastGoodData = [];
+
+    // Function to fetch commit count
+    async function fetchCommitCount() {
+      try {
+        const response = await fetch(commitsApiUrl);
+        if (!response.ok) {
+          throw new Error(`GitHub API error: ${response.status}`);
+        }
+        const commits = await response.json();
+        const commitCount = commits.length;
+        versionInfo.textContent = `Version: ${commitCount}`;
+      } catch (error) {
+        console.error('Error fetching commit count:', error);
+        versionInfo.textContent = 'Version: Unknown';
+      }
+    }
 
     function saveFavorites() {
       localStorage.setItem('favorites', JSON.stringify(favorites));
@@ -65,6 +289,11 @@
     }
 
     function renderFavorites() {
+      if (favorites.length === 0) {
+        favoritesList.innerHTML = '<li style="color: #7f8c8d; font-style: italic;">No favorites yet. Click the star next to a game to add it here.</li>';
+        return;
+      }
+      
       favoritesList.innerHTML = '';
       favorites.forEach(folderName => {
         const li = document.createElement('li');
@@ -92,6 +321,7 @@
       const favBtn = document.createElement('button');
       favBtn.innerHTML = favorites.includes(item.name) ? '★' : '☆';
       favBtn.className = 'favorite' + (favorites.includes(item.name) ? ' fav' : '');
+      favBtn.title = favorites.includes(item.name) ? 'Remove from favorites' : 'Add to favorites';
       favBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
@@ -106,21 +336,37 @@
     function renderLists() {
       const search = searchInput.value.toLowerCase();
 
-      fileList.innerHTML = '';
-      lastGamesData
+      // Render all games
+      const filteredGames = lastGamesData
         .filter(item => item.type === 'dir')
-        .filter(item => item.name.toLowerCase().includes(search))
-        .forEach(item => {
+        .filter(item => item.name.toLowerCase().includes(search));
+      
+      if (filteredGames.length === 0) {
+        fileList.innerHTML = search ? 
+          '<li style="color: #7f8c8d; font-style: italic;">No games match your search.</li>' : 
+          '<li style="color: #7f8c8d; font-style: italic;">No games found.</li>';
+      } else {
+        fileList.innerHTML = '';
+        filteredGames.forEach(item => {
           fileList.appendChild(createListItem(item, 'games'));
         });
+      }
 
-      goodGamesList.innerHTML = '';
-      lastGoodData
+      // Render good games
+      const filteredGoodGames = lastGoodData
         .filter(item => item.type === 'dir')
-        .filter(item => item.name.toLowerCase().includes(search))
-        .forEach(item => {
+        .filter(item => item.name.toLowerCase().includes(search));
+      
+      if (filteredGoodGames.length === 0) {
+        goodGamesList.innerHTML = search ? 
+          '<li style="color: #7f8c8d; font-style: italic;">No good games match your search.</li>' : 
+          '<li style="color: #7f8c8d; font-style: italic;">No good games found.</li>';
+      } else {
+        goodGamesList.innerHTML = '';
+        filteredGoodGames.forEach(item => {
           goodGamesList.appendChild(createListItem(item, 'good'));
         });
+      }
     }
 
     // Fetch both games + good games
@@ -132,14 +378,21 @@
       lastGamesData = gamesData;
       lastGoodData = goodData;
       renderLists();
+      renderFavorites();
     })
     .catch(err => {
-      fileList.innerHTML = '<li>Error loading data.</li>';
+      fileList.innerHTML = '<li class="error">Error loading games data. Please check your connection and try again.</li>';
+      goodGamesList.innerHTML = '<li class="error">Error loading good games data. Please check your connection and try again.</li>';
       console.error(err);
     });
 
     searchInput.addEventListener('input', renderLists);
+    
+    // Initial render of favorites
     renderFavorites();
+    
+    // Fetch commit count for version info
+    fetchCommitCount();
   </script>
 </body>
 </html>
