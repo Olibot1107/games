@@ -159,8 +159,7 @@
             commits.forEach(commit => {
                 const commitData = commit.commit;
                 const author = commit.author || commitData.author;
-                // skip if commit is not made by Olibot1107
-                if (author?.login !== 'Olibot1107') return;
+                // skip if commit is not made by Olibot110
                 html += `
                 <div class="commit">
                     <div class="commit-header">
