@@ -260,7 +260,8 @@
   <div id="debug-panel">[Debug logs will appear here]</div>
 
   <script>
-  const dataUrl = "/games.json"; // path to your single JSON file
+  // CHANGED: Use the raw.githubusercontent.com URL for games.json
+  const dataUrl = "https://raw.githubusercontent.com/Olibot1107/games/refs/heads/main/games.json";
 
   const fileList = document.getElementById('file-list');
   const goodGamesList = document.getElementById('good-games');
