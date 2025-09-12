@@ -1,5 +1,5 @@
 {
-  "generated": "2025-09-12T18:07:05.711Z",
+  "generated": "2025-09-12T19:26:13.093Z",
   "games": [
     "08800-space-organizer",
     "0xdead",
@@ -2354,13 +2354,13 @@
   ],
   "good": [
     "2048",
-    "Moto X3M",
     "blackholesquare",
     "c00kieclicker",
     "chromedino",
     "crossyroad",
     "doom",
     "drifthunters",
+    "drivemad",
     "friendlyfire",
     "geometrydash",
     "minecraft",
@@ -2374,6 +2374,7 @@
     "stack",
     "tetris",
     "vex6",
+    "wordle",
     "xx142-b2exe"
   ]
 }
