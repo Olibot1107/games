@@ -1,9 +1,9 @@
 {
     "TOTAL_MEMORY": 1073741824,
-    "dataUrl": "drfhunter-main/dh.data.unityweb",
-    "asmCodeUrl": "drfhunter-main/dh.asm.code.unityweb",
-    "asmMemoryUrl": "drfhunter-main/dh.asm.memory.unityweb",
-    "asmFrameworkUrl": "drfhunter-main/dh.asm.framework.unityweb",
+    "dataUrl": "https://hellooo-qtqr.onrender.com/drfhunter-main/dh.data.unityweb",
+    "asmCodeUrl": "https://hellooo-qtqr.onrender.com/drfhunter-main/dh.asm.code.unityweb",
+    "asmMemoryUrl": "https://hellooo-qtqr.onrender.com/drfhunter-main/dh.asm.memory.unityweb",
+    "asmFrameworkUrl": "https://hellooo-qtqr.onrender.com/drfhunter-main/dh.asm.framework.unityweb",
     "backgroundUrl": "",
     "splashScreenStyle": "Dark",
     "backgroundColor": "#111111",
