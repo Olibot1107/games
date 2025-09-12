@@ -131,6 +131,7 @@
       padding: 5px;
       border-radius: 3px;
       transition: background-color 0.2s;
+      margin-right: 8px;
     }
 
     button.favorite:hover {
@@ -225,7 +226,7 @@
 
   <div class="about-section">
     <p>Made with 🤓 | <a href="/updates.html">View Recent Updates</a></p>
-    <div class="version-info" id="version-info">Version: Loading...</div>
+    <div class="version-info" id="version-info">Version: 1.0</div>
   </div>
 
   <div class="section">
@@ -260,29 +261,35 @@
   <div id="debug-panel">[Debug logs will appear here]</div>
 
   <script>
-  // CHANGED: Use the raw.githubusercontent.com URL for games.json
-  const dataUrl = "https://raw.githubusercontent.com/Olibot1107/games/refs/heads/main/games.json";
+  const dataUrl = "https://raw.githubusercontent.com/Olibot1107/games/main/games.json";
 
   const fileList = document.getElementById('file-list');
   const goodGamesList = document.getElementById('good-games');
   const favoritesList = document.getElementById('favorites');
   const searchInput = document.getElementById('search');
-  const versionInfo = document.getElementById('version-info');
+  const debugPanel = document.getElementById('debug-panel');
 
   let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
   let allGames = [];
   let goodGames = [];
 
+  function logDebug(message) {
+    debugPanel.textContent += `\n${message}`;
+  }
+
   function saveFavorites() {
     localStorage.setItem('favorites', JSON.stringify(favorites));
     renderFavorites();
+    logDebug("Favorites saved: " + JSON.stringify(favorites));
   }
 
   function toggleFavorite(name) {
     if (favorites.includes(name)) {
       favorites = favorites.filter(f => f !== name);
+      logDebug(`Removed favorite: ${name}`);
     } else {
       favorites.push(name);
+      logDebug(`Added favorite: ${name}`);
     }
     saveFavorites();
     renderLists();
@@ -303,8 +310,9 @@
       toggleFavorite(name);
     });
 
-    li.appendChild(link);
+    // Star first (on the left)
     li.appendChild(favBtn);
+    li.appendChild(link);
     return li;
   }
 
@@ -315,42 +323,65 @@
     }
     favoritesList.innerHTML = '';
     favorites.forEach(name => {
+      // Prefer 'games' as basePath if in allGames, else 'good'
       const li = createListItem(name, allGames.includes(name) ? 'games' : 'good');
       favoritesList.appendChild(li);
     });
+    logDebug("Rendered favorites list.");
   }
 
   function renderLists() {
     const search = searchInput.value.toLowerCase();
 
+    // All Games
+    fileList.innerHTML = '';
     const filteredGames = allGames.filter(name => name.toLowerCase().includes(search));
-    fileList.innerHTML = filteredGames.length
-      ? filteredGames.map(name => createListItem(name, 'games').outerHTML).join('')
-      : '<li style="color:#7f8c8d;font-style:italic;">No games found.</li>';
+    if (filteredGames.length) {
+      filteredGames.forEach(name => {
+        fileList.appendChild(createListItem(name, 'games'));
+      });
+    } else {
+      fileList.innerHTML = '<li style="color:#7f8c8d;font-style:italic;">No games found.</li>';
+    }
 
+    // Good Games
+    goodGamesList.innerHTML = '';
     const filteredGood = goodGames.filter(name => name.toLowerCase().includes(search));
-    goodGamesList.innerHTML = filteredGood.length
-      ? filteredGood.map(name => createListItem(name, 'good').outerHTML).join('')
-      : '<li style="color:#7f8c8d;font-style:italic;">No good games found.</li>';
+    if (filteredGood.length) {
+      filteredGood.forEach(name => {
+        goodGamesList.appendChild(createListItem(name, 'good'));
+      });
+    } else {
+      goodGamesList.innerHTML = '<li style="color:#7f8c8d;font-style:italic;">No good games found.</li>';
+    }
+
+    logDebug(`Rendered lists. Games: ${filteredGames.length}, GoodGames: ${filteredGood.length}`);
   }
 
   fetch(dataUrl)
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) {
+        throw new Error('Failed to fetch games.json. Status: ' + res.status);
+      }
+      logDebug('Fetched games.json successfully.');
+      return res.json();
+    })
     .then(data => {
-      allGames = data.games;
-      goodGames = data.goodGames;
-      versionInfo.textContent = `Version: ${data.version}`;
+      allGames = data.games || [];
+      goodGames = data.good || [];
       renderLists();
       renderFavorites();
+      logDebug('Loaded and rendered data from games.json');
     })
     .catch(err => {
       fileList.innerHTML = '<li class="error">Error loading data.</li>';
       goodGamesList.innerHTML = '<li class="error">Error loading data.</li>';
+      debugPanel.textContent += `\nError: ${err.message}`;
       console.error(err);
     });
 
   searchInput.addEventListener('input', renderLists);
-</script>
+  </script>
 
 </body>
 </html>
