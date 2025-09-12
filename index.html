@@ -274,9 +274,9 @@
     console.log = (...args) => { origLog(...args); logToPanel("LOG:", ...args); };
     console.error = (...args) => { origError(...args); logToPanel("ERROR:", ...args); };
 
-    const gamesApiUrl = 'https://api.github.com/repos/Olibot1107/games/contents/games';
-    const goodApiUrl = 'https://api.github.com/repos/Olibot1107/games/contents/good';
-    const commitsApiUrl = 'https://api.github.com/repos/Olibot1107/games/commits';
+    const gamesApiUrl = 'https://ghproxy/repos/Olibot1107/games/contents/games';
+    const goodApiUrl = 'https://ghproxy/repos/Olibot1107/games/contents/good';
+    const commitsApiUrl = 'https://ghproxy/repos/Olibot1107/games/commits';
 
     const fileList = document.getElementById('file-list');
     const goodGamesList = document.getElementById('good-games');
