@@ -260,175 +260,96 @@
   <div id="debug-panel">[Debug logs will appear here]</div>
 
   <script>
-    const debugPanel = document.getElementById("debug-panel");
+  const dataUrl = "/games.json"; // path to your single JSON file
 
-    function logToPanel(...args) {
-      const msg = args.map(a => (typeof a === "object" ? JSON.stringify(a, null, 2) : a)).join(" ");
-      debugPanel.textContent += "\n" + msg;
-      debugPanel.scrollTop = debugPanel.scrollHeight;
+  const fileList = document.getElementById('file-list');
+  const goodGamesList = document.getElementById('good-games');
+  const favoritesList = document.getElementById('favorites');
+  const searchInput = document.getElementById('search');
+  const versionInfo = document.getElementById('version-info');
+
+  let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
+  let allGames = [];
+  let goodGames = [];
+
+  function saveFavorites() {
+    localStorage.setItem('favorites', JSON.stringify(favorites));
+    renderFavorites();
+  }
+
+  function toggleFavorite(name) {
+    if (favorites.includes(name)) {
+      favorites = favorites.filter(f => f !== name);
+    } else {
+      favorites.push(name);
     }
+    saveFavorites();
+    renderLists();
+  }
 
-    // Patch console.log/error to also print to panel
-    const origLog = console.log;
-    const origError = console.error;
-    console.log = (...args) => { origLog(...args); logToPanel("LOG:", ...args); };
-    console.error = (...args) => { origError(...args); logToPanel("ERROR:", ...args); };
+  function createListItem(name, basePath) {
+    const li = document.createElement('li');
+    const link = document.createElement('a');
+    link.textContent = name;
+    link.href = `/${basePath}/${name}/index.html`;
+    link.className = 'folder';
 
-    const gamesApiUrl = 'https://ghproxy/repos/Olibot1107/games/contents/games';
-    const goodApiUrl = 'https://ghproxy/repos/Olibot1107/games/contents/good';
-    const commitsApiUrl = 'https://ghproxy/repos/Olibot1107/games/commits';
+    const favBtn = document.createElement('button');
+    favBtn.innerHTML = favorites.includes(name) ? '★' : '☆';
+    favBtn.className = 'favorite' + (favorites.includes(name) ? ' fav' : '');
+    favBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleFavorite(name);
+    });
 
-    const fileList = document.getElementById('file-list');
-    const goodGamesList = document.getElementById('good-games');
-    const favoritesList = document.getElementById('favorites');
-    const searchInput = document.getElementById('search');
-    const versionInfo = document.getElementById('version-info');
+    li.appendChild(link);
+    li.appendChild(favBtn);
+    return li;
+  }
 
-    let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
-    let lastGamesData = [];
-    let lastGoodData = [];
-
-    // Function to fetch commit count
-    async function fetchCommitCount() {
-      try {
-        let page = 1;
-        let totalCommits = 0;
-        let commits;
-
-        do {
-          const response = await fetch(`${commitsApiUrl}?per_page=100&page=${page}`);
-          if (!response.ok) throw new Error(`GitHub API error: ${response.status}`);
-          commits = await response.json();
-          totalCommits += commits.length;
-          page++;
-        } while (commits.length > 0);
-
-        versionInfo.textContent = `Version: ${totalCommits}`;
-        console.log("Fetched commit count:", totalCommits);
-      } catch (error) {
-        console.error('Error fetching commit count:', error);
-        versionInfo.textContent = 'Version: Unknown';
-      }
+  function renderFavorites() {
+    if (favorites.length === 0) {
+      favoritesList.innerHTML = '<li style="color:#7f8c8d;font-style:italic;">No favorites yet.</li>';
+      return;
     }
+    favoritesList.innerHTML = '';
+    favorites.forEach(name => {
+      const li = createListItem(name, allGames.includes(name) ? 'games' : 'good');
+      favoritesList.appendChild(li);
+    });
+  }
 
-    function saveFavorites() {
-      localStorage.setItem('favorites', JSON.stringify(favorites));
-      renderFavorites();
-    }
+  function renderLists() {
+    const search = searchInput.value.toLowerCase();
 
-    function toggleFavorite(folderName) {
-      if (favorites.includes(folderName)) {
-        favorites = favorites.filter(f => f !== folderName);
-      } else {
-        favorites.push(folderName);
-      }
-      saveFavorites();
-      renderLists();
-    }
+    const filteredGames = allGames.filter(name => name.toLowerCase().includes(search));
+    fileList.innerHTML = filteredGames.length
+      ? filteredGames.map(name => createListItem(name, 'games').outerHTML).join('')
+      : '<li style="color:#7f8c8d;font-style:italic;">No games found.</li>';
 
-    function renderFavorites() {
-      if (favorites.length === 0) {
-        favoritesList.innerHTML = '<li style="color: #7f8c8d; font-style: italic;">No favorites yet. Click the star next to a game to add it here.</li>';
-        return;
-      }
+    const filteredGood = goodGames.filter(name => name.toLowerCase().includes(search));
+    goodGamesList.innerHTML = filteredGood.length
+      ? filteredGood.map(name => createListItem(name, 'good').outerHTML).join('')
+      : '<li style="color:#7f8c8d;font-style:italic;">No good games found.</li>';
+  }
 
-      favoritesList.innerHTML = '';
-      favorites.forEach(folderName => {
-        const li = document.createElement('li');
-        const link = document.createElement('a');
-        if (lastGamesData.find(item => item.name === folderName)) {
-          link.href = `/games/${folderName}/index.html`;
-        } else {
-          link.href = `/good/${folderName}/index.html`;
-        }
-        link.textContent = folderName;
-        link.className = 'folder';
-        li.appendChild(link);
-        favoritesList.appendChild(li);
-      });
-    }
-
-    function createListItem(item, basePath) {
-      const li = document.createElement('li');
-      const link = document.createElement('a');
-      link.textContent = item.name;
-      link.href = `/${basePath}/${item.name}/index.html`;
-      link.className = 'folder';
-
-      const favBtn = document.createElement('button');
-      favBtn.innerHTML = favorites.includes(item.name) ? '★' : '☆';
-      favBtn.className = 'favorite' + (favorites.includes(item.name) ? ' fav' : '');
-      favBtn.title = favorites.includes(item.name) ? 'Remove from favorites' : 'Add to favorites';
-      favBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        toggleFavorite(item.name);
-      });
-
-      li.appendChild(link);
-      li.appendChild(favBtn);
-      return li;
-    }
-
-    function renderLists() {
-      const search = searchInput.value.toLowerCase();
-
-      const filteredGames = lastGamesData
-        .filter(item => item.type === 'dir')
-        .filter(item => item.name.toLowerCase().includes(search));
-
-      if (filteredGames.length === 0) {
-        fileList.innerHTML = search ?
-          '<li style="color: #7f8c8d; font-style: italic;">No games match your search.</li>' :
-          '<li style="color: #7f8c8d; font-style: italic;">No games found.</li>';
-      } else {
-        fileList.innerHTML = '';
-        filteredGames.forEach(item => {
-          fileList.appendChild(createListItem(item, 'games'));
-        });
-      }
-
-      const filteredGoodGames = lastGoodData
-        .filter(item => item.type === 'dir')
-        .filter(item => item.name.toLowerCase().includes(search));
-
-      if (filteredGoodGames.length === 0) {
-        goodGamesList.innerHTML = search ?
-          '<li style="color: #7f8c8d; font-style: italic;">No good games match your search.</li>' :
-          '<li style="color: #7f8c8d; font-style: italic;">No good games found.</li>';
-      } else {
-        goodGamesList.innerHTML = '';
-        filteredGoodGames.forEach(item => {
-          goodGamesList.appendChild(createListItem(item, 'good'));
-        });
-      }
-    }
-
-    Promise.all([
-      fetch(gamesApiUrl).then(r => { console.log("Games API status:", r.status); return r.json(); }),
-      fetch(goodApiUrl).then(r => { console.log("Good API status:", r.status); return r.json(); })
-    ])
-    .then(([gamesData, goodData]) => {
-      console.log("✅ Games API response:", gamesData);
-      console.log("✅ Good API response:", goodData);
-
-      lastGamesData = gamesData;
-      lastGoodData = goodData;
+  fetch(dataUrl)
+    .then(res => res.json())
+    .then(data => {
+      allGames = data.games;
+      goodGames = data.goodGames;
+      versionInfo.textContent = `Version: ${data.version}`;
       renderLists();
       renderFavorites();
     })
     .catch(err => {
-      fileList.innerHTML = '<li class="error">Error loading games data. Please check your connection and try again.</li>';
-      goodGamesList.innerHTML = '<li class="error">Error loading good games data. Please check your connection and try again.</li>';
-      console.error("❌ Error fetching game data:", err);
+      fileList.innerHTML = '<li class="error">Error loading data.</li>';
+      goodGamesList.innerHTML = '<li class="error">Error loading data.</li>';
+      console.error(err);
     });
 
-    searchInput.addEventListener('input', renderLists);
+  searchInput.addEventListener('input', renderLists);
+</script>
 
-    renderFavorites();
-    fetchCommitCount();
-
-    console.log("🔍 Script loaded, debugging enabled...");
-  </script>
 </body>
 </html>
