@@ -179,6 +179,20 @@
       margin: 20px 0;
     }
 
+    /* Debug panel */
+    #debug-panel {
+      background: #111;
+      color: #0f0;
+      font-family: monospace;
+      font-size: 14px;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 30px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
     @media (max-width: 768px) {
       body {
         padding: 10px;
@@ -242,7 +256,24 @@
     </ul>
   </div>
 
+  <!-- Debug panel -->
+  <div id="debug-panel">[Debug logs will appear here]</div>
+
   <script>
+    const debugPanel = document.getElementById("debug-panel");
+
+    function logToPanel(...args) {
+      const msg = args.map(a => (typeof a === "object" ? JSON.stringify(a, null, 2) : a)).join(" ");
+      debugPanel.textContent += "\n" + msg;
+      debugPanel.scrollTop = debugPanel.scrollHeight;
+    }
+
+    // Patch console.log/error to also print to panel
+    const origLog = console.log;
+    const origError = console.error;
+    console.log = (...args) => { origLog(...args); logToPanel("LOG:", ...args); };
+    console.error = (...args) => { origError(...args); logToPanel("ERROR:", ...args); };
+
     const gamesApiUrl = 'https://api.github.com/repos/Olibot1107/games/contents/games';
     const goodApiUrl = 'https://api.github.com/repos/Olibot1107/games/contents/good';
     const commitsApiUrl = 'https://api.github.com/repos/Olibot1107/games/commits';
@@ -259,26 +290,26 @@
 
     // Function to fetch commit count
     async function fetchCommitCount() {
-  try {
-    let page = 1;
-    let totalCommits = 0;
-    let commits;
+      try {
+        let page = 1;
+        let totalCommits = 0;
+        let commits;
 
-    do {
-      const response = await fetch(`${commitsApiUrl}?per_page=100&page=${page}`);
-      if (!response.ok) throw new Error(`GitHub API error: ${response.status}`);
-      commits = await response.json();
-      totalCommits += commits.length;
-      page++;
-    } while (commits.length > 0);
+        do {
+          const response = await fetch(`${commitsApiUrl}?per_page=100&page=${page}`);
+          if (!response.ok) throw new Error(`GitHub API error: ${response.status}`);
+          commits = await response.json();
+          totalCommits += commits.length;
+          page++;
+        } while (commits.length > 0);
 
-    versionInfo.textContent = `Version: ${totalCommits}`;
-  } catch (error) {
-    console.error('Error fetching commit count:', error);
-    versionInfo.textContent = 'Version: Unknown';
-  }
-}
-
+        versionInfo.textContent = `Version: ${totalCommits}`;
+        console.log("Fetched commit count:", totalCommits);
+      } catch (error) {
+        console.error('Error fetching commit count:', error);
+        versionInfo.textContent = 'Version: Unknown';
+      }
+    }
 
     function saveFavorites() {
       localStorage.setItem('favorites', JSON.stringify(favorites));
@@ -305,7 +336,6 @@
       favorites.forEach(folderName => {
         const li = document.createElement('li');
         const link = document.createElement('a');
-        // default link: try in /games first, fallback to /good
         if (lastGamesData.find(item => item.name === folderName)) {
           link.href = `/games/${folderName}/index.html`;
         } else {
@@ -343,7 +373,6 @@
     function renderLists() {
       const search = searchInput.value.toLowerCase();
 
-      // Render all games
       const filteredGames = lastGamesData
         .filter(item => item.type === 'dir')
         .filter(item => item.name.toLowerCase().includes(search));
@@ -359,7 +388,6 @@
         });
       }
 
-      // Render good games
       const filteredGoodGames = lastGoodData
         .filter(item => item.type === 'dir')
         .filter(item => item.name.toLowerCase().includes(search));
@@ -376,12 +404,14 @@
       }
     }
 
-    // Fetch both games + good games
     Promise.all([
-      fetch(gamesApiUrl).then(r => r.json()),
-      fetch(goodApiUrl).then(r => r.json())
+      fetch(gamesApiUrl).then(r => { console.log("Games API status:", r.status); return r.json(); }),
+      fetch(goodApiUrl).then(r => { console.log("Good API status:", r.status); return r.json(); })
     ])
     .then(([gamesData, goodData]) => {
+      console.log("✅ Games API response:", gamesData);
+      console.log("✅ Good API response:", goodData);
+
       lastGamesData = gamesData;
       lastGoodData = goodData;
       renderLists();
@@ -390,16 +420,15 @@
     .catch(err => {
       fileList.innerHTML = '<li class="error">Error loading games data. Please check your connection and try again.</li>';
       goodGamesList.innerHTML = '<li class="error">Error loading good games data. Please check your connection and try again.</li>';
-      console.error(err);
+      console.error("❌ Error fetching game data:", err);
     });
 
     searchInput.addEventListener('input', renderLists);
 
-    // Initial render of favorites
     renderFavorites();
-
-    // Fetch commit count for version info
     fetchCommitCount();
+
+    console.log("🔍 Script loaded, debugging enabled...");
   </script>
 </body>
 </html>
