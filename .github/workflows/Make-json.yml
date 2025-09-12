@@ -1,0 +1,53 @@
+name: Generate Games Index
+
+on:
+  push:
+    paths:
+      - "games/**"
+      - "good/**"
+  workflow_dispatch: # allow manual trigger too
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Generate games.json
+        run: |
+          node <<'EOF'
+          const fs = require("fs");
+          const path = require("path");
+
+          function getDirs(base) {
+            return fs.readdirSync(base, { withFileTypes: true })
+              .filter(d => d.isDirectory())
+              .map(d => d.name);
+          }
+
+          const games = getDirs("games");
+          const good = getDirs("good");
+
+          const output = {
+            generated: new Date().toISOString(),
+            games,
+            good
+          };
+
+          fs.writeFileSync("games.json", JSON.stringify(output, null, 2));
+          console.log("✅ games.json generated:", output);
+          EOF
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games.json
+          git commit -m "Auto-update games.json"
+          git push
