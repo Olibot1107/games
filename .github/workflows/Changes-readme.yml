@@ -1,0 +1,63 @@
+name: Update README with Commit File Stats
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # need history for diff
+
+      - name: Get commit diff
+        id: diff
+        run: |
+          # Get last commit hash
+          LAST_COMMIT=$(git rev-parse HEAD)
+          PREV_COMMIT=$(git rev-parse HEAD^)
+
+          # Get file changes
+          ADDED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^A" | wc -l || true)
+          MODIFIED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^M" | wc -l || true)
+          DELETED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^D" | wc -l || true)
+
+          echo "added=$ADDED" >> $GITHUB_OUTPUT
+          echo "modified=$MODIFIED" >> $GITHUB_OUTPUT
+          echo "deleted=$DELETED" >> $GITHUB_OUTPUT
+          echo "commit_hash=$LAST_COMMIT" >> $GITHUB_OUTPUT
+          echo "commit_msg=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
+
+      - name: Update README.md
+        run: |
+          LOG_ENTRY="- **Commit** \`${{ steps.diff.outputs.commit_hash }}\`: ${{ steps.diff.outputs.commit_msg }}  
+            🔹 Added: ${{ steps.diff.outputs.added }} | ✏️ Modified: ${{ steps.diff.outputs.modified }} | ❌ Deleted: ${{ steps.diff.outputs.deleted }}"
+
+          # Ensure README exists
+          touch README.md
+
+          # Add section header if missing
+          if ! grep -q "## Commit File History" README.md; then
+            echo -e "\n## Commit File History\n" >> README.md
+          fi
+
+          # Insert new log entry at top of history
+          awk -v entry="$LOG_ENTRY" '
+            BEGIN {print "## Commit File History\n", entry}
+            /^## Commit File History/ {found=1; next}
+            found {print; count++}
+            count < 1000
+          ' README.md > README.tmp && mv README.tmp README.md
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "chore: update README with commit file stats" || echo "No changes to commit"
+          git push
