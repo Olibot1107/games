@@ -3,7 +3,10 @@ name: Update README with Commit File Stats
 on:
   push:
     branches:
-      - main
+      - main  # change if your default branch is different
+
+permissions:
+  contents: write
 
 jobs:
   update-readme:
@@ -13,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # full history for diffs
+          fetch-depth: 0
 
       - name: Get commit diff
         id: diff
@@ -37,7 +40,6 @@ jobs:
 
           touch README.md
 
-          # If table doesn't exist, create header
           if ! grep -q "## Commit File History" README.md; then
             cat <<'EOF' >> README.md
 
@@ -48,20 +50,13 @@ jobs:
 EOF
           fi
 
-          # Insert new row under header
           awk -v row="$ROW" '
             BEGIN {header=0}
             /^## Commit File History/ {print; getline; print; getline; print; header=1; print row; next}
             header {print; count++}
             !header {print}
-            END {
-              if (header && count >= 1000) {
-                # keep only last 1000 rows
-              }
-            }
           ' README.md > README.tmp && mv README.tmp README.md
 
-          # Trim to 1000 rows max
           awk '
             BEGIN {in_table=0; row_count=0}
             /^## Commit File History/ {print; in_table=1; next}
