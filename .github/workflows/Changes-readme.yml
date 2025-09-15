@@ -13,16 +13,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # need history for diff
+          fetch-depth: 0  # full history for diffs
 
       - name: Get commit diff
         id: diff
         run: |
-          # Get last commit hash
           LAST_COMMIT=$(git rev-parse HEAD)
           PREV_COMMIT=$(git rev-parse HEAD^)
 
-          # Get file changes
           ADDED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^A" | wc -l || true)
           MODIFIED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^M" | wc -l || true)
           DELETED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^D" | wc -l || true)
@@ -35,23 +33,44 @@ jobs:
 
       - name: Update README.md
         run: |
-          LOG_ENTRY="- **Commit** \`${{ steps.diff.outputs.commit_hash }}\`: ${{ steps.diff.outputs.commit_msg }}  
-            🔹 Added: ${{ steps.diff.outputs.added }} | ✏️ Modified: ${{ steps.diff.outputs.modified }} | ❌ Deleted: ${{ steps.diff.outputs.deleted }}"
+          ROW="| \`${{ steps.diff.outputs.commit_hash }}\` | ${{ steps.diff.outputs.commit_msg }} | ${{ steps.diff.outputs.added }} | ${{ steps.diff.outputs.modified }} | ${{ steps.diff.outputs.deleted }} |"
 
-          # Ensure README exists
           touch README.md
 
-          # Add section header if missing
+          # If table doesn't exist, create header
           if ! grep -q "## Commit File History" README.md; then
-            echo -e "\n## Commit File History\n" >> README.md
+            cat <<'EOF' >> README.md
+
+## Commit File History
+
+| Commit | Message | Added | Modified | Deleted |
+|--------|---------|-------|----------|---------|
+EOF
           fi
 
-          # Insert new log entry at top of history
-          awk -v entry="$LOG_ENTRY" '
-            BEGIN {print "## Commit File History\n", entry}
-            /^## Commit File History/ {found=1; next}
-            found {print; count++}
-            count < 1000
+          # Insert new row under header
+          awk -v row="$ROW" '
+            BEGIN {header=0}
+            /^## Commit File History/ {print; getline; print; getline; print; header=1; print row; next}
+            header {print; count++}
+            !header {print}
+            END {
+              if (header && count >= 1000) {
+                # keep only last 1000 rows
+              }
+            }
+          ' README.md > README.tmp && mv README.tmp README.md
+
+          # Trim to 1000 rows max
+          awk '
+            BEGIN {in_table=0; row_count=0}
+            /^## Commit File History/ {print; in_table=1; next}
+            in_table && /^| Commit / {print; getline; print; next}
+            in_table && /^\|/ {
+              if (row_count < 1000) {print; row_count++}
+              next
+            }
+            {print}
           ' README.md > README.tmp && mv README.tmp README.md
 
       - name: Commit changes
