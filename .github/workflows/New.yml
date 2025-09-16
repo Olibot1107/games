@@ -16,13 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Set up SSH (for deployment)
-      - name: Set up SSH key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
-
-      # 3️⃣ Generate changelog
+      # 2️⃣ Generate changelog
       - name: Generate changelog
         uses: m-radmacher/That-Changed@v1.3.0
         with:
@@ -34,11 +28,12 @@ jobs:
           upload: true
           repo: ${{ github.repository }}
 
-      # 4️⃣ Deploy to staging
-      - name: Deploy to Staging Server
+      # 3️⃣ Deploy to staging (example: build & push Docker image)
+      - name: Deploy to staging
         run: |
-          ssh -o StrictHostKeyChecking=no user@staging.example.com "
-            cd /path/to/app &&
-            git pull origin main &&
-            ./deploy.sh
-          "
+          echo "Running deployment steps..."
+          # Example: build Docker image
+          docker build -t my-app:staging .
+          # Push to a registry (use a secret for authentication)
+          # docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASS }}
+          # docker push my-app:staging
