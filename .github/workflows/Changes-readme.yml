@@ -15,13 +15,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get git history
+      - name: Generate changelog table
         run: |
           echo "# 📜 Project Changelog" > README.md
           echo "" >> README.md
-          echo "| Commit | Message | Author | Date |" >> README.md
-          echo "|--------|---------|--------|------|" >> README.md
-          git log --pretty=format:"| [%h](https://github.com/${{ github.repository }}/commit/%H) | %s | %an | %ad |" --date=short >> README.md
+          echo "| Commit | Message | Author | Date | Files Changed |" >> README.md
+          echo "|--------|---------|--------|------|---------------|" >> README.md
+
+          # Loop through commits and collect info
+          git log --pretty=format:"%H|%h|%s|%an|%ad" --date=short | while IFS="|" read full short msg author date
+          do
+            files=$(git show --pretty="" --name-only $full | wc -l)
+            echo "| [$short](https://github.com/${{ github.repository }}/commit/$full) | $msg | $author | $date | $files |" >> README.md
+          done
 
       - name: Commit & Push changes
         run: |
