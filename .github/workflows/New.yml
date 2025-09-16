@@ -18,14 +18,13 @@ jobs:
 
       # 2️⃣ Set up SSH (for deployment)
       - name: Set up SSH key
-        uses: webfactory/ssh-agent@v0.8.1
+        uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
 
       # 3️⃣ Generate changelog
       - name: Generate changelog
         uses: m-radmacher/That-Changed@v1.3.0
-        # Fallback: generate from last 10 commits if not enough tags
         with:
           from: HEAD~10
           to: HEAD
