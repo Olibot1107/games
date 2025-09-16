@@ -15,39 +15,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Get list of changed files in this commit
-      - name: Get changed files
-        id: changed
+      # 2️⃣ Get info about the latest commit
+      - name: Get commit info
+        id: commit
         run: |
-          # Get commit hash
           COMMIT_HASH=$(git rev-parse HEAD)
-          # Get author and message
           AUTHOR=$(git log -1 --pretty=format:'%an')
           MESSAGE=$(git log -1 --pretty=format:'%s')
-          # Get list of changed files
           FILES=$(git diff-tree --no-commit-id --name-only -r $COMMIT_HASH | tr '\n' ', ')
-          # Remove trailing comma and space
-          FILES=${FILES%, }
-          # Save for next step
-          echo "commit_hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
+          FILES=${FILES%, }  # Remove trailing comma
+          echo "hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
           echo "author=$AUTHOR" >> $GITHUB_OUTPUT
           echo "message=$MESSAGE" >> $GITHUB_OUTPUT
           echo "files=$FILES" >> $GITHUB_OUTPUT
 
-      # 3️⃣ Append info to README.md (or CHANGELOG.md)
-      - name: Append to README.md
+      # 3️⃣ Add table header if it doesn't exist
+      - name: Ensure table header
         run: |
-          echo "" >> README.md
-          echo "## Commit ${{ steps.changed.outputs.commit_hash }}" >> README.md
-          echo "- Author: ${{ steps.changed.outputs.author }}" >> README.md
-          echo "- Message: ${{ steps.changed.outputs.message }}" >> README.md
-          echo "- Files changed: ${{ steps.changed.outputs.files }}" >> README.md
+          if ! grep -q "| Commit | Author | Message | Files Changed |" README.md; then
+            echo "| Commit | Author | Message | Files Changed |" >> README.md
+            echo "|--------|--------|---------|---------------|" >> README.md
+          fi
 
-      # 4️⃣ Commit and push the updated README
+      # 4️⃣ Append the commit info as a table row
+      - name: Append commit to table
+        run: |
+          echo "| [${{ steps.commit.outputs.hash }}](https://github.com/${{ github.repository }}/commit/${{ steps.commit.outputs.hash }}) | ${{ steps.commit.outputs.author }} | ${{ steps.commit.outputs.message }} | ${{ steps.commit.outputs.files }} |" >> README.md
+
+      # 5️⃣ Commit and push the updated README
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
-          git commit -m "Update changelog for commit ${{ steps.changed.outputs.commit_hash }}" || echo "No changes to commit"
+          git commit -m "Update changelog for commit ${{ steps.commit.outputs.hash }}" || echo "No changes to commit"
           git push
