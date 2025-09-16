@@ -1,38 +1,73 @@
-name: Generate README with Changelog
+name: Update README with Commit File Stats
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    types: [closed]
+    paths:
+      - "**"        # watch all files (you can narrow this if needed)
+  workflow_dispatch: # allow manual trigger too
+
+permissions:
+  contents: write
 
 jobs:
-  update-readme:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-      - name: Generate changelog table
+      - name: Generate commit stats row
+        id: stats
         run: |
-          echo "# 📜 Project Changelog" > README.md
-          echo "" >> README.md
-          echo "| Commit | Message | Author | Date | Files Changed |" >> README.md
-          echo "|--------|---------|--------|------|---------------|" >> README.md
+          LAST_COMMIT=$(git rev-parse HEAD)
+          PREV_COMMIT=$(git rev-parse HEAD^)
 
-          # Loop through commits and collect info
-          git log --pretty=format:"%H|%h|%s|%an|%ad" --date=short | while IFS="|" read full short msg author date
-          do
-            files=$(git show --pretty="" --name-only $full | wc -l)
-            echo "| [$short](https://github.com/${{ github.repository }}/commit/$full) | $msg | $author | $date | $files |" >> README.md
-          done
+          ADDED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^A" | wc -l || true)
+          MODIFIED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^M" | wc -l || true)
+          DELETED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^D" | wc -l || true)
 
-      - name: Commit & Push changes
+          echo "ROW=| \`$LAST_COMMIT\` | $(git log -1 --pretty=%s) | $ADDED | $MODIFIED | $DELETED |" >> $GITHUB_ENV
+
+      - name: Update README.md
+        run: |
+          touch README.md
+
+          if ! grep -q "## Commit File History" README.md; then
+            cat <<'EOF' >> README.md
+
+## Commit File History
+
+| Commit | Message | Added | Modified | Deleted |
+|--------|---------|-------|----------|---------|
+EOF
+          fi
+
+          awk -v row="$ROW" '
+            BEGIN {header=0}
+            /^## Commit File History/ {print; getline; print; getline; print; header=1; print row; next}
+            header {print; count++}
+            !header {print}
+          ' README.md > README.tmp && mv README.tmp README.md
+
+          awk '
+            BEGIN {in_table=0; row_count=0}
+            /^## Commit File History/ {print; in_table=1; next}
+            in_table && /^| Commit / {print; getline; print; next}
+            in_table && /^\|/ {
+              if (row_count < 1000) {print; row_count++}
+              next
+            }
+            {print}
+          ' README.md > README.tmp && mv README.tmp README.md
+
+      - name: Commit and push changes
+        if: github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add README.md
-          git commit -m "chore: update README with changelog" || echo "No changes to commit"
+          git commit -m "chore: update README with commit file stats" || echo "No changes to commit"
           git push
