@@ -1,0 +1,19 @@
+  name: that-changed
+  jobs:
+    my_job:
+      name: deploy to staging
+      runs-on: m-radmacher/That-Changed@v1.3.0
+  on:
+    push:
+      branches:
+      - main
+      - release/*
+  env:
+    # GitHub personal access token. Defaults to github.token
+    token: ${{ github.token }}
+    # Language of the changelog (en or de). Defaults to en
+    language: en
+    # Whether to upload the changelog as a build artifact. Defaults to true
+    upload: true
+    # Repository to generate the changelog for. Defaults to the current repository (<username>/<repo>)
+    repo: ${{ github.repository }}
