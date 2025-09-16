@@ -1,73 +1,114 @@
-name: Update README with Commit File Stats
+name: Generate README changelog
 
+# Triggers:
+# - push to main (ignore README.md pushes so our own updates don't re-trigger)
+# - closed pull requests (only runs if merged)
+# - manual run
 on:
   push:
-    paths:
-      - "**"        # watch all files (you can narrow this if needed)
-  workflow_dispatch: # allow manual trigger too
+    branches: [ "main" ]
+    paths-ignore:
+      - "README.md"
+  pull_request:
+    types: [ closed ]
+  workflow_dispatch:
 
+# allow this workflow to push the updated README
 permissions:
   contents: write
 
+concurrency:
+  group: repo-readme-changelog
+  cancel-in-progress: true
+
 jobs:
-  build:
+  update-readme:
+    # Don't run if the actor is the GitHub Actions bot (prevents self-trigger loops).
+    # Also, for pull_request events only run when the PR was merged.
+    if: >
+      github.actor != 'github-actions[bot]' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.merged == true)
+
     runs-on: ubuntu-latest
+    env:
+      REPO: ${{ github.repository }}
+      MAX_COMMITS: 100
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout repository (full history)
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: true
 
-      - name: Generate commit stats row
-        id: stats
-        run: |
-          LAST_COMMIT=$(git rev-parse HEAD)
-          PREV_COMMIT=$(git rev-parse HEAD^)
-
-          ADDED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^A" | wc -l || true)
-          MODIFIED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^M" | wc -l || true)
-          DELETED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^D" | wc -l || true)
-
-          echo "ROW=| \`$LAST_COMMIT\` | $(git log -1 --pretty=%s) | $ADDED | $MODIFIED | $DELETED |" >> $GITHUB_ENV
-
-      - name: Update README.md
-        run: |
-          touch README.md
-
-          if ! grep -q "## Commit File History" README.md; then
-            cat <<'EOF' >> README.md
-
-## Commit File History
-
-| Commit | Message | Added | Modified | Deleted |
-|--------|---------|-------|----------|---------|
-EOF
-          fi
-
-          awk -v row="$ROW" '
-            BEGIN {header=0}
-            /^## Commit File History/ {print; getline; print; getline; print; header=1; print row; next}
-            header {print; count++}
-            !header {print}
-          ' README.md > README.tmp && mv README.tmp README.md
-
-          awk '
-            BEGIN {in_table=0; row_count=0}
-            /^## Commit File History/ {print; in_table=1; next}
-            in_table && /^| Commit / {print; getline; print; next}
-            in_table && /^\|/ {
-              if (row_count < 1000) {print; row_count++}
-              next
-            }
-            {print}
-          ' README.md > README.tmp && mv README.tmp README.md
-
-      - name: Commit and push changes
-        if: github.ref == 'refs/heads/main'
+      - name: Configure git user
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add README.md
-          git commit -m "chore: update README with commit file stats" || echo "No changes to commit"
+
+      - name: Build changelog table and update README
+        run: |
+          set -eo pipefail
+
+          START_MARKER="<!-- changelog-start -->"
+          END_MARKER="<!-- changelog-end -->"
+          TMPFILE="changelog.md"
+
+          # Header for the changelog block
+          cat > "${TMPFILE}" <<'MARK'
+<!-- changelog-start -->
+## 📜 Changelog
+
+| Commit | Message | Author | Date | Files Changed |
+|--------|---------|--------|------|---------------|
+MARK
+
+          # Build a markdown table of the last $MAX_COMMITS commits
+          git log -n "${MAX_COMMITS}" --pretty=format:'%H%x01%h%x01%s%x01%an%x01%ad' --date=short \
+            | while IFS=$'\x01' read -r full short subject author date; do
+                # count files changed in that commit
+                files_changed=$(git show --pretty="" --name-only "$full" | sed '/^$/d' | wc -l)
+                # sanitize message to avoid breaking the table (replace pipes)
+                subject_safe=$(printf '%s' "$subject" | sed 's/|/-/g' | tr -d '\r')
+                printf "| [%s](https://github.com/%s/commit/%s) | %s | %s | %s | %s |\n" \
+                  "$short" "${REPO}" "$full" "$subject_safe" "$author" "$date" "$files_changed" >> "${TMPFILE}"
+              done
+
+          # footer marker
+          echo "" >> "${TMPFILE}"
+          echo "${END_MARKER}" >> "${TMPFILE}"
+
+          # Insert or append the changelog block into README.md between markers.
+          if [ -f README.md ]; then
+            python - <<'PY'
+from pathlib import Path
+p = Path('README.md')
+block = Path('changelog.md').read_text()
+text = p.read_text()
+start = "<!-- changelog-start -->"
+end = "<!-- changelog-end -->"
+if start in text and end in text:
+    head, rest = text.split(start, 1)
+    _, tail = rest.split(end, 1)
+    new = head + start + "\n" + block + "\n" + end + tail
+else:
+    new = text.rstrip() + "\n\n" + block
+p.write_text(new)
+PY
+          else
+            # no README exists — create one from the changelog
+            cp changelog.md README.md
+          fi
+
+          # Commit and push only if there are changes
+          git add README.md || true
+          if git diff --cached --quiet; then
+            echo "No README changes to commit."
+            exit 0
+          fi
+
+          git commit -m "chore: update README changelog [skip ci]"
           git push
+
+      - name: Finished
+        run: echo "README changelog updated (if changes found)."
