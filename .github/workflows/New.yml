@@ -1,4 +1,4 @@
-name: that-changed
+name: Deploy to Staging
 
 on:
   push:
@@ -7,21 +7,39 @@ on:
       - release/*
 
 jobs:
-  my_job:
-    name: deploy to staging
+  deploy:
+    name: Generate Changelog & Deploy to Staging
     runs-on: ubuntu-latest
+
     steps:
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2️⃣ Set up SSH (for deployment)
+      - name: Set up SSH key
+        uses: webfactory/ssh-agent@v0.8.1
+        with:
+          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+
+      # 3️⃣ Generate changelog
       - name: Generate changelog
         uses: m-radmacher/That-Changed@v1.3.0
+        # Fallback: generate from last 10 commits if not enough tags
+        with:
+          from: HEAD~10
+          to: HEAD
         env:
-          # GitHub personal access token. Defaults to github.token
           token: ${{ github.token }}
-          # Language of the changelog (en or de). Defaults to en
           language: en
-          # Whether to upload the changelog as a build artifact. Defaults to true
           upload: true
-          # Repository to generate the changelog for. Defaults to the current repository (<username>/<repo>)
           repo: ${{ github.repository }}
+
+      # 4️⃣ Deploy to staging
+      - name: Deploy to Staging Server
+        run: |
+          ssh -o StrictHostKeyChecking=no user@staging.example.com "
+            cd /path/to/app &&
+            git pull origin main &&
+            ./deploy.sh
+          "
