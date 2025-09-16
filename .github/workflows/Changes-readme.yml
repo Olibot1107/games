@@ -3,7 +3,8 @@ name: Update README with Commit File Stats
 on:
   push:
     branches:
-      - main  # change if your default branch is different
+      - '**'        # run on all branches
+  workflow_dispatch: # allow manual run from Actions tab
 
 permissions:
   contents: write
@@ -68,7 +69,8 @@ EOF
             {print}
           ' README.md > README.tmp && mv README.tmp README.md
 
-      - name: Commit changes
+      - name: Commit changes (only on main)
+        if: github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
