@@ -1,79 +1,39 @@
-name: Update README with Commit File Stats
-
 on:
   push:
-    branches:
-      - '**'        # run on all branches
-  workflow_dispatch: # allow manual run from Actions tab
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
-permissions:
-  contents: write
+name: Create Release
 
 jobs:
-  update-readme:
+  build:
+    name: Create Release
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Get version from tag
+        id: tag_name
+        run: |
+          echo "current_version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Get Changelog Entry
+        id: changelog_reader
+        uses: mindsers/changelog-reader-action@v2
         with:
-          fetch-depth: 0
-
-      - name: Get commit diff
-        id: diff
-        run: |
-          LAST_COMMIT=$(git rev-parse HEAD)
-          PREV_COMMIT=$(git rev-parse HEAD^)
-
-          ADDED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^A" | wc -l || true)
-          MODIFIED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^M" | wc -l || true)
-          DELETED=$(git diff --name-status $PREV_COMMIT $LAST_COMMIT | grep "^D" | wc -l || true)
-
-          echo "added=$ADDED" >> $GITHUB_OUTPUT
-          echo "modified=$MODIFIED" >> $GITHUB_OUTPUT
-          echo "deleted=$DELETED" >> $GITHUB_OUTPUT
-          echo "commit_hash=$LAST_COMMIT" >> $GITHUB_OUTPUT
-          echo "commit_msg=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
-
-      - name: Update README.md
-        run: |
-          ROW="| \`${{ steps.diff.outputs.commit_hash }}\` | ${{ steps.diff.outputs.commit_msg }} | ${{ steps.diff.outputs.added }} | ${{ steps.diff.outputs.modified }} | ${{ steps.diff.outputs.deleted }} |"
-
-          touch README.md
-
-          if ! grep -q "## Commit File History" README.md; then
-            cat <<'EOF' >> README.md
-
-## Commit File History
-
-| Commit | Message | Added | Modified | Deleted |
-|--------|---------|-------|----------|---------|
-EOF
-          fi
-
-          awk -v row="$ROW" '
-            BEGIN {header=0}
-            /^## Commit File History/ {print; getline; print; getline; print; header=1; print row; next}
-            header {print; count++}
-            !header {print}
-          ' README.md > README.tmp && mv README.tmp README.md
-
-          awk '
-            BEGIN {in_table=0; row_count=0}
-            /^## Commit File History/ {print; in_table=1; next}
-            in_table && /^| Commit / {print; getline; print; next}
-            in_table && /^\|/ {
-              if (row_count < 1000) {print; row_count++}
-              next
-            }
-            {print}
-          ' README.md > README.tmp && mv README.tmp README.md
-
-      - name: Commit changes (only on main)
-        if: github.ref == 'refs/heads/main'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add README.md
-          git commit -m "chore: update README with commit file stats" || echo "No changes to commit"
-          git push
+          validation_level: warn
+          version: ${{ steps.tag_name.outputs.current_version }}
+          path: ./CHANGELOG.md
+      - name: Create/update release
+        uses: ncipollo/release-action@v1
+        with:
+          # This pulls from the "Get Changelog Entry" step above, referencing it's ID to get its outputs object.
+          # See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          tag: ${{ steps.changelog_reader.outputs.version }}
+          name: Release ${{ steps.changelog_reader.outputs.version }}
+          body: ${{ steps.changelog_reader.outputs.changes }}
+          prerelease: ${{ steps.changelog_reader.outputs.status == 'prereleased' }}
+          draft: ${{ steps.changelog_reader.outputs.status == 'unreleased' }}
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
