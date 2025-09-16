@@ -1,4 +1,4 @@
-name: Deploy to Staging
+name: Update Changelog on Every Commit
 
 on:
   push:
@@ -7,8 +7,7 @@ on:
       - release/*
 
 jobs:
-  deploy:
-    name: Generate Changelog & Deploy to Staging
+  update-changelog:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,24 +15,39 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Generate changelog
-      - name: Generate changelog
-        uses: m-radmacher/That-Changed@v1.3.0
-        with:
-          from: HEAD~10
-          to: HEAD
-        env:
-          token: ${{ github.token }}
-          language: en
-          upload: true
-          repo: ${{ github.repository }}
-
-      # 3️⃣ Deploy to staging (example: build & push Docker image)
-      - name: Deploy to staging
+      # 2️⃣ Get list of changed files in this commit
+      - name: Get changed files
+        id: changed
         run: |
-          echo "Running deployment steps..."
-          # Example: build Docker image
-          docker build -t my-app:staging .
-          # Push to a registry (use a secret for authentication)
-          # docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASS }}
-          # docker push my-app:staging
+          # Get commit hash
+          COMMIT_HASH=$(git rev-parse HEAD)
+          # Get author and message
+          AUTHOR=$(git log -1 --pretty=format:'%an')
+          MESSAGE=$(git log -1 --pretty=format:'%s')
+          # Get list of changed files
+          FILES=$(git diff-tree --no-commit-id --name-only -r $COMMIT_HASH | tr '\n' ', ')
+          # Remove trailing comma and space
+          FILES=${FILES%, }
+          # Save for next step
+          echo "commit_hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
+          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+          echo "message=$MESSAGE" >> $GITHUB_OUTPUT
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+
+      # 3️⃣ Append info to README.md (or CHANGELOG.md)
+      - name: Append to README.md
+        run: |
+          echo "" >> README.md
+          echo "## Commit ${{ steps.changed.outputs.commit_hash }}" >> README.md
+          echo "- Author: ${{ steps.changed.outputs.author }}" >> README.md
+          echo "- Message: ${{ steps.changed.outputs.message }}" >> README.md
+          echo "- Files changed: ${{ steps.changed.outputs.files }}" >> README.md
+
+      # 4️⃣ Commit and push the updated README
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "Update changelog for commit ${{ steps.changed.outputs.commit_hash }}" || echo "No changes to commit"
+          git push
