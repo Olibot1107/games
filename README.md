@@ -8,3 +8,4 @@
 | [52cc255c009c07dca101be7d62d0b73a7263e6db](https://github.com/Olibot1107/games/commit/52cc255c009c07dca101be7d62d0b73a7263e6db) | Olibot1107 | Added stuff yn |  |
 | [58617757c497bf3ab5a04be952a191399135f64e](https://github.com/Olibot1107/games/commit/58617757c497bf3ab5a04be952a191399135f64e) | Olibot1107 | Rename video.html.txt to video.html |  |
 | [01f72c59417fcabc410762b68d2b4c5025dc0d87](https://github.com/Olibot1107/games/commit/01f72c59417fcabc410762b68d2b4c5025dc0d87) | Olibot1107 | Merge pull request #1 from hello12111211/main |  |
+| [9e7f2fdc73a46fe3a42a403b1602a560be2f2ddf](https://github.com/Olibot1107/games/commit/9e7f2fdc73a46fe3a42a403b1602a560be2f2ddf) | Olibot1107 | Merge pull request #2 from hello12111211/main |  |
