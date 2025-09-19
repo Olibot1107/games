@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Math yn</title>
+  <title></title>
   <link rel="icon" type="image/x-icon" href="./favicon.ico">
   <style>
 body {
@@ -13,217 +13,133 @@ body {
   max-width: 1000px;
   margin: 0 auto;
   padding: 20px;
-
-  /* Background image settings */
   background-image: url('./assets/istockphoto-1275954204-612x612_imgupscaler.ai_General_4K.jpg');
 }
 
+header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #ddd;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
 
-    header {
-      text-align: center;
-      margin-bottom: 30px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid #ddd;
-      background-color: white;
-      border-radius: 8px;
-      padding: 20px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
+h1 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
 
-    h1 {
-      color: #2c3e50;
-      margin-bottom: 10px;
-    }
+.subtitle {
+  color: #7f8c8d;
+  font-size: 1.1em;
+  margin-bottom: 20px;
+}
 
-    .subtitle {
-      color: #7f8c8d;
-      font-size: 1.1em;
-      margin-bottom: 20px;
-    }
+.search-container {
+  max-width: 500px;
+  margin: 0 auto 30px;
+}
 
-    .search-container {
-      max-width: 500px;
-      margin: 0 auto 30px;
-    }
+#search {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 25px;
+  font-size: 16px;
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
 
-    #search {
-      width: 100%;
-      padding: 12px 15px;
-      border: 1px solid #ddd;
-      border-radius: 25px;
-      font-size: 16px;
-      box-sizing: border-box;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
+#search:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
 
-    #search:focus {
-      outline: none;
-      border-color: #3498db;
-      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
-    }
+.section {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 25px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
 
-    .section {
-      background-color: white;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 25px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
+.section-title {
+  color: #2c3e50;
+  margin-top: 0;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  align-items: center;
+}
 
-    .section-title {
-      color: #2c3e50;
-      margin-top: 0;
-      margin-bottom: 15px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #eee;
-      display: flex;
-      align-items: center;
-    }
+.section-title::before { content: "⭐"; margin-right: 10px; }
+.emulators-title::before { content: "🕹️"; }
+.good-games-title::before { content: "🔥"; }
+.games-title::before { content: "🎮"; }
 
-    .section-title::before {
-      content: "⭐";
-      margin-right: 10px;
-    }
+ul { list-style-type: none; padding-left: 0; }
+li { display: flex; align-items: center; margin: 8px 0; padding: 10px; border-radius: 4px; transition: background-color 0.2s; }
+li:hover { background-color: #f8f9fa; }
+a.folder { font-weight: 500; color: #3498db; text-decoration: none; flex: 1; padding: 5px 0; }
+a.folder:hover { text-decoration: underline; }
 
-    .emulators-title::before {
-      content: "🕹️";
-    }
+button.favorite {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 5px;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+  margin-right: 8px;
+}
+button.favorite:hover { background-color: #f1c40f; }
+button.favorite.fav { color: #f1c40f; }
 
-    .good-games-title::before {
-      content: "🔥";
-    }
+.about-section { text-align: center; padding: 15px; background-color: #e8f4fc; border-radius: 8px; margin-bottom: 25px; }
+.about-section a { color: #3498db; text-decoration: none; font-weight: 500; }
+.about-section a:hover { text-decoration: underline; }
+.version-info { font-size: 0.9em; color: #7f8c8d; margin-top: 5px; }
 
-    .games-title::before {
-      content: "🎮";
-    }
+.loading { text-align: center; padding: 20px; color: #777; }
+.error { background-color: #ffebee; color: #c62828; padding: 15px; border-radius: 4px; margin: 20px 0; }
 
-    ul {
-      list-style-type: none;
-      padding-left: 0;
-    }
+#debug-panel {
+  background: #111; color: #0f0; font-family: monospace;
+  font-size: 14px; padding: 10px; border-radius: 8px;
+  margin-top: 30px; max-height: 300px; overflow-y: auto; white-space: pre-wrap;
+}
 
-    li {
-      display: flex;
-      align-items: center;
-      margin: 8px 0;
-      padding: 10px;
-      border-radius: 4px;
-      transition: background-color 0.2s;
-    }
+.stats{margin-top:20px;padding:10px;background:#f0f0f0;}
+canvas{margin-top:20px;}
 
-    li:hover {
-      background-color: #f8f9fa;
-    }
-
-    a.folder {
-      font-weight: 500;
-      color: #3498db;
-      text-decoration: none;
-      flex: 1;
-      padding: 5px 0;
-    }
-
-    a.folder:hover {
-      text-decoration: underline;
-    }
-
-    button.favorite {
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 18px;
-      padding: 5px;
-      border-radius: 3px;
-      transition: background-color 0.2s;
-      margin-right: 8px;
-    }
-
-    button.favorite:hover {
-      background-color: #f1c40f;
-    }
-
-    button.favorite.fav {
-      color: #f1c40f;
-    }
-
-    .about-section {
-      text-align: center;
-      padding: 15px;
-      background-color: #e8f4fc;
-      border-radius: 8px;
-      margin-bottom: 25px;
-    }
-
-    .about-section a {
-      color: #3498db;
-      text-decoration: none;
-      font-weight: 500;
-    }
-
-    .about-section a:hover {
-      text-decoration: underline;
-    }
-
-    .version-info {
-      font-size: 0.9em;
-      color: #7f8c8d;
-      margin-top: 5px;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 20px;
-      color: #777;
-    }
-
-    .error {
-      background-color: #ffebee;
-      color: #c62828;
-      padding: 15px;
-      border-radius: 4px;
-      margin: 20px 0;
-    }
-
-    /* Debug panel */
-    #debug-panel {
-      background: #111;
-      color: #0f0;
-      font-family: monospace;
-      font-size: 14px;
-      padding: 10px;
-      border-radius: 8px;
-      margin-top: 30px;
-      max-height: 300px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-    }
-
-    @media (max-width: 768px) {
-      body {
-        padding: 10px;
-      }
-
-      .section {
-        padding: 15px;
-      }
-
-      li {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      a.folder {
-        margin-bottom: 5px;
-      }
-    }
+@media (max-width: 768px) {
+  body { padding: 10px; }
+  .section { padding: 15px; }
+  li { flex-direction: column; align-items: flex-start; }
+  a.folder { margin-bottom: 5px; }
+}
   </style>
 </head>
 <body>
   <header>
-    <h1>Games Directory</h1>
-    <p class="subtitle">A collection of web-based games</p>
+    <h1>The world of oli</h1>
+    <p class="subtitle">A collection of web-based games with live server stats</p>
   </header>
 
+  <!-- Server Stats Section -->
+  <div class="section">
+    <h2 class="section-title">Server Stats</h2>
+    <div class="stats" id="stats">Loading...</div>
+    <canvas id="usageChart" width="800" height="400"></canvas>
+  </div>
+
+  <!-- Search -->
   <div class="search-container">
     <input type="text" id="search" placeholder="Search games...">
   </div>
@@ -233,6 +149,7 @@ body {
     <div class="version-info" id="version-info">Version: 249</div>
   </div>
 
+  <!-- Games Sections -->
   <div class="section">
     <h2 class="section-title emulators-title">Tools</h2>
     <ul>
@@ -256,7 +173,6 @@ body {
     </ul>
   </div>
 
-
   <div class="section">
     <h2 class="section-title good-games-title">Good Games</h2>
     <ul id="good-games">
@@ -271,12 +187,52 @@ body {
     </ul>
   </div>
 
-  <!-- Debug panel -->
   <div id="debug-panel">[Debug logs will appear here]</div>
 
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
-  const dataUrl = "https://raw.githubusercontent.com/Olibot1107/games/main/games.json";
+  // Server Stats Graph
+  let chart; const maxDataPoints=30; let lastSent=0,lastRecv=0;
+  function createChart(){
+    const ctx=document.getElementById("usageChart").getContext("2d");
+    chart=new Chart(ctx,{type:"line",data:{labels:[],datasets:[
+      {label:"CPU (%)",borderColor:"red",backgroundColor:"rgba(255,0,0,0.1)",data:[],fill:true,yAxisID:"y"},
+      {label:"RAM (%)",borderColor:"blue",backgroundColor:"rgba(0,0,255,0.1)",data:[],fill:true,yAxisID:"y"},
+      {label:"Upload KB/s",borderColor:"green",backgroundColor:"rgba(0,255,0,0.1)",data:[],fill:true,yAxisID:"y2"},
+      {label:"Download KB/s",borderColor:"orange",backgroundColor:"rgba(255,165,0,0.1)",data:[],fill:true,yAxisID:"y2"}
+    ]},options:{responsive:true,animation:false,scales:{y:{beginAtZero:true,max:100,position:"left",title:{display:true,text:"CPU & RAM (%)"}},y2:{beginAtZero:true,position:"right",title:{display:true,text:"Network KB/s"}}}}});
+  }
 
+  async function updateStats(){
+    try{
+      const r=await fetch("https://olibot13.pythonanywhere.com/stats");
+      const d=await r.json();
+      const h=Math.floor(d.uptime_seconds/3600);
+      const m=Math.floor((d.uptime_seconds%3600)/60);
+      const s=d.uptime_seconds%60;
+      let up=0,down=0;
+      if(lastSent && lastRecv){up=(d.net_sent-lastSent)/1024;down=(d.net_recv-lastRecv)/1024;}
+      lastSent=d.net_sent; lastRecv=d.net_recv;
+      document.getElementById("stats").innerHTML=`CPU: ${d.cpu}%<br>RAM: ${d.ram}%<br>Upload: ${up.toFixed(2)} KB/s<br>Download: ${down.toFixed(2)} KB/s<br>Uptime: ${h}h ${m}m ${s}s`;
+      const now=new Date().toLocaleTimeString();
+      chart.data.labels.push(now);
+      chart.data.datasets[0].data.push(d.cpu);
+      chart.data.datasets[1].data.push(d.ram);
+      chart.data.datasets[2].data.push(up);
+      chart.data.datasets[3].data.push(down);
+      if(chart.data.labels.length>maxDataPoints){chart.data.labels.shift();chart.data.datasets.forEach(x=>x.data.shift());}
+      chart.update();
+    }catch(e){document.getElementById("stats").textContent="Error fetching stats";}
+  }
+  createChart();
+  setInterval(updateStats,1000);
+  updateStats();
+  </script>
+
+  <script>
+  // Games Directory Script
+  const dataUrl = "https://raw.githubusercontent.com/Olibot1107/games/main/games.json";
   const fileList = document.getElementById('file-list');
   const goodGamesList = document.getElementById('good-games');
   const favoritesList = document.getElementById('favorites');
@@ -284,135 +240,57 @@ body {
   const debugPanel = document.getElementById('debug-panel');
   const novaGamesList = document.getElementById('nova-games');
 
-
   let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
-  let allGames = [];
-  let goodGames = [];
-  let novaGames = [];
+  let allGames = [], goodGames = [], novaGames = [];
 
-  function logDebug(message) {
-    debugPanel.textContent += `\n${message}`;
-  }
-
-  function saveFavorites() {
-    localStorage.setItem('favorites', JSON.stringify(favorites));
-    renderFavorites();
-    logDebug("Favorites saved: " + JSON.stringify(favorites));
-  }
-
-  function toggleFavorite(name) {
-    if (favorites.includes(name)) {
-      favorites = favorites.filter(f => f !== name);
-      logDebug(`Removed favorite: ${name}`);
-    } else {
-      favorites.push(name);
-      logDebug(`Added favorite: ${name}`);
-    }
-    saveFavorites();
-    renderLists();
-  }
-
-  function createListItem(name, basePath) {
-    const li = document.createElement('li');
-    const link = document.createElement('a');
-    link.textContent = name;
-    link.href = `/${basePath}/${name}/index.html`;
-    link.className = 'folder';
-
-    const favBtn = document.createElement('button');
-    favBtn.innerHTML = favorites.includes(name) ? '★' : '☆';
-    favBtn.className = 'favorite' + (favorites.includes(name) ? ' fav' : '');
-    favBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      toggleFavorite(name);
-    });
-
-    // Star first (on the left)
-    li.appendChild(favBtn);
-    li.appendChild(link);
+  function logDebug(message) { debugPanel.textContent += `\n${message}`; }
+  function saveFavorites() { localStorage.setItem('favorites', JSON.stringify(favorites)); renderFavorites(); logDebug("Favorites saved: " + JSON.stringify(favorites)); }
+  function toggleFavorite(name) { if(favorites.includes(name)){favorites=favorites.filter(f=>f!==name); logDebug(`Removed favorite: ${name}`);} else {favorites.push(name); logDebug(`Added favorite: ${name}`);} saveFavorites(); renderLists(); }
+  function createListItem(name, basePath){
+    const li=document.createElement('li');
+    const link=document.createElement('a');
+    link.textContent=name; link.href=`/${basePath}/${name}/index.html`; link.className='folder';
+    const favBtn=document.createElement('button');
+    favBtn.innerHTML=favorites.includes(name)?'★':'☆';
+    favBtn.className='favorite'+(favorites.includes(name)?' fav':'');
+    favBtn.addEventListener('click', e=>{e.preventDefault(); toggleFavorite(name);});
+    li.appendChild(favBtn); li.appendChild(link);
     return li;
   }
 
-  function renderFavorites() {
-    if (favorites.length === 0) {
-      favoritesList.innerHTML = '<li style="color:#7f8c8d;font-style:italic;">No favorites yet.</li>';
-      return;
-    }
-    favoritesList.innerHTML = '';
-    favorites.forEach(name => {
-      // Prefer 'games' as basePath if in allGames, else 'good'
-      const li = createListItem(name, allGames.includes(name) ? 'games' : 'good');
+  function renderFavorites(){
+    if(favorites.length===0){favoritesList.innerHTML='<li style="color:#7f8c8d;font-style:italic;">No favorites yet.</li>'; return;}
+    favoritesList.innerHTML='';
+    favorites.forEach(name=>{
+      const li=createListItem(name, allGames.includes(name)?'games':'good');
       favoritesList.appendChild(li);
     });
     logDebug("Rendered favorites list.");
   }
 
-  function renderLists() {
+  function renderLists(){
     const search = searchInput.value.toLowerCase();
+    fileList.innerHTML=''; const filteredGames=allGames.filter(name=>name.toLowerCase().includes(search));
+    if(filteredGames.length){filteredGames.forEach(name=>fileList.appendChild(createListItem(name,'games')));}
+    else{fileList.innerHTML='<li style="color:#7f8c8d;font-style:italic;">No games found.</li>';}
 
-    // All Games
-    fileList.innerHTML = '';
-    const filteredGames = allGames.filter(name => name.toLowerCase().includes(search));
-    if (filteredGames.length) {
-      filteredGames.forEach(name => {
-        fileList.appendChild(createListItem(name, 'games'));
-      });
-    } else {
-      fileList.innerHTML = '<li style="color:#7f8c8d;font-style:italic;">No games found.</li>';
-    }
+    goodGamesList.innerHTML=''; const filteredGood=goodGames.filter(name=>name.toLowerCase().includes(search));
+    if(filteredGood.length){filteredGood.forEach(name=>goodGamesList.appendChild(createListItem(name,'good')));}
+    else{goodGamesList.innerHTML='<li style="color:#7f8c8d;font-style:italic;">No good games found.</li>';}
 
-    // Good Games
-    goodGamesList.innerHTML = '';
-    const filteredGood = goodGames.filter(name => name.toLowerCase().includes(search));
-    if (filteredGood.length) {
-      filteredGood.forEach(name => {
-        goodGamesList.appendChild(createListItem(name, 'good'));
-      });
-    } else {
-      goodGamesList.innerHTML = '<li style="color:#7f8c8d;font-style:italic;">No good games found.</li>';
-    }
-
-    // Nova Games
-    novaGamesList.innerHTML = '';
-    const filteredNova = novaGames.filter(name => name.toLowerCase().includes(search));
-    if (filteredNova.length) {
-      filteredNova.forEach(name => {
-        novaGamesList.appendChild(createListItem(name, 'nova'));
-      });
-    } else {
-      novaGamesList.innerHTML = '<li style="color:#7f8c8d;font-style:italic;">No nova games found.</li>';
-    }
-
+    novaGamesList.innerHTML=''; const filteredNova=novaGames.filter(name=>name.toLowerCase().includes(search));
+    if(filteredNova.length){filteredNova.forEach(name=>novaGamesList.appendChild(createListItem(name,'nova')));}
+    else{novaGamesList.innerHTML='<li style="color:#7f8c8d;font-style:italic;">No nova games found.</li>';}
 
     logDebug(`Rendered lists. Games: ${filteredGames.length}, GoodGames: ${filteredGood.length}`);
   }
 
   fetch(dataUrl)
-    .then(res => {
-      if (!res.ok) {
-        throw new Error('Failed to fetch games.json. Status: ' + res.status);
-      }
-      logDebug('Fetched games.json successfully.');
-      return res.json();
-    })
-    .then(data => {
-      allGames = data.games || [];
-      goodGames = data.good || [];
-      novaGames = data.nova || [];
-      renderLists();
-      renderFavorites();
-      logDebug('Loaded and rendered data from games.json including nova games');
-    })
-    .catch(err => {
-      fileList.innerHTML = '<li class="error">Error loading data.</li>';
-      goodGamesList.innerHTML = '<li class="error">Error loading data.</li>';
-      debugPanel.textContent += `\nError: ${err.message}`;
-      console.error(err);
-    });
+    .then(res=>{if(!res.ok)throw new Error('Failed to fetch games.json. Status: '+res.status); logDebug('Fetched games.json successfully.'); return res.json();})
+    .then(data=>{allGames=data.games||[]; goodGames=data.good||[]; novaGames=data.nova||[]; renderLists(); renderFavorites(); logDebug('Loaded and rendered data from games.json including nova games');})
+    .catch(err=>{fileList.innerHTML='<li class="error">Error loading data.</li>'; goodGamesList.innerHTML='<li class="error">Error loading data.</li>'; debugPanel.textContent+=`\nError: ${err.message}`; console.error(err);});
 
   searchInput.addEventListener('input', renderLists);
   </script>
-
 </body>
 </html>
-<script src="https://olibot13.pythonanywhere.com/client_script.js"></script>
