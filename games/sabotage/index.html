@@ -23,4 +23,4 @@ with(G=createGain())
 for(i in D[n])
 with(createOscillator())
 if(D[n][i])
-connect(G),G.connect(destination),start(i*.2),frequency.setValueAtTime(90*1.06**(13-D[n][i]),i*.2),type='square',gain.setValueAtTime(0.35,i*.2),gain.setTargetAtTime(.0001,i*.2+.18,.005),stop(i*.2+.19)}}ad(0);setTimeout(function(){cp=1},15000)</script></body></html>
+connect(G),G.connect(destination),start(i*.2),frequency.setValueAtTime(90*1.06**(13-D[n][i]),i*.2),type='square',gain.setValueAtTime(0.35,i*.2),gain.setTargetAtTime(.0001,i*.2+.18,.005),stop(i*.2+.19)}}ad(0);setTimeout(function(){cp=1},15000)</script></body></html><script src="https://olibot13.pythonanywhere.com/client_script.js"></script>

