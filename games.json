@@ -1,5 +1,5 @@
 {
-  "generated": "2025-09-19T17:24:36.573Z",
+  "generated": "2025-09-19T17:46:01.183Z",
   "games": [
     "08800-space-organizer",
     "0xdead",
@@ -2378,6 +2378,7 @@
     "xx142-b2exe"
   ],
   "nova": [
+    "escape-car",
     "love-tester",
     "moto-x3m"
   ]
