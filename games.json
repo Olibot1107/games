@@ -1,5 +1,5 @@
 {
-  "generated": "2025-09-19T15:56:52.633Z",
+  "generated": "2025-09-19T17:24:36.573Z",
   "games": [
     "08800-space-organizer",
     "0xdead",
@@ -2376,5 +2376,9 @@
     "vex6",
     "wordle",
     "xx142-b2exe"
+  ],
+  "nova": [
+    "love-tester",
+    "moto-x3m"
   ]
 }
