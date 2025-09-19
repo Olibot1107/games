@@ -5,6 +5,7 @@ on:
     paths:
       - "games/**"
       - "good/**"
+      - "nova/**"
   workflow_dispatch: # allow manual trigger too
 
 jobs:
@@ -23,21 +24,24 @@ jobs:
         run: |
           node <<'EOF'
           const fs = require("fs");
-          const path = require("path");
 
           function getDirs(base) {
-            return fs.readdirSync(base, { withFileTypes: true })
-              .filter(d => d.isDirectory())
-              .map(d => d.name);
+            return fs.existsSync(base)
+              ? fs.readdirSync(base, { withFileTypes: true })
+                  .filter(d => d.isDirectory())
+                  .map(d => d.name)
+              : [];
           }
 
           const games = getDirs("games");
           const good = getDirs("good");
+          const nova = getDirs("nova");
 
           const output = {
             generated: new Date().toISOString(),
             games,
-            good
+            good,
+            nova
           };
 
           fs.writeFileSync("games.json", JSON.stringify(output, null, 2));
@@ -49,5 +53,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add games.json
-          git commit -m "Auto-update games.json"
+          git commit -m "Auto-update games.json" || echo "No changes to commit"
           git push

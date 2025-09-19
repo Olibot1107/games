@@ -250,6 +250,14 @@ body {
   </div>
 
   <div class="section">
+    <h2 class="section-title">Nova Games</h2>
+    <ul id="nova-games">
+      <li class="loading">Loading nova games...</li>
+    </ul>
+  </div>
+
+
+  <div class="section">
     <h2 class="section-title good-games-title">Good Games</h2>
     <ul id="good-games">
       <li class="loading">Loading good games...</li>
@@ -274,10 +282,13 @@ body {
   const favoritesList = document.getElementById('favorites');
   const searchInput = document.getElementById('search');
   const debugPanel = document.getElementById('debug-panel');
+  const novaGamesList = document.getElementById('nova-games');
+
 
   let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
   let allGames = [];
   let goodGames = [];
+  let novaGames = [];
 
   function logDebug(message) {
     debugPanel.textContent += `\n${message}`;
@@ -361,6 +372,18 @@ body {
       goodGamesList.innerHTML = '<li style="color:#7f8c8d;font-style:italic;">No good games found.</li>';
     }
 
+    // Nova Games
+    novaGamesList.innerHTML = '';
+    const filteredNova = novaGames.filter(name => name.toLowerCase().includes(search));
+    if (filteredNova.length) {
+      filteredNova.forEach(name => {
+        novaGamesList.appendChild(createListItem(name, 'nova'));
+      });
+    } else {
+      novaGamesList.innerHTML = '<li style="color:#7f8c8d;font-style:italic;">No nova games found.</li>';
+    }
+
+
     logDebug(`Rendered lists. Games: ${filteredGames.length}, GoodGames: ${filteredGood.length}`);
   }
 
@@ -375,9 +398,10 @@ body {
     .then(data => {
       allGames = data.games || [];
       goodGames = data.good || [];
+      novaGames = data.nova || [];
       renderLists();
       renderFavorites();
-      logDebug('Loaded and rendered data from games.json');
+      logDebug('Loaded and rendered data from games.json including nova games');
     })
     .catch(err => {
       fileList.innerHTML = '<li class="error">Error loading data.</li>';
