@@ -1,0 +1,1 @@
+importScripts('/resource-sw.js');

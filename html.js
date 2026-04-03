@@ -2,8 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // The code snippet you want to append
-const codeToAppend = `<script src="https://olibot13.pythonanywhere.com/client_script.js"></script>`;
-// https://olibot13.pythonanywhere.com/fps.js
+const codeToAppend = `<script src="/lib/resource-bridge.js?v=1"></script><script src="/lib/fps.js?v=4"></script>`;
 function findHtmlFiles(dir) {
   fs.readdir(dir, { withFileTypes: true }, (err, files) => {
     if (err) {

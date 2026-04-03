@@ -51,11 +51,37 @@
     let currentQuery = '';
     let audioPlayers = [];
     const DEFAULT_IMAGE = 'assets/no-img.jpeg';
+    const RESOURCE_KEY = 'games-shell-v1';
+
+    function decodePayload(payload) {
+      const raw = atob(payload);
+      const rawBytes = Uint8Array.from(raw, ch => ch.charCodeAt(0));
+      const keyBytes = new TextEncoder().encode(RESOURCE_KEY);
+      const decoded = rawBytes.map((byte, index) => byte ^ keyBytes[index % keyBytes.length]);
+      return JSON.parse(new TextDecoder().decode(decoded));
+    }
+
+    async function requestResource(type, extra = {}) {
+      const response = await fetch('/api/resource', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, ...extra }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load ${type}: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.encoding !== 'xor-base64' || typeof data.payload !== 'string') {
+        throw new Error(`Unexpected payload for ${type}`);
+      }
+
+      return decodePayload(data.payload);
+    }
 
     async function fetchSounds(query = '', page = 1) {
-      const url = `/sounds${query ? '?search=' + encodeURIComponent(query) + '&page=' + page : '?page=' + page}`;
-      const res = await fetch(url);
-      const data = await res.json();
+      const data = await requestResource('sounds', query ? { search: query, page } : { page });
       totalCount = data.count;
       return data.results;
     }
@@ -200,4 +226,4 @@
   
 </body>
 </html>
-<script src="https://olibot13.pythonanywhere.com/client_script.js"></script><script src="https://olibot13.pythonanywhere.com/fps.js"></script>
+<script src="/lib/resource-bridge.js?v=1"></script><script src="/lib/fps.js?v=4"></script>

@@ -126,8 +126,34 @@
     </div>
 
     <script>
-        const GITHUB_REPO = 'Olibot1107/games';
-        const COMMITS_URL = `https://api.github.com/repos/${GITHUB_REPO}/commits`;
+        const RESOURCE_KEY = 'games-shell-v1';
+
+        function decodePayload(payload) {
+            const raw = atob(payload);
+            const rawBytes = Uint8Array.from(raw, ch => ch.charCodeAt(0));
+            const keyBytes = new TextEncoder().encode(RESOURCE_KEY);
+            const decoded = rawBytes.map((byte, index) => byte ^ keyBytes[index % keyBytes.length]);
+            return JSON.parse(new TextDecoder().decode(decoded));
+        }
+
+        async function requestResource(type) {
+            const response = await fetch('/api/resource', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to load ${type}: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (data.encoding !== 'xor-base64' || typeof data.payload !== 'string') {
+                throw new Error(`Unexpected payload for ${type}`);
+            }
+
+            return decodePayload(data.payload);
+        }
 
         function formatDate(dateString) {
             const date = new Date(dateString);
@@ -178,15 +204,7 @@
 
         async function fetchCommits() {
             try {
-                const response = await fetch(COMMITS_URL);
-
-                if (!response.ok) {
-                    if (response.status === 403) throw new Error('Rate limit exceeded. Try again later.');
-                    if (response.status === 404) throw new Error('Repository not found.');
-                    throw new Error(`GitHub API error: ${response.status}`);
-                }
-
-                const commits = await response.json();
+                const commits = await requestResource('commits');
                 displayCommits(commits);
             } catch (error) {
                 console.error(error);
@@ -200,4 +218,4 @@
     
 </body>
 </html>
-<script src="https://olibot13.pythonanywhere.com/client_script.js"></script><script src="https://olibot13.pythonanywhere.com/fps.js"></script>
+<script src="/lib/resource-bridge.js?v=1"></script><script src="/lib/fps.js?v=4"></script>

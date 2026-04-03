@@ -209,6 +209,35 @@ Nova Games
   <script>
     // Server Stats Graph
     let chart; const maxDataPoints=30; let lastSent=0,lastRecv=0;
+    window.__RESOURCE_KEY = window.__RESOURCE_KEY || 'games-shell-v1';
+
+    function decodePayload(payload) {
+      const raw = atob(payload);
+      const rawBytes = Uint8Array.from(raw, ch => ch.charCodeAt(0));
+      const keyBytes = new TextEncoder().encode(window.__RESOURCE_KEY);
+      const decoded = rawBytes.map((byte, index) => byte ^ keyBytes[index % keyBytes.length]);
+      return JSON.parse(new TextDecoder().decode(decoded));
+    }
+
+    async function requestResource(type) {
+      const response = await fetch('/api/resource', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load ${type}: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.encoding !== 'xor-base64' || typeof data.payload !== 'string') {
+        throw new Error(`Unexpected payload for ${type}`);
+      }
+
+      return decodePayload(data.payload);
+    }
+
     function createChart(){
       const ctx=document.getElementById("usageChart").getContext("2d");
       chart=new Chart(ctx,{type:"line",data:{labels:[],datasets:[
@@ -220,8 +249,7 @@ Nova Games
     }
     async function updateStats(){
       try{
-        const r=await fetch("https://olibot13.pythonanywhere.com/stats");
-        const d=await r.json();
+        const d=await requestResource("stats");
         const h=Math.floor(d.uptime_seconds/3600);
         const m=Math.floor((d.uptime_seconds%3600)/60);
         const s=d.uptime_seconds%60;
@@ -246,17 +274,42 @@ Nova Games
 
   <!-- Games Directory -->
   <script>
-    const dataUrl = "https://raw.githubusercontent.com/Olibot1107/games/main/games.json";
     const favoritesList = document.getElementById('favorites');
     const searchInput = document.getElementById('search');
     const debugPanel = document.getElementById('debug-panel');
     const novaGamesList = document.getElementById('nova-games');
     const goodGamesList = document.getElementById('good-games');
-
     let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
     let goodGames = [], novaGames = [];
 
     function logDebug(msg){ debugPanel.textContent += `\n${msg}`; }
+
+    function decodePayload(payload) {
+      const raw = atob(payload);
+      const rawBytes = Uint8Array.from(raw, ch => ch.charCodeAt(0));
+      const keyBytes = new TextEncoder().encode(window.__RESOURCE_KEY);
+      const decoded = rawBytes.map((byte, index) => byte ^ keyBytes[index % keyBytes.length]);
+      return JSON.parse(new TextDecoder().decode(decoded));
+    }
+
+    async function requestResource(type) {
+      const response = await fetch('/api/resource', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load ${type}: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.encoding !== 'xor-base64' || typeof data.payload !== 'string') {
+        throw new Error(`Unexpected payload for ${type}`);
+      }
+
+      return decodePayload(data.payload);
+    }
 
     function saveFavorites(){
       localStorage.setItem('favorites', JSON.stringify(favorites));
@@ -309,14 +362,10 @@ Nova Games
       logDebug(`Rendered lists. Good Games: ${filteredGood.length}, Nova Games: ${filteredNova.length}`);
     }
 
-    fetch(dataUrl)
-      .then(res=>{
-        if(!res.ok)throw new Error('Failed to fetch games.json. Status: '+res.status);
-        logDebug('Fetched games.json successfully.');
-        return res.json();
-      })
+    requestResource('games')
       .then(data=>{
         goodGames=data.good||[]; novaGames=data.nova||[];
+        logDebug('Fetched games.json successfully.');
         renderLists(); renderFavorites();
         logDebug('Loaded and rendered data from games.json');
       })
@@ -334,4 +383,4 @@ Nova Games
 
 </body>
 </html>
-<script src="https://olibot13.pythonanywhere.com/client_script.js"></script><script src="https://olibot13.pythonanywhere.com/fps.js"></script>
+<script src="/lib/resource-bridge.js?v=1"></script><script src="/lib/fps.js?v=4"></script>

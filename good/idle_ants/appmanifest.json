@@ -1,0 +1,14 @@
+{
+  "name": "Idle Ants Poki",
+  "short_name": "Idle Ants",
+  "start_url": "index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

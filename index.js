@@ -2,11 +2,11 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
-const { url } = require('inspector');
-const zlib = require('zlib');
+const os = require('os');
 
 const app = express();
 const PORT = 3004;
+const RESOURCE_KEY = 'games-shell-v1';
 
 // Logging colors
 const colors = {
@@ -99,6 +99,8 @@ app.use((req, res, next) => {
   next(); // all other requests handled normally
 });
 
+app.use(express.json({ limit: '64kb' }));
+
 // Middleware to avoid octet-stream
 app.use((req, res, next) => {
   const originalSetHeader = res.setHeader.bind(res);
@@ -130,39 +132,193 @@ app.get('/ping', (req, res) => {
 
 const BASE_URL = 'https://www.myinstants.com';
 
+function getContentType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  switch (ext) {
+    case '.html': return 'text/html; charset=utf-8';
+    case '.js': return 'application/javascript; charset=utf-8';
+    case '.css': return 'text/css; charset=utf-8';
+    case '.json': return 'application/json; charset=utf-8';
+    case '.svg': return 'image/svg+xml';
+    case '.png': return 'image/png';
+    case '.jpg':
+    case '.jpeg': return 'image/jpeg';
+    case '.gif': return 'image/gif';
+    case '.webp': return 'image/webp';
+    case '.webm': return 'audio/webm';
+    case '.ico': return 'image/x-icon';
+    case '.wasm': return 'application/wasm';
+    case '.mp3': return 'audio/mpeg';
+    case '.ogg': return 'audio/ogg';
+    case '.wav': return 'audio/wav';
+    case '.mp4': return 'video/mp4';
+    case '.txt': return 'text/plain; charset=utf-8';
+    default: return 'application/octet-stream';
+  }
+}
+
+function xorEncodeBuffer(buffer) {
+  const key = Buffer.from(RESOURCE_KEY, 'utf8');
+  const output = Buffer.alloc(buffer.length);
+
+  for (let i = 0; i < buffer.length; i += 1) {
+    output[i] = buffer[i] ^ key[i % key.length];
+  }
+
+  return output.toString('base64');
+}
+
+function xorEncode(value) {
+  return xorEncodeBuffer(Buffer.from(JSON.stringify(value), 'utf8'));
+}
+
+function normalizeRequestPath(requestPath) {
+  const normalized = requestPath.startsWith('/') ? requestPath : `/${requestPath}`;
+  const withoutQuery = normalized.split('?')[0].split('#')[0];
+  return withoutQuery === '/' ? '/index.html' : withoutQuery.endsWith('/') ? `${withoutQuery}index.html` : withoutQuery;
+}
+
+function resolveResourcePath(requestPath, referrerPath = '') {
+  const adjusted = normalizeRequestPath(requestPath);
+  const root = path.resolve(__dirname);
+  const resolved = path.resolve(__dirname, `.${adjusted}`);
+
+  if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
+    throw new Error('Invalid resource path');
+  }
+
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+    if (referrerPath) {
+      const referrerDir = path.posix.dirname(normalizeRequestPath(referrerPath));
+      const relativeCandidate = path.resolve(__dirname, `.${path.posix.join(referrerDir, path.posix.basename(adjusted))}`);
+      if (fs.existsSync(relativeCandidate) && fs.statSync(relativeCandidate).isFile()) {
+        return relativeCandidate;
+      }
+
+      const aliasCandidates = [
+        path.posix.join(referrerDir, 'main.js'),
+        path.posix.join(referrerDir, 'index.js'),
+        path.posix.join(referrerDir, 'webapp', 'index.js'),
+        path.posix.join(referrerDir, 'webapp', 'source_min.js'),
+        path.posix.join(referrerDir, 'scripts', 'main.js'),
+        path.posix.join(referrerDir, 'scripts', 'index.js'),
+        path.posix.join(referrerDir, 'Jump_Gamemonetize.js'),
+      ];
+
+      for (const alias of aliasCandidates) {
+        const aliasResolved = path.resolve(__dirname, `.${alias}`);
+        if (fs.existsSync(aliasResolved) && fs.statSync(aliasResolved).isFile()) {
+          return aliasResolved;
+        }
+      }
+    }
+    throw new Error(`File not found: ${adjusted}`);
+  }
+
+  return resolved;
+}
+
+function loadFileResource(requestPath, referrerPath) {
+  const filePath = resolveResourcePath(requestPath, referrerPath);
+  const data = fs.readFileSync(filePath);
+  return {
+    contentType: getContentType(filePath),
+    payload: xorEncodeBuffer(data),
+  };
+}
+
+async function loadSounds({ search, page } = {}) {
+  let url = `${BASE_URL}/api/v1/instants/?format=json&page=${page || 1}`;
+  if (search && search.length >= 2) {
+    url += `&name=${encodeURIComponent(search)}`;
+  }
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Sounds fetch failed with HTTP ${response.status}`);
+
+  const data = await response.json();
+
+  return {
+    count: data.count,
+    next: data.next,
+    previous: data.previous,
+    results: (data.results || []).map(s => ({
+      name: s.name,
+      mp3: s.sound,
+      slug: s.slug,
+      color: s.color,
+      image: s.image,
+      description: s.description,
+    })),
+  };
+}
+
+async function loadResource(type, params = {}) {
+  switch (type) {
+    case 'games': {
+      const filePath = path.join(__dirname, 'games.json');
+      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
+    case 'file':
+    case 'path':
+      return loadFileResource(params.path || params.filePath || '/index.html', params.referrer || params.referrerPath || '');
+    case 'sounds':
+      return loadSounds(params);
+    case 'stats': {
+      const totalMem = os.totalmem();
+      const usedMem = totalMem - os.freemem();
+      const cpuLoad = os.loadavg()[0] || 0;
+      return {
+        cpu: Math.min(100, Math.round(cpuLoad * 25)),
+        ram: Math.min(100, Math.round((usedMem / totalMem) * 100)),
+        net_sent: 0,
+        net_recv: 0,
+        uptime_seconds: Math.floor(process.uptime()),
+        fallback: true,
+      };
+    }
+    case 'commits': {
+      const response = await fetch('https://api.github.com/repos/Olibot1107/games/commits', {
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'games-site',
+        },
+      });
+      if (!response.ok) throw new Error(`GitHub fetch failed with HTTP ${response.status}`);
+      return response.json();
+    }
+    default:
+      throw new Error(`Unsupported resource type: ${type}`);
+  }
+}
+
+app.post('/api/resource', async (req, res) => {
+  try {
+    const { type } = req.body || {};
+
+    if (typeof type !== 'string' || !type.trim()) {
+      return res.status(400).json({ error: 'Missing resource type' });
+    }
+
+    const data = await loadResource(type.trim(), req.body || {});
+    res.json({
+      type: type.trim(),
+      encoding: 'xor-base64',
+      ...(data && typeof data === 'object' && data.contentType ? { contentType: data.contentType } : {}),
+      payload: xorEncode(data),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Failed to load resource' });
+  }
+});
+
 // Get all sounds (optionally filtered by search)
 // Get all sounds (optionally filtered by search)
 app.get('/sounds', async (req, res) => {
   try {
-    const search = req.query.search;
-    const page = req.query.page || 1; // optional query param for pagination
-    let url = `${BASE_URL}/api/v1/instants/?format=json&page=${page}`;
-    if (search && search.length >= 2) {
-      url += `&name=${encodeURIComponent(search)}`;
-    }
-
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-
-    const data = await response.json();
-
-    // Map the results
-    const sounds = (data.results || []).map(s => ({
-      name: s.name,
-      mp3: s.sound,   // the API already provides full URL
-      slug: s.slug,
-      color: s.color,
-      image: s.image,
-      description: s.description
-    }));
-
-    // Include pagination info
-    res.json({
-      count: data.count,
-      next: data.next,
-      previous: data.previous,
-      results: sounds
-    });
+    const data = await loadSounds({ search: req.query.search, page: req.query.page });
+    res.json(data);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch sounds' });
