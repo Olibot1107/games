@@ -1,0 +1,16 @@
+{
+"companyName": "Brinemedia",
+"productName": "Zombie Derby: Blocky Roads",
+"productVersion": "1.0.0",
+"dataUrl": "2021_08_22_poki.data.unityweb",
+"wasmCodeUrl": "2021_08_22_poki.wasm.code.unityweb",
+"wasmFrameworkUrl": "2021_08_22_poki.wasm.framework.unityweb",
+"graphicsAPI": ["WebGL 2.0","WebGL 1.0"],
+"webglContextAttributes": {"preserveDrawingBuffer": false},
+"splashScreenStyle": "Dark",
+"backgroundColor": "#231F20",
+"cacheControl": {"default": "must-revalidate"},
+"developmentBuild": false,
+"multithreading": false,
+"unityVersion": "2019.2.12f1"
+}
