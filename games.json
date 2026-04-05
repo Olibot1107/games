@@ -1,5 +1,5 @@
 {
-  "generated": "2026-04-05T19:39:41.200Z",
+  "generated": "2026-04-05T23:23:35.897Z",
   "good": [
     "2048",
     "CaseClicker-master",
@@ -31,6 +31,8 @@
     "ducklife3",
     "ducklife4",
     "earn-to-die",
+    "farm-battles",
+    "five-nights-at-epsteins",
     "fnaf_1",
     "fnaf_2",
     "fnaf_3",
@@ -101,7 +103,8 @@
     "wordle",
     "worlds-hardest-game",
     "worlds-hardest-game-2",
-    "xx142-b2exe"
+    "xx142-b2exe",
+    "zombie_derby"
   ],
   "nova": [
     "among-impostor",
