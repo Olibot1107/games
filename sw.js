@@ -174,6 +174,7 @@ self.addEventListener('fetch', event => {
   // skip API to avoid loop and client ot avoid problems
   if (url.pathname.startsWith('/api/')) return;
   if (url.pathname.startsWith('/math/')) return;
+  if (url.pathname.startsWith("https://potential-space-yodel-5g4jjj4gjp76fpjw-3000.app.github.dev/nova/nuts-and-bolts-puzzle/")) return;
 
   event.respondWith((async () => {
     try {

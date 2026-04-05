@@ -231,7 +231,6 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
 }
 </script>
-
 `;
     html = html.includes('</head>')
       ? html.replace('</head>', inject + '</head>')
