@@ -13,99 +13,6 @@
     <h1 class="text-3xl font-bold text-slate-800 mb-2">The world of fun</h1>
     <p class="text-gray-500 text-lg">A collection of web-based games with live server stats</p>
   </header>
-<!-- Christmas countdown alert (no floating) -->
-<div class="flex justify-center my-8">
-  <div id="christmas-alert"
-    class="flex items-center p-6 text-sm text-red-900 border border-red-300 rounded-lg bg-red-50 shadow-lg max-w-xl w-full justify-center flex-col"
-    role="alert" aria-live="polite">
-    
-    <div class="flex-1 w-full">
-      <div class="flex items-baseline justify-between">
-        <div>
-          <span class="font-medium text-lg">Christmas Countdown!</span>
-        </div>
-        <div id="status-badge"
-          class="ml-4 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 hidden">
-          It's Christmas!
-        </div>
-      </div>
-
-      <div class="mt-4 grid grid-cols-4 gap-3 text-center">
-        <div class="p-3 bg-white/70 rounded-lg shadow">
-          <div id="days" class="text-2xl font-semibold">0</div>
-          <div class="text-xs text-red-700/80">Days</div>
-        </div>
-        <div class="p-3 bg-white/70 rounded-lg shadow">
-          <div id="hours" class="text-2xl font-semibold">0</div>
-          <div class="text-xs text-red-700/80">Hours</div>
-        </div>
-        <div class="p-3 bg-white/70 rounded-lg shadow">
-          <div id="minutes" class="text-2xl font-semibold">0</div>
-          <div class="text-xs text-red-700/80">Minutes</div>
-        </div>
-        <div class="p-3 bg-white/70 rounded-lg shadow">
-          <div id="seconds" class="text-2xl font-semibold">0</div>
-          <div class="text-xs text-red-700/80">Seconds</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<script>
-(function () {
-  'use strict';
-
-  // Get countdown elements
-  const daysEl = document.getElementById('days');
-  const hoursEl = document.getElementById('hours');
-  const minutesEl = document.getElementById('minutes');
-  const secondsEl = document.getElementById('seconds');
-  const badge = document.getElementById('status-badge');
-
-  // Compute next Christmas (Dec 25)
-  function getNextChristmas() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const thisYearChristmas = new Date(year, 11, 25, 0, 0, 0, 0); // December = 11
-    return now > thisYearChristmas ? new Date(year + 1, 11, 25, 0, 0, 0, 0) : thisYearChristmas;
-  }
-
-  let target = getNextChristmas();
-
-  // Update countdown every second
-  function updateCountdown() {
-    const now = new Date();
-    const diff = target - now;
-
-    if (diff <= 0) {
-      // Christmas has arrived
-      daysEl.textContent = hoursEl.textContent = minutesEl.textContent = secondsEl.textContent = '0';
-      badge.classList.remove('hidden'); // show celebration
-      // Optional: reset for next year
-      target = getNextChristmas();
-      return;
-    }
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-    const minutes = Math.floor((diff / (1000 * 60)) % 60);
-    const seconds = Math.floor((diff / 1000) % 60);
-
-    // Update the DOM
-    daysEl.textContent = days;
-    hoursEl.textContent = String(hours).padStart(2, '0');
-    minutesEl.textContent = String(minutes).padStart(2, '0');
-    secondsEl.textContent = String(seconds).padStart(2, '0');
-
-    // Hide badge while counting down
-    badge.classList.add('hidden');
-  }
-
-  // Initial update
-  updateCountdown();
-  setInterval(updateCountdown, 1000);
-})();
-</script>
 
   <!-- Alert -->
 <div class="flex items-center p-4 mb-6 text-sm text-green-800 border border-green-300 rounded-lg bg-green-50 shadow-md" role="alert">
@@ -128,15 +35,6 @@
     My home server seems to be overloading some games may not be working sorry :)
   </div>
 </div> -->
-
-  <!-- Server Stats Section -->
-  <div class="bg-white rounded-lg p-5 mb-6 shadow">
-    <h2 class="flex items-center text-slate-800 mb-4 pb-2 border-b border-gray-200 text-xl font-semibold">
-      Server Stats
-    </h2>
-    <div id="stats" class="mt-2 p-3 bg-gray-100 rounded text-sm">Loading...</div>
-    <canvas id="usageChart" class="mt-5 w-full"></canvas>
-  </div>
 
   <!-- Search -->
   <div class="max-w-md mx-auto mb-6">
@@ -203,46 +101,6 @@ Nova Games
   <div id="debug-panel" class="bg-black text-green-400 font-mono text-sm p-3 rounded-lg max-h-72 overflow-y-auto whitespace-pre-wrap mt-6">
     [Debug logs will appear here]
   </div>
-
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script>
-    // Server Stats Graph
-    let chart; const maxDataPoints=30; let lastSent=0,lastRecv=0;
-    function createChart(){
-      const ctx=document.getElementById("usageChart").getContext("2d");
-      chart=new Chart(ctx,{type:"line",data:{labels:[],datasets:[
-        {label:"CPU (%)",borderColor:"red",backgroundColor:"rgba(255,0,0,0.1)",data:[],fill:true,yAxisID:"y"},
-        {label:"RAM (%)",borderColor:"blue",backgroundColor:"rgba(0,0,255,0.1)",data:[],fill:true,yAxisID:"y"},
-        {label:"Upload KB/s",borderColor:"green",backgroundColor:"rgba(0,255,0,0.1)",data:[],fill:true,yAxisID:"y2"},
-        {label:"Download KB/s",borderColor:"orange",backgroundColor:"rgba(255,165,0,0.1)",data:[],fill:true,yAxisID:"y2"}
-      ]},options:{responsive:true,animation:false,scales:{y:{beginAtZero:true,max:100,position:"left",title:{display:true,text:"CPU & RAM (%)"}},y2:{beginAtZero:true,position:"right",title:{display:true,text:"Network KB/s"}}}}});
-    }
-    async function updateStats(){
-      try{
-        const r=await fetch("https://olibot13.pythonanywhere.com/stats");
-        const d=await r.json();
-        const h=Math.floor(d.uptime_seconds/3600);
-        const m=Math.floor((d.uptime_seconds%3600)/60);
-        const s=d.uptime_seconds%60;
-        let up=0,down=0;
-        if(lastSent && lastRecv){up=(d.net_sent-lastSent)/1024;down=(d.net_recv-lastRecv)/1024;}
-        lastSent=d.net_sent; lastRecv=d.net_recv;
-        document.getElementById("stats").innerHTML=`CPU: ${d.cpu}%<br>RAM: ${d.ram}%<br>Upload: ${up.toFixed(2)} KB/s<br>Download: ${down.toFixed(2)} KB/s<br>Uptime: ${h}h ${m}m ${s}s`;
-        const now=new Date().toLocaleTimeString();
-        chart.data.labels.push(now);
-        chart.data.datasets[0].data.push(d.cpu);
-        chart.data.datasets[1].data.push(d.ram);
-        chart.data.datasets[2].data.push(up);
-        chart.data.datasets[3].data.push(down);
-        if(chart.data.labels.length>maxDataPoints){chart.data.labels.shift();chart.data.datasets.forEach(x=>x.data.shift());}
-        chart.update();
-      }catch(e){document.getElementById("stats").textContent="Error fetching stats";}
-    }
-    createChart();
-    setInterval(updateStats,1000);
-    updateStats();
-  </script>
 
   <!-- Games Directory -->
   <script>
@@ -334,4 +192,3 @@ Nova Games
 
 </body>
 </html>
-<script src="https://olibot13.pythonanywhere.com/client_script.js"></script><script src="https://olibot13.pythonanywhere.com/fps.js"></script>

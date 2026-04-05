@@ -1,239 +1,214 @@
 const express = require('express');
-const path = require('path');
 const fs = require('fs');
-const https = require('https');
-const { url } = require('inspector');
-const zlib = require('zlib');
+const path = require('path');
+const multer = require('multer');
 
 const app = express();
-const PORT = 3004;
+const PORT = 3000;
 
-// Logging colors
-const colors = {
-  reset: "\x1b[0m",
-  red: "\x1b[31m",
-  yellow: "\x1b[33m",
-  green: "\x1b[32m",
-  cyan: "\x1b[36m",
-};
+const PUBLIC_DIR = path.join(__dirname, '');
+const RESOURCE_KEY = 'games-shell-v1';
+// Configure multer for file uploads
 
-function colorStatus(status) {
-  if (status >= 500) return colors.red + status + colors.reset;
-  if (status >= 400) return colors.yellow + status + colors.reset;
-  if (status >= 300) return colors.cyan + status + colors.reset;
-  return colors.green + status + colors.reset;
+
+app.use(express.json({ limit: '10mb' }));
+
+// =======================
+// LOGGING FUNCTION
+// =======================
+function log(...args) {
+  console.log('[SERVER]', ...args);
 }
 
-// Logging middleware
-app.use((req, res, next) => {
-  if (req.url === '/ping') return next();
+// =======================
+// XOR (STREAM SAFE)
+// =======================
+function xorBuffer(buffer) {
+  const key = Buffer.from(RESOURCE_KEY);
+  const out = Buffer.allocUnsafe(buffer.length);
 
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    console.log(`${req.method} ${req.url} ${colorStatus(res.statusCode)} ${duration}ms`);
+  for (let i = 0; i < buffer.length; i++) {
+    out[i] = buffer[i] ^ key[i % key.length];
+  }
+
+  return out;
+}
+
+// =======================
+// MIME TYPES (EXTENDED)
+// =======================
+const mimeTypes = {
+  '.html': 'text/html; charset=utf-8',
+  '.htm': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
+
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+
+  // UNITY / WASM
+  '.wasm': 'application/wasm',
+  '.data': 'application/octet-stream',
+  '.unityweb': 'application/octet-stream'
+};
+
+// =======================
+// ENCODING DETECTION
+// =======================
+function getEncoding(filePath) {
+  if (filePath.endsWith('.unityweb')) return 'gzip'; // sometimes 'br'
+  return null;
+}
+
+// =======================
+// API ROUTE (STREAM + RANGE + LOGGING)
+// =======================
+app.post('/api/resource', (req, res) => {
+  const reqPath = req.body.path;
+  log('API request for path:', reqPath);
+
+  if (!reqPath || reqPath.includes('..')) {
+    log('Invalid path request:', reqPath);
+    return res.status(400).json({ error: 'invalid path' });
+  }
+
+  const fullPath = path.join(PUBLIC_DIR, reqPath);
+  log('Full path resolved:', fullPath);
+
+  if (!fs.existsSync(fullPath)) {
+    log('File not found:', fullPath);
+    return res.status(404).json({ error: 'not found' });
+  }
+
+  const stat = fs.statSync(fullPath);
+  const ext = path.extname(fullPath).toLowerCase();
+  const contentType = mimeTypes[ext] || 'application/octet-stream';
+  const encoding = getEncoding(fullPath);
+
+  // RANGE SUPPORT
+  const range = req.headers.range;
+  let start = 0;
+  let end = stat.size - 1;
+  let statusCode = 200;
+
+  if (range) {
+    const match = /bytes=(\d+)-(\d*)/.exec(range);
+    if (match) {
+      start = parseInt(match[1], 10);
+      end = match[2] ? parseInt(match[2], 10) : end;
+      statusCode = 206;
+      log(`Range requested: ${start}-${end}`);
+    }
+  }
+
+  const stream = fs.createReadStream(fullPath, { start, end });
+  let buffers = [];
+
+  stream.on('data', chunk => {
+    buffers.push(chunk);
+    log(`Streaming chunk: ${chunk.length} bytes`);
   });
 
-  next();
+  stream.on('end', () => {
+    log('File read complete, assembling buffer...');
+    const fileBuffer = Buffer.concat(buffers);
+    log('Buffer length:', fileBuffer.length);
+
+    const encryptedFile = xorBuffer(fileBuffer).toString('base64');
+    log('File encrypted and base64-encoded');
+
+    const envelope = {
+      contentType,
+      contentEncoding: encoding,
+      size: stat.size,
+      start,
+      end,
+      payload: encryptedFile
+    };
+
+    const encryptedEnvelope = xorBuffer(
+      Buffer.from(JSON.stringify(envelope))
+    ).toString('base64');
+
+    log('Envelope encrypted and ready to send');
+    res.status(statusCode).json({
+      payload: encryptedEnvelope
+    });
+  });
+
+  stream.on('error', err => {
+    log('Stream error:', err);
+    res.status(500).json({ error: 'stream error' });
+  });
 });
 
+// =======================
+// HTML INJECTION + LOGGING
+// =======================
 app.use((req, res, next) => {
-  if (!req.url.startsWith("/good/gun_spin/")) return next();
+  if (req.method !== 'GET') return next();
 
-  if (req.url.endsWith(".uwu")) {
-    const filePath = path.join(__dirname, ".", req.url);
+  if (req.path.endsWith('.html') || req.path === '/') {
+    const filePath = req.path === '/'
+      ? path.join(PUBLIC_DIR, 'index.html')
+      : path.join(PUBLIC_DIR, req.path);
 
-    try {
-      const data = fs.readFileSync(filePath);
+    log('HTML requested:', filePath);
 
-      // Set MIME types without using octet-stream
-      if (req.url.includes(".wasm")) {
-        res.type("application/wasm");
-      } else if (req.url.includes(".js")) {
-        res.type("application/javascript");
-      } else {
-        // For .data and any other files
-        res.type("application/binary");
-      }
+    if (!fs.existsSync(filePath)) return next();
 
-      // If the file is gzipped, tell browser
-      if (data.length >= 2 && data.readUInt16BE(0) === 0x1f8b) {
-        res.setHeader("Content-Encoding", "gzip");
-      }
+    let html = fs.readFileSync(filePath, 'utf8');
+    const inject = `
+<script>
+console.log('[Client] Registering SW...');
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
+</script>
 
-      res.send(data);
-    } catch (err) {
-      console.error("Error serving file:", err);
-      res.status(404).send("File not found");
-    }
-    return;
+`;
+    html = html.includes('</head>')
+      ? html.replace('</head>', inject + '</head>')
+      : html + inject;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    log('Injected SW registration script');
+    return res.send(html);
   }
 
   next();
 });
 
-// Handle requests coming from /projects/editor
-app.use((req, res, next) => {
-  const referer = req.get('Referer') || '';
-
-  // Serve editor page
-  if (req.url === '/projects/editor') {
-    const editorHtmlPath = path.join(__dirname, 'projects', 'editor');
-    if (fs.existsSync(editorHtmlPath)) {
-      return res.type('html').sendFile(editorHtmlPath);
-    } else {
-      return res.status(404).send('Editor HTML not found');
-    }
-  }
-
-  // Any request coming from the editor page
-  if (referer.includes('/projects/editor')) {
-    const filePath = path.join(__dirname, 'scratch', req.url.replace(/^\//, ''));
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-      return res.sendFile(filePath);
-    } else {
-      return res.status(404).send('<meta http-equiv="refresh" content="0">');
-    }
-  }
-
-  next(); // all other requests handled normally
-});
-
-// Middleware to avoid octet-stream
-app.use((req, res, next) => {
-  const originalSetHeader = res.setHeader.bind(res);
-  res.setHeader = function(name, value) {
-    if (name === 'Content-Type' && value === 'application/octet-stream') {
-      value = 'application/binary';
-    }
-    return originalSetHeader(name, value);
-  };
-  next();
-});
-
-// Serve other static files normally
-app.use(express.static(path.join(__dirname, ''), {
+// =======================
+// STATIC FALLBACK + LOGGING
+// =======================
+app.use(express.static(PUBLIC_DIR, {
   setHeaders: (res, filePath) => {
-    const contentType = res.getHeader('Content-Type');
-    if (contentType === 'application/octet-stream') {
-      res.setHeader('Content-Type', 'application/binary');
-    }
-    if (!res.req.url.startsWith('/ping')) {
-      console.log(`Sending ${filePath}`);
-    }
+    log('Serving static file:', filePath);
   }
 }));
 
-app.get('/ping', (req, res) => {
-  res.send('Pong!');
-});
-
-const BASE_URL = 'https://www.myinstants.com';
-
-// Get all sounds (optionally filtered by search)
-// Get all sounds (optionally filtered by search)
-app.get('/sounds', async (req, res) => {
-  try {
-    const search = req.query.search;
-    const page = req.query.page || 1; // optional query param for pagination
-    let url = `${BASE_URL}/api/v1/instants/?format=json&page=${page}`;
-    if (search && search.length >= 2) {
-      url += `&name=${encodeURIComponent(search)}`;
-    }
-
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-
-    const data = await response.json();
-
-    // Map the results
-    const sounds = (data.results || []).map(s => ({
-      name: s.name,
-      mp3: s.sound,   // the API already provides full URL
-      slug: s.slug,
-      color: s.color,
-      image: s.image,
-      description: s.description
-    }));
-
-    // Include pagination info
-    res.json({
-      count: data.count,
-      next: data.next,
-      previous: data.previous,
-      results: sounds
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch sounds' });
-  }
-});
-
-
-app.get('/media/sounds/:filename', async (req, res) => {
-  try {
-    const { filename } = req.params;
-    const url = `https://www.myinstants.com/media/sounds/${filename}`;
-
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Failed to fetch ${filename}`);
-
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-    res.send(buffer);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch MP3' });
-  }
-});
-app.get('/media/images/:filename', async (req, res) => {
-  try {
-    const { filename } = req.params;
-    const url = `https://www.myinstants.com/media/instants_images/${filename}`;
-
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Failed to fetch image: ${filename}`);
-
-    // Convert to buffer
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Set headers and send
-    res.setHeader('Content-Type', 'image/png'); // change dynamically if needed
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-    res.send(buffer);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch image' });
-  }
-});
-
-const DROPBOX_URL = 'https://www.dropbox.com/scl/fi/r9pwae9dv7kk3znqwhg0l/9999-MG-Joined-by-HappyScribe.mp3?rlkey=iqd7zyrv14032to2hjtpdt3qd&e=1&st=w7l2crxa&dl=1';
-
-function streamDropboxFile(url, res) {
-  https.get(url, (dropboxRes) => {
-    // Handle 302 redirect
-    if (dropboxRes.statusCode >= 300 && dropboxRes.statusCode < 400 && dropboxRes.headers.location) {
-      return streamDropboxFile(dropboxRes.headers.location, res);
-    }
-
-    // Stream audio
-    res.setHeader('Content-Type', 'audio/mpeg');
-    dropboxRes.pipe(res);
-  }).on('error', (err) => {
-    console.error(err);
-    res.status(500).send('Failed to load audio');
-  });
-}
-
-app.get('/phonk', (req, res) => {
-  streamDropboxFile(DROPBOX_URL, res);
-});
-
+// =======================
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  log('Server running on http://localhost:' + PORT);
 });
