@@ -134,24 +134,24 @@ app.post('/api/resource', (req, res) => {
   log('API request for path:', reqPath);
 
   if (!reqPath || reqPath.includes('..')) {
-    log('Invalid path request:', reqPath);
     return res.status(400).json({ error: 'invalid path' });
   }
 
   const fullPath = path.join(PUBLIC_DIR, reqPath);
-  log('Full path resolved:', fullPath);
 
   if (!fs.existsSync(fullPath)) {
-    log('File not found:', fullPath);
     return res.status(404).json({ error: 'not found' });
   }
 
   const stat = fs.statSync(fullPath);
+  if (!stat.isFile()) {
+    return res.status(400).json({ error: 'not a file' });
+  }
+
   const ext = path.extname(fullPath).toLowerCase();
   const contentType = mimeTypes[ext] || 'application/octet-stream';
   const encoding = getEncoding(fullPath);
 
-  // RANGE SUPPORT
   const range = req.headers.range;
   let start = 0;
   let end = stat.size - 1;
@@ -163,48 +163,37 @@ app.post('/api/resource', (req, res) => {
       start = parseInt(match[1], 10);
       end = match[2] ? parseInt(match[2], 10) : end;
       statusCode = 206;
-      log(`Range requested: ${start}-${end}`);
     }
   }
 
   const stream = fs.createReadStream(fullPath, { start, end });
-  let buffers = [];
+
+  res.status(statusCode);
+  res.setHeader('Content-Type', 'application/json');
+  res.write('{"payload":"'); // start JSON envelope
 
   stream.on('data', chunk => {
-    buffers.push(chunk);
-    log(`Streaming chunk: ${chunk.length} bytes`);
+    try {
+      const encrypted = xorBuffer(chunk);
+      res.write(encrypted.toString('base64'));
+    } catch (err) {
+      log('Chunk encryption error:', err);
+      stream.destroy();
+    }
   });
 
   stream.on('end', () => {
-    log('File read complete, assembling buffer...');
-    const fileBuffer = Buffer.concat(buffers);
-    log('Buffer length:', fileBuffer.length);
-
-    const encryptedFile = xorBuffer(fileBuffer).toString('base64');
-    log('File encrypted and base64-encoded');
-
-    const envelope = {
-      contentType,
-      contentEncoding: encoding,
-      size: stat.size,
-      start,
-      end,
-      payload: encryptedFile
-    };
-
-    const encryptedEnvelope = xorBuffer(
-      Buffer.from(JSON.stringify(envelope))
-    ).toString('base64');
-
-    log('Envelope encrypted and ready to send');
-    res.status(statusCode).json({
-      payload: encryptedEnvelope
-    });
+    res.end('"}'); // close JSON envelope
+    log('Streaming complete');
   });
 
   stream.on('error', err => {
     log('Stream error:', err);
-    res.status(500).json({ error: 'stream error' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'stream error' });
+    } else {
+      res.end(); // ensure connection closes
+    }
   });
 });
 
