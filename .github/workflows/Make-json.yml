@@ -32,7 +32,7 @@ jobs:
           const good = getDirs("good");
           const nova = getDirs("nova");
           const output = { generated: new Date().toISOString(), good, nova };
-          fs.writeFileSync("games.json", JSON.stringify(output, null, 2));
+          fs.writeFileSync("list.json", JSON.stringify(output, null, 2));
           console.log("✅ games.json generated:", output);
           EOF
 
@@ -40,6 +40,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add games.json
+          git add list.json
           git commit -m "Auto-update games.json" || echo "No changes to commit"
           git push
