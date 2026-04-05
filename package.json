@@ -11,6 +11,8 @@
   "description": "",
   "packageManager": "pnpm@8.10.0",
   "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "discord.js": "^14.26.2",
     "express": "^5.2.1",
     "multer": "^2.1.1",
     "uuid": "^13.0.0"

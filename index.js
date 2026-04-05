@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
-
+const cookieParser = require('cookie-parser');
 const app = express();
 const PORT = 3000;
 
@@ -12,7 +12,53 @@ const RESOURCE_KEY = 'games-shell-v1';
 
 
 app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser()); // <-- MUST come before auth check
+app.use(async (req, res, next) => {
+    try {
+        // Only log API requests (optional: remove if you want all)
+        if (!req.path.startsWith('/api/resource')) return next();
 
+        // Prepare pretty code block strings
+        const queryString = Object.keys(req.query).length ? JSON.stringify(req.query, null, 2) : '{}';
+        const bodyString = Object.keys(req.body || {}).length ? JSON.stringify(req.body, null, 2) : '{}';
+
+        // Build payload for embed API
+        const payload = {
+            color: '#FFA500',
+            fields: [
+                { name: 'Method', value: `\`\`\`${req.method}\`\`\``, inline: true },
+                { name: 'Path', value: `\`\`\`${req.path}\`\`\``, inline: true },
+                { name: 'Query', value: `\`\`\`json\n${queryString}\n\`\`\``, inline: false },
+                { name: 'Body', value: `\`\`\`json\n${bodyString}\n\`\`\``, inline: false },
+                { name: 'IP', value: `\`\`\`${req.ip}\`\`\``, inline: true },
+                { name: 'Timestamp', value: `\`\`\`${new Date().toISOString()}\`\`\``, inline: true }
+            ]
+        };
+
+        // Send to embed API on localhost:4000
+        await fetch('http://localhost:4000/send-embed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    } catch (err) {
+        console.error('Failed to forward request to embed API:', err);
+    }
+
+    next(); // continue to next route/middleware
+});
+
+app.use((req, res, next) => {
+
+    // Allow /auth.html and /math/* without cookie
+    if (req.path.startsWith('/auth') || req.path.startsWith('/math')) return next();
+
+    // Check cookie
+    if (req.cookies && req.cookies.ok === 'true') return next();
+
+    // Redirect if not authenticated
+    return res.redirect('/math/index.html');
+});
 // =======================
 // LOGGING FUNCTION
 // =======================

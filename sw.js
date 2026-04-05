@@ -173,6 +173,7 @@ self.addEventListener('fetch', event => {
 
   // skip API to avoid loop and client ot avoid problems
   if (url.pathname.startsWith('/api/')) return;
+  if (url.pathname.startsWith('/math/')) return;
 
   event.respondWith((async () => {
     try {
