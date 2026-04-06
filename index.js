@@ -8,37 +8,63 @@ const PORT = 3000;
 
 const PUBLIC_DIR = path.join(__dirname, '');
 const CACHE_DIR = path.join(__dirname, 'pre_cache');
-
-// PROPER ENCRYPTION SETUP
-const MASTER_KEY = crypto.scryptSync('your-secure-password-here-change-this', 'salt', 32); // Derive 256-bit key
-const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 16; // 128-bit IV
-const TAG_LENGTH = 16; // 128-bit auth tag
-const KEY_LENGTH = 32; // 256-bit key
+const RESOURCE_KEY = Buffer.from('games-shell-v1');
 
 // ANSI Color codes
 const colors = {
-    reset: '\x1b[0m', bright: '\x1b[1m', red: '\x1b[31m', green: '\x1b[32m',
-    yellow: '\x1b[33m', blue: '\x1b[34m', magenta: '\x1b[35m', cyan: '\x1b[36m',
-    white: '\x1b[37m', bgRed: '\x1b[41m', bgGreen: '\x1b[42m', bgYellow: '\x1b[43m', bgBlue: '\x1b[44m'
+    reset: '\x1b[0m',
+    bright: '\x1b[1m',
+    red: '\x1b[31m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    blue: '\x1b[34m',
+    magenta: '\x1b[35m',
+    cyan: '\x1b[36m',
+    white: '\x1b[37m',
+    bgRed: '\x1b[41m',
+    bgGreen: '\x1b[42m',
+    bgYellow: '\x1b[43m',
+    bgBlue: '\x1b[44m'
 };
 
-function log(msg, color = 'white') { console.log(`${colors[color]}[SERVER]${colors.reset}`, msg); }
-function logCache(hit, file) {
-    if (hit) console.log(`${colors.bgGreen}${colors.bright} CACHE HIT ${colors.reset} ${colors.green}${file}${colors.reset}`);
-    else console.log(`${colors.bgYellow}${colors.bright} CACHE MISS ${colors.reset} ${colors.yellow}${file}${colors.reset}`);
+// Colored logging functions
+function log(msg, color = 'white') {
+    console.log(`${colors[color]}[SERVER]${colors.reset}`, msg);
 }
-function logError(msg) { console.log(`${colors.bgRed}${colors.bright} ERROR ${colors.reset} ${colors.red}${msg}${colors.reset}`); }
-function logInfo(msg) { console.log(`${colors.cyan}[INFO]${colors.reset} ${msg}`); }
-function logSuccess(msg) { console.log(`${colors.green}[SUCCESS]${colors.reset} ${msg}`); }
 
-if (!fs.existsSync(CACHE_DIR)) { fs.mkdirSync(CACHE_DIR, { recursive: true }); logSuccess('Created pre_cache directory'); }
+function logCache(hit, file) {
+    if (hit) {
+        console.log(`${colors.bgGreen}${colors.bright} CACHE HIT ${colors.reset} ${colors.green}${file}${colors.reset}`);
+    } else {
+        console.log(`${colors.bgYellow}${colors.bright} CACHE MISS ${colors.reset} ${colors.yellow}${file}${colors.reset}`);
+    }
+}
+
+function logError(msg) {
+    console.log(`${colors.bgRed}${colors.bright} ERROR ${colors.reset} ${colors.red}${msg}${colors.reset}`);
+}
+
+function logInfo(msg) {
+    console.log(`${colors.cyan}[INFO]${colors.reset} ${msg}`);
+}
+
+function logSuccess(msg) {
+    console.log(`${colors.green}[SUCCESS]${colors.reset} ${msg}`);
+}
+
+// Create cache directory if it doesn't exist
+if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    logSuccess('Created pre_cache directory');
+}
 
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
+// Non-blocking logger
 app.use((req, res, next) => {
     if (!req.path.startsWith('/api/resource')) return next();
+    
     process.nextTick(() => {
         fetch('http://localhost:4000/send-embed', {
             method: 'POST',
@@ -62,169 +88,103 @@ app.use((req, res, next) => {
     return res.redirect('/math/index.html');
 });
 
-// PROPER AES-256-GCM ENCRYPTION
-function encryptBuffer(buffer) {
-    const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv(ALGORITHM, MASTER_KEY, iv);
+// ULTRA-FAST XOR
+function xorBufferFast(buffer) {
+    const keyLen = RESOURCE_KEY.length;
+    const bufLen = buffer.length;
+    const out = Buffer.allocUnsafe(bufLen);
     
-    const encrypted = Buffer.concat([cipher.update(buffer), cipher.final()]);
-    const tag = cipher.getAuthTag();
+    let i = 0;
+    const limit = bufLen - 15;
     
-    // Format: IV (16) + TAG (16) + ENCRYPTED_DATA
-    return Buffer.concat([iv, tag, encrypted]);
-}
-
-function decryptBuffer(buffer) {
-    const iv = buffer.slice(0, IV_LENGTH);
-    const tag = buffer.slice(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
-    const encrypted = buffer.slice(IV_LENGTH + TAG_LENGTH);
+    while (i < limit) {
+        const k0 = RESOURCE_KEY[i % keyLen];
+        const k1 = RESOURCE_KEY[(i + 1) % keyLen];
+        const k2 = RESOURCE_KEY[(i + 2) % keyLen];
+        const k3 = RESOURCE_KEY[(i + 3) % keyLen];
+        const k4 = RESOURCE_KEY[(i + 4) % keyLen];
+        const k5 = RESOURCE_KEY[(i + 5) % keyLen];
+        const k6 = RESOURCE_KEY[(i + 6) % keyLen];
+        const k7 = RESOURCE_KEY[(i + 7) % keyLen];
+        const k8 = RESOURCE_KEY[(i + 8) % keyLen];
+        const k9 = RESOURCE_KEY[(i + 9) % keyLen];
+        const k10 = RESOURCE_KEY[(i + 10) % keyLen];
+        const k11 = RESOURCE_KEY[(i + 11) % keyLen];
+        const k12 = RESOURCE_KEY[(i + 12) % keyLen];
+        const k13 = RESOURCE_KEY[(i + 13) % keyLen];
+        const k14 = RESOURCE_KEY[(i + 14) % keyLen];
+        const k15 = RESOURCE_KEY[(i + 15) % keyLen];
+        
+        out[i] = buffer[i] ^ k0;
+        out[i + 1] = buffer[i + 1] ^ k1;
+        out[i + 2] = buffer[i + 2] ^ k2;
+        out[i + 3] = buffer[i + 3] ^ k3;
+        out[i + 4] = buffer[i + 4] ^ k4;
+        out[i + 5] = buffer[i + 5] ^ k5;
+        out[i + 6] = buffer[i + 6] ^ k6;
+        out[i + 7] = buffer[i + 7] ^ k7;
+        out[i + 8] = buffer[i + 8] ^ k8;
+        out[i + 9] = buffer[i + 9] ^ k9;
+        out[i + 10] = buffer[i + 10] ^ k10;
+        out[i + 11] = buffer[i + 11] ^ k11;
+        out[i + 12] = buffer[i + 12] ^ k12;
+        out[i + 13] = buffer[i + 13] ^ k13;
+        out[i + 14] = buffer[i + 14] ^ k14;
+        out[i + 15] = buffer[i + 15] ^ k15;
+        
+        i += 16;
+    }
     
-    const decipher = crypto.createDecipheriv(ALGORITHM, MASTER_KEY, iv);
-    decipher.setAuthTag(tag);
+    while (i < bufLen) {
+        out[i] = buffer[i] ^ RESOURCE_KEY[i % keyLen];
+        i++;
+    }
     
-    return Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    return out;
 }
 
 const mimeTypes = {
-    '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8',
-    '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
-    '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
-    '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg', '.mp4': 'video/mp4',
-    '.wasm': 'application/wasm', '.unityweb': 'application/octet-stream'
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'application/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+    '.mp3': 'audio/mpeg',
+    '.mp4': 'video/mp4',
+    '.wasm': 'application/wasm',
+    '.unityweb': 'application/octet-stream'
 };
 
+// Generate cache filename from path
 function getCacheFilename(filePath) {
-    const hash = crypto.createHash('sha256').update(filePath).digest('hex');
-    return path.join(CACHE_DIR, hash + '.enc'); // .enc for encrypted
+    const hash = crypto.createHash('md5').update(filePath).digest('hex');
+    return path.join(CACHE_DIR, hash + '.cache');
 }
 
+// Check if cached version is valid (file not modified)
 async function isCacheValid(originalPath, cachePath) {
     try {
         const [originalStat, cacheStat] = await Promise.all([
             fs.promises.stat(originalPath),
             fs.promises.stat(cachePath)
         ]);
+        
         return originalStat.mtime <= cacheStat.mtime;
-    } catch { return false; }
+    } catch {
+        return false;
+    }
 }
 
-let cacheStats = { hits: 0, misses: 0, saves: 0 };
-
-// STREAM ENCRYPT to disk - AES-256-GCM
-async function streamEncryptFileToFile(sourcePath, destPath, filePathForLog) {
-    return new Promise((resolve, reject) => {
-        const readStream = fs.createReadStream(sourcePath, { highWaterMark: 64 * 1024 });
-        const writeStream = fs.createWriteStream(destPath);
-        
-        // Generate random IV
-        const iv = crypto.randomBytes(IV_LENGTH);
-        const cipher = crypto.createCipheriv(ALGORITHM, MASTER_KEY, iv);
-        
-        let totalBytes = 0;
-        const startTime = Date.now();
-        
-        // Write IV first
-        writeStream.write(iv);
-        
-        cipher.on('data', (chunk) => writeStream.write(chunk));
-        cipher.on('end', () => {
-            const tag = cipher.getAuthTag();
-            writeStream.write(tag); // Append auth tag at end
-            writeStream.end();
-        });
-        
-        readStream.on('data', (chunk) => {
-            totalBytes += chunk.length;
-            cipher.write(chunk);
-        });
-        
-        readStream.on('end', () => cipher.end());
-        
-        readStream.on('error', reject);
-        cipher.on('error', reject);
-        writeStream.on('finish', () => {
-            const elapsed = Date.now() - startTime;
-            logInfo(`Encrypted ${colors.cyan}${(totalBytes/1024).toFixed(2)}KB${colors.reset} to disk in ${colors.green}${elapsed}ms${colors.reset} for ${colors.yellow}${filePathForLog}${colors.reset}`);
-            resolve();
-        });
-        writeStream.on('error', reject);
-        
-        // Pipe manually to handle auth tag
-        readStream.pipe(cipher, { end: true });
-    });
-}
-
-// STREAM DECRYPT from disk to response - AES-256-GCM
-async function streamDecryptToResponse(sourcePath, res, filePathForLog, envelopeMeta) {
-    return new Promise((resolve, reject) => {
-        const readStream = fs.createReadStream(sourcePath, { highWaterMark: 64 * 1024 });
-        
-        let headerBuffer = Buffer.alloc(0);
-        let decipher = null;
-        let chunks = [];
-        let totalBytes = 0;
-        let headerParsed = false;
-        const startTime = Date.now();
-        
-        readStream.on('data', (chunk) => {
-            if (!headerParsed) {
-                headerBuffer = Buffer.concat([headerBuffer, chunk]);
-                
-                // Wait until we have IV + TAG (32 bytes)
-                if (headerBuffer.length >= IV_LENGTH + TAG_LENGTH) {
-                    const iv = headerBuffer.slice(0, IV_LENGTH);
-                    const tag = headerBuffer.slice(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
-                    const remaining = headerBuffer.slice(IV_LENGTH + TAG_LENGTH);
-                    
-                    decipher = crypto.createDecipheriv(ALGORITHM, MASTER_KEY, iv);
-                    decipher.setAuthTag(tag);
-                    
-                    // Process remaining data
-                    if (remaining.length > 0) {
-                        const decrypted = decipher.update(remaining);
-                        chunks.push(decrypted.toString('base64'));
-                        totalBytes += decrypted.length;
-                    }
-                    
-                    headerParsed = true;
-                }
-            } else {
-                const decrypted = decipher.update(chunk);
-                chunks.push(decrypted.toString('base64'));
-                totalBytes += decrypted.length;
-            }
-        });
-        
-        readStream.on('end', () => {
-            if (!headerParsed) {
-                reject(new Error('File too small/invalid'));
-                return;
-            }
-            
-            const final = decipher.final();
-            if (final.length > 0) {
-                chunks.push(final.toString('base64'));
-                totalBytes += final.length;
-            }
-            
-            const payload = chunks.join('');
-            const elapsed = Date.now() - startTime;
-            logInfo(`Decrypted ${colors.cyan}${(totalBytes/1024).toFixed(2)}KB${colors.reset} to response in ${colors.green}${elapsed}ms${colors.reset} for ${colors.yellow}${filePathForLog}${colors.reset}`);
-            
-            const envelope = { ...envelopeMeta, payload };
-            const envelopeBuf = Buffer.from(JSON.stringify(envelope));
-            const encryptedEnvelope = encryptBuffer(envelopeBuf);
-            
-            res.json({ payload: encryptedEnvelope.toString('base64') });
-            resolve();
-        });
-        
-        readStream.on('error', (err) => {
-            logError('Stream error: ' + err.message);
-            reject(err);
-        });
-    });
-}
+// Cache statistics
+let cacheStats = {
+    hits: 0,
+    misses: 0,
+    saves: 0
+};
 
 app.post('/api/resource', async (req, res) => {
     const reqPath = req.body.path;
@@ -240,10 +200,12 @@ app.post('/api/resource', async (req, res) => {
     try {
         const stat = await fs.promises.stat(fullPath);
         const ext = path.extname(fullPath).toLowerCase();
-        const fileSize = stat.size;
-
+        
+        // Range handling
         const range = req.headers.range;
-        let start = 0, end = fileSize - 1, statusCode = 200;
+        let start = 0;
+        let end = stat.size - 1;
+        let statusCode = 200;
 
         if (range) {
             const match = /bytes=(\d+)-(\d*)/.exec(range);
@@ -251,40 +213,68 @@ app.post('/api/resource', async (req, res) => {
                 start = parseInt(match[1], 10);
                 end = match[2] ? parseInt(match[2], 10) : end;
                 statusCode = 206;
-                logInfo(`Range request: ${colors.cyan}${start}-${end}${colors.reset} for ${colors.yellow}${reqPath}${colors.reset}`);
+                logInfo(`Range request: ${start}-${end} for ${reqPath}`);
             }
         }
 
-        const envelopeMeta = {
-            contentType: mimeTypes[ext] || 'application/octet-stream',
-            contentEncoding: ext === '.unityweb' ? 'gzip' : null,
-            size: fileSize, start, end
-        };
-
+        let encryptedFile;
         const startTime = Date.now();
         
+        // Check if pre-cached version exists and is valid
         if (await isCacheValid(fullPath, cacheFile)) {
             cacheStats.hits++;
             logCache(true, reqPath);
-            await streamDecryptToResponse(cacheFile, res, reqPath, envelopeMeta);
-            const totalElapsed = Date.now() - startTime;
-            logInfo(`Total request time: ${colors.green}${totalElapsed}ms${colors.reset}`);
-            return;
+            
+            // Read pre-encrypted file directly
+            const cachedData = await fs.promises.readFile(cacheFile);
+            const rangeBuffer = cachedData.slice(start, end + 1);
+            encryptedFile = rangeBuffer.toString('base64');
+            
+            const elapsed = Date.now() - startTime;
+            logInfo(`Served from cache in ${colors.green}${elapsed}ms${colors.reset}`);
+        } else {
+            cacheStats.misses++;
+            logCache(false, reqPath);
+            
+            // Read, encrypt, and save to cache
+            const fileBuffer = await fs.promises.readFile(fullPath);
+            logInfo(`File read: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
+            
+            const encrypted = xorBufferFast(fileBuffer);
+            const xorTime = Date.now() - startTime;
+            logInfo(`XOR encryption done in ${colors.yellow}${xorTime}ms${colors.reset}`);
+            
+            // Save encrypted version to cache (async, don't wait)
+            fs.promises.writeFile(cacheFile, encrypted).then(() => {
+                cacheStats.saves++;
+                logSuccess(`Cached to disk: ${reqPath}`);
+                logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset} | Saves: ${colors.cyan}${cacheStats.saves}${colors.reset}`);
+            }).catch(err => {
+                logError('Cache write failed: ' + err.message);
+            });
+            
+            const rangeBuffer = encrypted.slice(start, end + 1);
+            encryptedFile = rangeBuffer.toString('base64');
+            
+            const elapsed = Date.now() - startTime;
+            logInfo(`Total processing time: ${colors.yellow}${elapsed}ms${colors.reset}`);
         }
 
-        cacheStats.misses++;
-        logCache(false, reqPath);
-        logInfo(`Creating encrypted disk cache for ${colors.yellow}${reqPath}${colors.reset} (${colors.cyan}${(fileSize/1024).toFixed(2)}KB${colors.reset})...`);
-        
-        await streamEncryptFileToFile(fullPath, cacheFile, reqPath);
-        
-        cacheStats.saves++;
-        logSuccess(`Encrypted cache created: ${colors.green}${reqPath}${colors.reset}`);
-        logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset} | Saves: ${colors.cyan}${cacheStats.saves}${colors.reset}`);
-        
-        await streamDecryptToResponse(cacheFile, res, reqPath, envelopeMeta);
-        const totalElapsed = Date.now() - startTime;
-        logInfo(`Total request time: ${colors.yellow}${totalElapsed}ms${colors.reset}`);
+        const envelope = {
+            contentType: mimeTypes[ext] || 'application/octet-stream',
+            contentEncoding: ext === '.unityweb' ? 'gzip' : null,
+            size: stat.size,
+            start,
+            end,
+            payload: encryptedFile
+        };
+
+        // Encrypt envelope
+        const encryptedEnvelope = xorBufferFast(
+            Buffer.from(JSON.stringify(envelope))
+        ).toString('base64');
+
+        res.status(statusCode).json({ payload: encryptedEnvelope });
 
     } catch (err) {
         if (err.code === 'ENOENT') {
@@ -296,24 +286,39 @@ app.post('/api/resource', async (req, res) => {
     }
 });
 
+// Cached HTML injection
+const htmlCache = new Map();
+
 app.use(async (req, res, next) => {
     if (req.method !== 'GET') return next();
-    if (!req.path.endsWith('.html') && req.path !== '/') return next();
 
-    const filePath = req.path === '/' 
-        ? path.join(PUBLIC_DIR, 'index.html')
-        : path.join(PUBLIC_DIR, req.path);
+    if (req.path.endsWith('.html') || req.path === '/') {
+        const filePath = req.path === '/' 
+            ? path.join(PUBLIC_DIR, 'index.html')
+            : path.join(PUBLIC_DIR, req.path);
 
-    try {
-        const html = await fs.promises.readFile(filePath, 'utf8');
-        const inject = `<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>`;
-        const finalHtml = html.includes('</head>') 
-            ? html.replace('</head>', inject + '</head>')
-            : html + inject;
-        logInfo(`HTML served from disk: ${colors.cyan}${req.path}${colors.reset}`);
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        return res.send(finalHtml);
-    } catch { return next(); }
+        try {
+            let html;
+            if (htmlCache.has(filePath)) {
+                html = htmlCache.get(filePath);
+                logInfo(`HTML cache hit: ${req.path}`);
+            } else {
+                html = await fs.promises.readFile(filePath, 'utf8');
+                const inject = `<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>`;
+                html = html.includes('</head>') 
+                    ? html.replace('</head>', inject + '</head>')
+                    : html + inject;
+                htmlCache.set(filePath, html);
+                logInfo(`HTML cached: ${req.path}`);
+            }
+
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            return res.send(html);
+        } catch {
+            return next();
+        }
+    }
+    next();
 });
 
 app.use(express.static(PUBLIC_DIR));
@@ -324,9 +329,7 @@ ${colors.bright}${colors.cyan}╔═══════════════�
 ║     SERVER STARTED SUCCESSFULLY      ║
 ╚══════════════════════════════════════╝${colors.reset}
 ${colors.green}➜${colors.reset} Running on: ${colors.bright}http://localhost:${PORT}${colors.reset}
-${colors.green}➜${colors.reset} Encryption: ${colors.bright}AES-256-GCM${colors.reset} (authenticated)
-${colors.green}➜${colors.reset} Key: ${colors.bright}256-bit${colors.reset} (scrypt derived)
-${colors.green}➜${colors.reset} IV: ${colors.bright}Random 128-bit${colors.reset} per encryption
-${colors.green}➜${colors.reset} RAM usage: ${colors.bright}MINIMAL${colors.reset} (streaming)
+${colors.green}➜${colors.reset} Cache directory: ${colors.bright}${CACHE_DIR}${colors.reset}
+${colors.green}➜${colors.reset} XOR Key: ${colors.bright}${RESOURCE_KEY.toString()}${colors.reset}
     `);
 });
