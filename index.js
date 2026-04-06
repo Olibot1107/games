@@ -323,6 +323,45 @@ app.use(async (req, res, next) => {
 
 app.use(express.static(PUBLIC_DIR));
 
+const VOTES_FILE = path.join(__dirname, 'votes.json');
+
+// Ensure votes file exists
+if (!fs.existsSync(VOTES_FILE)) fs.writeFileSync(VOTES_FILE, '{}', 'utf8');
+
+// Helper to read/write votes
+function readVotes() {
+    try { return JSON.parse(fs.readFileSync(VOTES_FILE, 'utf8')); }
+    catch { return {}; }
+}
+
+function writeVotes(votes) {
+    fs.writeFileSync(VOTES_FILE, JSON.stringify(votes, null, 2));
+}
+
+// Serve static files
+app.use(express.static(PUBLIC_DIR));
+
+// Get all votes
+app.get('/api/votes', (req, res) => {
+    const votes = readVotes();
+    res.json(votes);
+});
+
+// Submit a vote
+app.post('/api/vote', (req, res) => {
+    const { game, vote, uid } = req.body;
+    if(!game || !vote || !uid) return res.status(400).json({ error:'Invalid payload' });
+
+    const votes = readVotes();
+    if(!votes[game]) votes[game] = {};
+    
+    // Only store one vote per uid, overwrite previous vote
+    votes[game][uid] = vote;
+    writeVotes(votes);
+
+    res.json({ success:true });
+});
+
 app.listen(PORT, () => {
     console.log(`
 ${colors.bright}${colors.cyan}╔══════════════════════════════════════╗
