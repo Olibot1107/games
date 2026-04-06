@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
-const stream = require('stream');
 const app = express();
 const PORT = 3000;
 
@@ -89,59 +88,41 @@ app.use((req, res, next) => {
     return res.redirect('/math/index.html');
 });
 
-// ULTRA-FAST XOR (for small buffers)
+// ULTRA-FAST XOR - operates on buffer in-place when possible
 function xorBufferFast(buffer) {
     const keyLen = RESOURCE_KEY.length;
     const bufLen = buffer.length;
-    const out = Buffer.allocUnsafe(bufLen);
     
     let i = 0;
     const limit = bufLen - 15;
     
     while (i < limit) {
-        const k0 = RESOURCE_KEY[i % keyLen];
-        const k1 = RESOURCE_KEY[(i + 1) % keyLen];
-        const k2 = RESOURCE_KEY[(i + 2) % keyLen];
-        const k3 = RESOURCE_KEY[(i + 3) % keyLen];
-        const k4 = RESOURCE_KEY[(i + 4) % keyLen];
-        const k5 = RESOURCE_KEY[(i + 5) % keyLen];
-        const k6 = RESOURCE_KEY[(i + 6) % keyLen];
-        const k7 = RESOURCE_KEY[(i + 7) % keyLen];
-        const k8 = RESOURCE_KEY[(i + 8) % keyLen];
-        const k9 = RESOURCE_KEY[(i + 9) % keyLen];
-        const k10 = RESOURCE_KEY[(i + 10) % keyLen];
-        const k11 = RESOURCE_KEY[(i + 11) % keyLen];
-        const k12 = RESOURCE_KEY[(i + 12) % keyLen];
-        const k13 = RESOURCE_KEY[(i + 13) % keyLen];
-        const k14 = RESOURCE_KEY[(i + 14) % keyLen];
-        const k15 = RESOURCE_KEY[(i + 15) % keyLen];
-        
-        out[i] = buffer[i] ^ k0;
-        out[i + 1] = buffer[i + 1] ^ k1;
-        out[i + 2] = buffer[i + 2] ^ k2;
-        out[i + 3] = buffer[i + 3] ^ k3;
-        out[i + 4] = buffer[i + 4] ^ k4;
-        out[i + 5] = buffer[i + 5] ^ k5;
-        out[i + 6] = buffer[i + 6] ^ k6;
-        out[i + 7] = buffer[i + 7] ^ k7;
-        out[i + 8] = buffer[i + 8] ^ k8;
-        out[i + 9] = buffer[i + 9] ^ k9;
-        out[i + 10] = buffer[i + 10] ^ k10;
-        out[i + 11] = buffer[i + 11] ^ k11;
-        out[i + 12] = buffer[i + 12] ^ k12;
-        out[i + 13] = buffer[i + 13] ^ k13;
-        out[i + 14] = buffer[i + 14] ^ k14;
-        out[i + 15] = buffer[i + 15] ^ k15;
+        buffer[i] ^= RESOURCE_KEY[i % keyLen];
+        buffer[i + 1] ^= RESOURCE_KEY[(i + 1) % keyLen];
+        buffer[i + 2] ^= RESOURCE_KEY[(i + 2) % keyLen];
+        buffer[i + 3] ^= RESOURCE_KEY[(i + 3) % keyLen];
+        buffer[i + 4] ^= RESOURCE_KEY[(i + 4) % keyLen];
+        buffer[i + 5] ^= RESOURCE_KEY[(i + 5) % keyLen];
+        buffer[i + 6] ^= RESOURCE_KEY[(i + 6) % keyLen];
+        buffer[i + 7] ^= RESOURCE_KEY[(i + 7) % keyLen];
+        buffer[i + 8] ^= RESOURCE_KEY[(i + 8) % keyLen];
+        buffer[i + 9] ^= RESOURCE_KEY[(i + 9) % keyLen];
+        buffer[i + 10] ^= RESOURCE_KEY[(i + 10) % keyLen];
+        buffer[i + 11] ^= RESOURCE_KEY[(i + 11) % keyLen];
+        buffer[i + 12] ^= RESOURCE_KEY[(i + 12) % keyLen];
+        buffer[i + 13] ^= RESOURCE_KEY[(i + 13) % keyLen];
+        buffer[i + 14] ^= RESOURCE_KEY[(i + 14) % keyLen];
+        buffer[i + 15] ^= RESOURCE_KEY[(i + 15) % keyLen];
         
         i += 16;
     }
     
     while (i < bufLen) {
-        out[i] = buffer[i] ^ RESOURCE_KEY[i % keyLen];
+        buffer[i] ^= RESOURCE_KEY[i % keyLen];
         i++;
     }
     
-    return out;
+    return buffer;
 }
 
 const mimeTypes = {
@@ -187,49 +168,83 @@ let cacheStats = {
     saves: 0
 };
 
-// LRU-style HTML cache with size limit
-const htmlCache = new Map();
-const MAX_HTML_CACHE = 100; // Limit HTML cache entries
-
-function setHtmlCache(key, value) {
-    if (htmlCache.size >= MAX_HTML_CACHE) {
-        const firstKey = htmlCache.keys().next().value;
-        htmlCache.delete(firstKey);
-        logInfo(`HTML cache evicted: ${colors.yellow}${firstKey}${colors.reset}`);
-    }
-    htmlCache.set(key, value);
+// STREAMING XOR directly to another file - ZERO RAM accumulation
+async function streamXorFileToFile(sourcePath, destPath, key, filePathForLog) {
+    return new Promise((resolve, reject) => {
+        const readStream = fs.createReadStream(sourcePath, { highWaterMark: 64 * 1024 });
+        const writeStream = fs.createWriteStream(destPath);
+        const keyLen = key.length;
+        let keyIndex = 0;
+        let totalBytes = 0;
+        const startTime = Date.now();
+        
+        readStream.on('data', (chunk) => {
+            // XOR in-place on the chunk buffer
+            for (let i = 0; i < chunk.length; i++) {
+                chunk[i] ^= key[keyIndex];
+                keyIndex = (keyIndex + 1) % keyLen;
+            }
+            totalBytes += chunk.length;
+            writeStream.write(chunk);
+        });
+        
+        readStream.on('end', () => {
+            writeStream.end();
+            const elapsed = Date.now() - startTime;
+            logInfo(`Streamed ${colors.cyan}${(totalBytes/1024).toFixed(2)}KB${colors.reset} to disk in ${colors.green}${elapsed}ms${colors.reset} for ${colors.yellow}${filePathForLog}${colors.reset}`);
+            resolve();
+        });
+        
+        readStream.on('error', reject);
+        writeStream.on('error', reject);
+    });
 }
 
-// STREAMING XOR for large files - doesn't load entire file into RAM
-async function streamXorToBuffer(readable, key, filePath) {
-    const keyLen = key.length;
-    let keyIndex = 0;
-    const chunks = [];
-    let totalBytes = 0;
-    const startTime = Date.now();
-    
-    for await (const chunk of readable) {
-        const buf = Buffer.from(chunk);
-        const out = Buffer.allocUnsafe(buf.length);
+// STREAMING XOR to base64 response - minimal RAM (one chunk at a time)
+async function streamXorToResponse(sourcePath, key, res, filePathForLog, envelopeMeta) {
+    return new Promise((resolve, reject) => {
+        const readStream = fs.createReadStream(sourcePath, { highWaterMark: 48 * 1024 }); // 48KB chunks for base64 efficiency
+        const keyLen = key.length;
+        let keyIndex = 0;
+        const chunks = [];
+        let totalBytes = 0;
+        const startTime = Date.now();
         
-        // XOR chunk
-        for (let i = 0; i < buf.length; i++) {
-            out[i] = buf[i] ^ key[keyIndex];
-            keyIndex = (keyIndex + 1) % keyLen;
-        }
+        readStream.on('data', (chunk) => {
+            // XOR in-place
+            for (let i = 0; i < chunk.length; i++) {
+                chunk[i] ^= key[keyIndex];
+                keyIndex = (keyIndex + 1) % keyLen;
+            }
+            // Convert to base64 immediately, don't accumulate raw buffers
+            chunks.push(chunk.toString('base64'));
+            totalBytes += chunk.length;
+        });
         
-        chunks.push(out);
-        totalBytes += out.length;
-    }
-    
-    const elapsed = Date.now() - startTime;
-    logInfo(`Streamed ${colors.cyan}${(totalBytes/1024/1024).toFixed(2)}MB${colors.reset} in ${colors.green}${elapsed}ms${colors.reset} for ${colors.yellow}${filePath}${colors.reset}`);
-    
-    return Buffer.concat(chunks);
+        readStream.on('end', () => {
+            const payload = chunks.join('');
+            const elapsed = Date.now() - startTime;
+            logInfo(`Streamed ${colors.cyan}${(totalBytes/1024).toFixed(2)}KB${colors.reset} to response in ${colors.green}${elapsed}ms${colors.reset} for ${colors.yellow}${filePathForLog}${colors.reset}`);
+            
+            const envelope = {
+                ...envelopeMeta,
+                payload: payload
+            };
+            
+            // XOR envelope in-place
+            const envelopeBuf = Buffer.from(JSON.stringify(envelope));
+            xorBufferFast(envelopeBuf);
+            
+            res.json({ payload: envelopeBuf.toString('base64') });
+            resolve();
+        });
+        
+        readStream.on('error', (err) => {
+            logError('Stream error: ' + err.message);
+            reject(err);
+        });
+    });
 }
-
-// Skip cache for large files
-const MAX_FILE_CACHE_SIZE = 10 * 1024 * 1024; // 10MB
 
 app.post('/api/resource', async (req, res) => {
     const reqPath = req.body.path;
@@ -263,80 +278,47 @@ app.post('/api/resource', async (req, res) => {
             }
         }
 
-        let encryptedFile;
-        const startTime = Date.now();
-        
-        // STREAM large files instead of buffering everything at once
-        if (fileSize > MAX_FILE_CACHE_SIZE) {
-            logInfo(`Large file detected (${colors.magenta}${(fileSize/1024/1024).toFixed(2)}MB${colors.reset}), streaming with XOR...`);
-            
-            const fileStream = fs.createReadStream(fullPath, { 
-                highWaterMark: 256 * 1024, // 256KB chunks
-                start: start,
-                end: end
-            });
-            
-            const encrypted = await streamXorToBuffer(fileStream, RESOURCE_KEY, reqPath);
-            encryptedFile = encrypted.toString('base64');
-            
-            const totalElapsed = Date.now() - startTime;
-            logSuccess(`Large file served in ${colors.green}${totalElapsed}ms${colors.reset} (no disk cache)`);
-            
-        } else {
-            // Small files: use cache logic
-            if (await isCacheValid(fullPath, cacheFile)) {
-                cacheStats.hits++;
-                logCache(true, reqPath);
-                
-                const cachedData = await fs.promises.readFile(cacheFile);
-                const rangeBuffer = cachedData.slice(start, end + 1);
-                encryptedFile = rangeBuffer.toString('base64');
-                
-                const elapsed = Date.now() - startTime;
-                logInfo(`Served from cache in ${colors.green}${elapsed}ms${colors.reset}`);
-            } else {
-                cacheStats.misses++;
-                logCache(false, reqPath);
-                
-                const fileBuffer = await fs.promises.readFile(fullPath);
-                logInfo(`File read: ${colors.cyan}${(fileBuffer.length / 1024).toFixed(2)} KB${colors.reset}`);
-                
-                const encrypted = xorBufferFast(fileBuffer);
-                const xorTime = Date.now() - startTime;
-                logInfo(`XOR encryption done in ${colors.yellow}${xorTime}ms${colors.reset}`);
-                
-                // Save encrypted version to cache (async, don't wait)
-                fs.promises.writeFile(cacheFile, encrypted).then(() => {
-                    cacheStats.saves++;
-                    logSuccess(`Cached to disk: ${colors.green}${reqPath}${colors.reset}`);
-                    logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset} | Saves: ${colors.cyan}${cacheStats.saves}${colors.reset}`);
-                }).catch(err => {
-                    logError('Cache write failed: ' + err.message);
-                });
-                
-                const rangeBuffer = encrypted.slice(start, end + 1);
-                encryptedFile = rangeBuffer.toString('base64');
-                
-                const elapsed = Date.now() - startTime;
-                logInfo(`Total processing time: ${colors.yellow}${elapsed}ms${colors.reset}`);
-            }
-        }
-
-        const envelope = {
+        const envelopeMeta = {
             contentType: mimeTypes[ext] || 'application/octet-stream',
             contentEncoding: ext === '.unityweb' ? 'gzip' : null,
             size: fileSize,
             start,
-            end,
-            payload: encryptedFile
+            end
         };
 
-        // Encrypt envelope
-        const encryptedEnvelope = xorBufferFast(
-            Buffer.from(JSON.stringify(envelope))
-        ).toString('base64');
+        const startTime = Date.now();
+        
+        // Check disk cache first
+        if (await isCacheValid(fullPath, cacheFile)) {
+            cacheStats.hits++;
+            logCache(true, reqPath);
+            
+            // Stream from disk cache to response - NO RAM accumulation
+            await streamXorToResponse(cacheFile, RESOURCE_KEY, res, reqPath, envelopeMeta);
+            
+            const totalElapsed = Date.now() - startTime;
+            logInfo(`Total request time: ${colors.green}${totalElapsed}ms${colors.reset}`);
+            return;
+        }
 
-        res.status(statusCode).json({ payload: encryptedEnvelope });
+        // Cache miss - create encrypted cache on disk, then stream from it
+        cacheStats.misses++;
+        logCache(false, reqPath);
+        
+        logInfo(`Creating disk cache for ${colors.yellow}${reqPath}${colors.reset} (${colors.cyan}${(fileSize/1024).toFixed(2)}KB${colors.reset})...`);
+        
+        // Stream original file to encrypted cache file
+        await streamXorFileToFile(fullPath, cacheFile, RESOURCE_KEY, reqPath);
+        
+        cacheStats.saves++;
+        logSuccess(`Cached to disk: ${colors.green}${reqPath}${colors.reset}`);
+        logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset} | Saves: ${colors.cyan}${cacheStats.saves}${colors.reset}`);
+        
+        // Now stream from the newly created cache to response
+        await streamXorToResponse(cacheFile, RESOURCE_KEY, res, reqPath, envelopeMeta);
+        
+        const totalElapsed = Date.now() - startTime;
+        logInfo(`Total request time: ${colors.yellow}${totalElapsed}ms${colors.reset}`);
 
     } catch (err) {
         if (err.code === 'ENOENT') {
@@ -348,7 +330,7 @@ app.post('/api/resource', async (req, res) => {
     }
 });
 
-// HTML cache with LRU eviction
+// HTML - NO RAM CACHE, read from disk every time (or use disk cache too)
 app.use(async (req, res, next) => {
     if (req.method !== 'GET') return next();
 
@@ -358,22 +340,17 @@ app.use(async (req, res, next) => {
             : path.join(PUBLIC_DIR, req.path);
 
         try {
-            let html;
-            if (htmlCache.has(filePath)) {
-                html = htmlCache.get(filePath);
-                logInfo(`HTML cache hit: ${colors.green}${req.path}${colors.reset}`);
-            } else {
-                html = await fs.promises.readFile(filePath, 'utf8');
-                const inject = `<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>`;
-                html = html.includes('</head>') 
-                    ? html.replace('</head>', inject + '</head>')
-                    : html + inject;
-                setHtmlCache(filePath, html);
-                logInfo(`HTML cached: ${colors.cyan}${req.path}${colors.reset} (cache size: ${colors.yellow}${htmlCache.size}/${MAX_HTML_CACHE}${colors.reset})`);
-            }
+            // Always read from disk - NO HTML CACHE IN RAM
+            const html = await fs.promises.readFile(filePath, 'utf8');
+            const inject = `<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>`;
+            const finalHtml = html.includes('</head>') 
+                ? html.replace('</head>', inject + '</head>')
+                : html + inject;
+            
+            logInfo(`HTML served from disk: ${colors.cyan}${req.path}${colors.reset}`);
 
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            return res.send(html);
+            return res.send(finalHtml);
         } catch {
             return next();
         }
@@ -391,7 +368,7 @@ ${colors.bright}${colors.cyan}╔═══════════════�
 ${colors.green}➜${colors.reset} Running on: ${colors.bright}http://localhost:${PORT}${colors.reset}
 ${colors.green}➜${colors.reset} Cache directory: ${colors.bright}${CACHE_DIR}${colors.reset}
 ${colors.green}➜${colors.reset} XOR Key: ${colors.bright}${RESOURCE_KEY.toString()}${colors.reset}
-${colors.green}➜${colors.reset} Streaming threshold: ${colors.bright}${(MAX_FILE_CACHE_SIZE/1024/1024).toFixed(0)}MB${colors.reset}
-${colors.green}➜${colors.reset} HTML cache limit: ${colors.bright}${MAX_HTML_CACHE}${colors.reset} entries
+${colors.green}➜${colors.reset} RAM usage: ${colors.bright}MINIMAL${colors.reset} (disk-only streaming)
+${colors.green}➜${colors.reset} HTML cache: ${colors.bright}DISABLED${colors.reset} (disk reads only)
     `);
 });
