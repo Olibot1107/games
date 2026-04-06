@@ -10,52 +10,10 @@ const PUBLIC_DIR = path.join(__dirname, '');
 const CACHE_DIR = path.join(__dirname, 'pre_cache');
 const RESOURCE_KEY = Buffer.from('games-shell-v1');
 
-// ANSI Color codes
-const colors = {
-    reset: '\x1b[0m',
-    bright: '\x1b[1m',
-    red: '\x1b[31m',
-    green: '\x1b[32m',
-    yellow: '\x1b[33m',
-    blue: '\x1b[34m',
-    magenta: '\x1b[35m',
-    cyan: '\x1b[36m',
-    white: '\x1b[37m',
-    bgRed: '\x1b[41m',
-    bgGreen: '\x1b[42m',
-    bgYellow: '\x1b[43m',
-    bgBlue: '\x1b[44m'
-};
-
-// Colored logging functions
-function log(msg, color = 'white') {
-    console.log(`${colors[color]}[SERVER]${colors.reset}`, msg);
-}
-
-function logCache(hit, file) {
-    if (hit) {
-        console.log(`${colors.bgGreen}${colors.bright} CACHE HIT ${colors.reset} ${colors.green}${file}${colors.reset}`);
-    } else {
-        console.log(`${colors.bgYellow}${colors.bright} CACHE MISS ${colors.reset} ${colors.yellow}${file}${colors.reset}`);
-    }
-}
-
-function logError(msg) {
-    console.log(`${colors.bgRed}${colors.bright} ERROR ${colors.reset} ${colors.red}${msg}${colors.reset}`);
-}
-
-function logInfo(msg) {
-    console.log(`${colors.cyan}[INFO]${colors.reset} ${msg}`);
-}
-
-function logSuccess(msg) {
-    console.log(`${colors.green}[SUCCESS]${colors.reset} ${msg}`);
-}
-
 // Create cache directory if it doesn't exist
 if (!fs.existsSync(CACHE_DIR)) {
     fs.mkdirSync(CACHE_DIR, { recursive: true });
-    logSuccess('Created pre_cache directory');
+    console.log('[SERVER] Created pre_cache directory');
 }
 
 app.use(express.json({ limit: '10mb' }));
@@ -173,24 +131,17 @@ async function isCacheValid(originalPath, cachePath) {
             fs.promises.stat(cachePath)
         ]);
         
+        // Cache is valid if original file hasn't been modified after cache was created
         return originalStat.mtime <= cacheStat.mtime;
     } catch {
         return false;
     }
 }
 
-// Cache statistics
-let cacheStats = {
-    hits: 0,
-    misses: 0,
-    saves: 0
-};
-
 app.post('/api/resource', async (req, res) => {
     const reqPath = req.body.path;
     
     if (!reqPath || reqPath.includes('..')) {
-        logError('Invalid path request: ' + reqPath);
         return res.status(400).json({ error: 'invalid path' });
     }
 
@@ -213,51 +164,31 @@ app.post('/api/resource', async (req, res) => {
                 start = parseInt(match[1], 10);
                 end = match[2] ? parseInt(match[2], 10) : end;
                 statusCode = 206;
-                logInfo(`Range request: ${start}-${end} for ${reqPath}`);
             }
         }
 
         let encryptedFile;
-        const startTime = Date.now();
         
         // Check if pre-cached version exists and is valid
         if (await isCacheValid(fullPath, cacheFile)) {
-            cacheStats.hits++;
-            logCache(true, reqPath);
-            
+            console.log('[CACHE HIT]', reqPath);
             // Read pre-encrypted file directly
             const cachedData = await fs.promises.readFile(cacheFile);
             const rangeBuffer = cachedData.slice(start, end + 1);
             encryptedFile = rangeBuffer.toString('base64');
-            
-            const elapsed = Date.now() - startTime;
-            logInfo(`Served from cache in ${colors.green}${elapsed}ms${colors.reset}`);
         } else {
-            cacheStats.misses++;
-            logCache(false, reqPath);
-            
+            console.log('[CACHE MISS]', reqPath);
             // Read, encrypt, and save to cache
             const fileBuffer = await fs.promises.readFile(fullPath);
-            logInfo(`File read: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
-            
             const encrypted = xorBufferFast(fileBuffer);
-            const xorTime = Date.now() - startTime;
-            logInfo(`XOR encryption done in ${colors.yellow}${xorTime}ms${colors.reset}`);
             
             // Save encrypted version to cache (async, don't wait)
-            fs.promises.writeFile(cacheFile, encrypted).then(() => {
-                cacheStats.saves++;
-                logSuccess(`Cached to disk: ${reqPath}`);
-                logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset} | Saves: ${colors.cyan}${cacheStats.saves}${colors.reset}`);
-            }).catch(err => {
-                logError('Cache write failed: ' + err.message);
+            fs.promises.writeFile(cacheFile, encrypted).catch(err => {
+                console.error('[CACHE WRITE ERROR]', err);
             });
             
             const rangeBuffer = encrypted.slice(start, end + 1);
             encryptedFile = rangeBuffer.toString('base64');
-            
-            const elapsed = Date.now() - startTime;
-            logInfo(`Total processing time: ${colors.yellow}${elapsed}ms${colors.reset}`);
         }
 
         const envelope = {
@@ -278,10 +209,8 @@ app.post('/api/resource', async (req, res) => {
 
     } catch (err) {
         if (err.code === 'ENOENT') {
-            logError('File not found: ' + fullPath);
             return res.status(404).json({ error: 'not found' });
         }
-        logError('Server error: ' + err.message);
         res.status(500).json({ error: 'server error' });
     }
 });
@@ -301,7 +230,6 @@ app.use(async (req, res, next) => {
             let html;
             if (htmlCache.has(filePath)) {
                 html = htmlCache.get(filePath);
-                logInfo(`HTML cache hit: ${req.path}`);
             } else {
                 html = await fs.promises.readFile(filePath, 'utf8');
                 const inject = `<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>`;
@@ -309,7 +237,6 @@ app.use(async (req, res, next) => {
                     ? html.replace('</head>', inject + '</head>')
                     : html + inject;
                 htmlCache.set(filePath, html);
-                logInfo(`HTML cached: ${req.path}`);
             }
 
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -324,12 +251,6 @@ app.use(async (req, res, next) => {
 app.use(express.static(PUBLIC_DIR));
 
 app.listen(PORT, () => {
-    console.log(`
-${colors.bright}${colors.cyan}╔══════════════════════════════════════╗
-║     SERVER STARTED SUCCESSFULLY      ║
-╚══════════════════════════════════════╝${colors.reset}
-${colors.green}➜${colors.reset} Running on: ${colors.bright}http://localhost:${PORT}${colors.reset}
-${colors.green}➜${colors.reset} Cache directory: ${colors.bright}${CACHE_DIR}${colors.reset}
-${colors.green}➜${colors.reset} XOR Key: ${colors.bright}${RESOURCE_KEY.toString()}${colors.reset}
-    `);
+    console.log('[SERVER] Running on http://localhost:' + PORT);
+    console.log('[SERVER] Pre-cache directory:', CACHE_DIR);
 });
