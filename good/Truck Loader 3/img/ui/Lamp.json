@@ -1,0 +1,27 @@
+{"frames": [
+
+{
+	"filename": "lamp10000",
+	"frame": {"x":0,"y":0,"w":48,"h":34},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":56,"y":0,"w":160,"h":94},
+	"sourceSize": {"w":160,"h":94}
+}
+,{
+	"filename": "lamp10001",
+	"frame": {"x":48,"y":0,"w":160,"h":94},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":0,"y":0,"w":160,"h":94},
+	"sourceSize": {"w":160,"h":94}
+}],
+"meta": {
+	"app": "Adobe Flash Professional",
+	"version": "13.0.0.759",
+	"image": "LampAnimation.png",
+	"format": "RGBA8888",
+	"size": {"w":256,"h":256},
+	"scale": "1"
+}
+}

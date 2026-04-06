@@ -1,0 +1,43 @@
+{"frames": [
+
+{
+	"filename": "LevelItem_BtnRight0000",
+	"frame": {"x":0,"y":0,"w":34,"h":40},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":34,"h":40},
+	"sourceSize": {"w":34,"h":40}
+}
+,{
+	"filename": "LevelItem_BtnRight0001",
+	"frame": {"x":34,"y":0,"w":34,"h":40},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":34,"h":40},
+	"sourceSize": {"w":34,"h":40}
+}
+,{
+	"filename": "LevelItem_BtnRight0002",
+	"frame": {"x":68,"y":0,"w":34,"h":40},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":34,"h":40},
+	"sourceSize": {"w":34,"h":40}
+}
+,{
+	"filename": "LevelItem_BtnRight0003",
+	"frame": {"x":0,"y":40,"w":34,"h":40},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":34,"h":40},
+	"sourceSize": {"w":34,"h":40}
+}],
+"meta": {
+	"app": "Adobe Flash CS6",
+	"version": "12.0.0.481",
+	"image": "gfx_ftc_lvl17_BtnRightAnimation.png",
+	"format": "RGBA8888",
+	"size": {"w":128,"h":128},
+	"scale": "1"
+}
+}

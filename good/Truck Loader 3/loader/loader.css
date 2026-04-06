@@ -1,0 +1,22 @@
+.loading_bg {
+	width: 100%;
+	height: 100%;
+	position: absolute;
+	z-index: 2;
+	visibility:collapse;
+
+	background-position: center center;
+
+	/* Center and scale the image nicely */
+	background-repeat: no-repeat;
+	background-size: cover;
+}
+
+
+.no-webp .loading_bg {
+	background-image: url("loading.png");
+}
+
+.webp .loading_bg{
+	background-image: url("loading.webp");
+}

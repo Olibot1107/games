@@ -1,1 +1,0 @@
-Package size exceeded the configured limit of 50 MB. Try https://github.com/genizy/web-port/tree/main/repo/sharedassets0.resource instead.

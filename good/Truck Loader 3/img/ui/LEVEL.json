@@ -1,0 +1,253 @@
+﻿{"frames": [
+
+{
+	"filename": "00000",
+	"frame": {"x":0,"y":0,"w":116,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":116,"h":96},
+	"sourceSize": {"w":116,"h":96}
+}
+,{
+	"filename": "10000",
+	"frame": {"x":116,"y":0,"w":181,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":181,"h":96},
+	"sourceSize": {"w":181,"h":96}
+}
+,{
+		"filename": "20000",
+		"frame": {"x":0,"y":283,"w":137,"h":96},
+		"rotated": false,
+		"trimmed": false,
+		"spriteSourceSize": {"x":0,"y":0,"w":137,"h":96},
+		"sourceSize": {"w":137,"h":96}
+	}
+,{
+		"filename": "30000",
+		"frame": {"x":567,"y":419,"w":179,"h":96},
+		"rotated": false,
+		"trimmed": false,
+		"spriteSourceSize": {"x":0,"y":0,"w":179,"h":96},
+		"sourceSize": {"w":179,"h":96}
+	}
+,{
+		"filename": "40000",
+		"frame": {"x":746,"y":419,"w":113,"h":96},
+		"rotated": false,
+		"trimmed": false,
+		"spriteSourceSize": {"x":0,"y":0,"w":113,"h":96},
+		"sourceSize": {"w":113,"h":96}
+	}
+,{
+		"filename": "50000",
+		"frame": {"x":859,"y":419,"w":129,"h":96},
+		"rotated": false,
+		"trimmed": false,
+		"spriteSourceSize": {"x":0,"y":0,"w":129,"h":96},
+		"sourceSize": {"w":129,"h":96}
+	}
+,{
+		"filename": "60000",
+		"frame": {"x":0,"y":515,"w":137,"h":96},
+		"rotated": false,
+		"trimmed": false,
+		"spriteSourceSize": {"x":0,"y":0,"w":137,"h":96},
+		"sourceSize": {"w":137,"h":96}
+	}
+,{
+		"filename": "70000",
+		"frame": {"x":137,"y":515,"w":141,"h":96},
+		"rotated": false,
+		"trimmed": false,
+		"spriteSourceSize": {"x":0,"y":0,"w":141,"h":96},
+		"sourceSize": {"w":141,"h":96}
+	}
+,{
+		"filename": "80000",
+		"frame": {"x":278,"y":515,"w":128,"h":96},
+		"rotated": false,
+		"trimmed": false,
+		"spriteSourceSize": {"x":0,"y":0,"w":128,"h":96},
+		"sourceSize": {"w":128,"h":96}
+	}
+,{
+		"filename": "90000",
+		"frame": {"x":406,"y":515,"w":131,"h":96},
+		"rotated": false,
+		"trimmed": false,
+		"spriteSourceSize": {"x":0,"y":0,"w":131,"h":96},
+		"sourceSize": {"w":131,"h":96}
+	}
+,{
+	"filename": "100000",
+	"frame": {"x":297,"y":0,"w":122,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":122,"h":96},
+	"sourceSize": {"w":122,"h":96}
+}
+,{
+	"filename": "110000",
+	"frame": {"x":419,"y":0,"w":126,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":126,"h":96},
+	"sourceSize": {"w":126,"h":96}
+}
+,{
+	"filename": "120000",
+	"frame": {"x":545,"y":0,"w":455,"h":187},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":455,"h":187},
+	"sourceSize": {"w":455,"h":187}
+}
+,{
+	"filename": "130000",
+	"frame": {"x":0,"y":187,"w":132,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":132,"h":96},
+	"sourceSize": {"w":132,"h":96}
+}
+,{
+	"filename": "140000",
+	"frame": {"x":132,"y":187,"w":127,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":127,"h":96},
+	"sourceSize": {"w":127,"h":96}
+}
+,{
+	"filename": "150000",
+	"frame": {"x":259,"y":187,"w":127,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":127,"h":96},
+	"sourceSize": {"w":127,"h":96}
+}
+,{
+	"filename": "160000",
+	"frame": {"x":386,"y":187,"w":147,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":147,"h":96},
+	"sourceSize": {"w":147,"h":96}
+}
+,{
+	"filename": "170000",
+	"frame": {"x":533,"y":187,"w":219,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":219,"h":96},
+	"sourceSize": {"w":219,"h":96}
+}
+,{
+	"filename": "180000",
+	"frame": {"x":752,"y":187,"w":139,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":139,"h":96},
+	"sourceSize": {"w":139,"h":96}
+}
+,{
+	"filename": "190000",
+	"frame": {"x":891,"y":187,"w":133,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":133,"h":96},
+	"sourceSize": {"w":133,"h":96}
+}
+
+,{
+	"filename": "200000",
+	"frame": {"x":137,"y":283,"w":126,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":126,"h":96},
+	"sourceSize": {"w":126,"h":96}
+}
+,{
+	"filename": "210000",
+	"frame": {"x":263,"y":283,"w":130,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":130,"h":96},
+	"sourceSize": {"w":130,"h":96}
+}
+,{
+	"filename": "220000",
+	"frame": {"x":393,"y":283,"w":130,"h":136},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":130,"h":136},
+	"sourceSize": {"w":130,"h":136}
+}
+,{
+	"filename": "230000",
+	"frame": {"x":523,"y":283,"w":131,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":131,"h":96},
+	"sourceSize": {"w":131,"h":96}
+}
+,{
+	"filename": "240000",
+	"frame": {"x":654,"y":283,"w":131,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":131,"h":96},
+	"sourceSize": {"w":131,"h":96}
+}
+,{
+	"filename": "250000",
+	"frame": {"x":785,"y":283,"w":131,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":131,"h":96},
+	"sourceSize": {"w":131,"h":96}
+}
+,{
+	"filename": "260000",
+	"frame": {"x":0,"y":419,"w":128,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":128,"h":96},
+	"sourceSize": {"w":128,"h":96}
+}
+,{
+	"filename": "270000",
+	"frame": {"x":128,"y":419,"w":140,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":140,"h":96},
+	"sourceSize": {"w":140,"h":96}
+}
+,{
+	"filename": "280000",
+	"frame": {"x":268,"y":419,"w":147,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":147,"h":96},
+	"sourceSize": {"w":147,"h":96}
+}
+,{
+	"filename": "290000",
+	"frame": {"x":415,"y":419,"w":152,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":152,"h":96},
+	"sourceSize": {"w":152,"h":96}
+}
+],
+"meta": {
+	"app": "Adobe Animate",
+	"version": "18.0.0.107",
+	"image": "LEVEL_.png",
+	"format": "RGBA8888",
+	"size": {"w":1024,"h":1024},
+	"scale": "1"
+}
+}

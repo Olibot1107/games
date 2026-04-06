@@ -1,0 +1,43 @@
+{"frames": [
+
+{
+	"filename": "Lamps0000",
+	"frame": {"x":0,"y":0,"w":88,"h":30},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":88,"h":30},
+	"sourceSize": {"w":88,"h":30}
+}
+,{
+	"filename": "Lamps0001",
+	"frame": {"x":0,"y":30,"w":88,"h":30},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":88,"h":30},
+	"sourceSize": {"w":88,"h":30}
+}
+,{
+	"filename": "Lamps0002",
+	"frame": {"x":0,"y":60,"w":88,"h":30},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":88,"h":30},
+	"sourceSize": {"w":88,"h":30}
+}
+,{
+	"filename": "Lamps0003",
+	"frame": {"x":0,"y":90,"w":88,"h":30},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":88,"h":30},
+	"sourceSize": {"w":88,"h":30}
+}],
+"meta": {
+	"app": "Adobe Flash Professional",
+	"version": "13.0.0.759",
+	"image": "starAnimation.png",
+	"format": "RGBA8888",
+	"size": {"w":128,"h":128},
+	"scale": "1"
+}
+}

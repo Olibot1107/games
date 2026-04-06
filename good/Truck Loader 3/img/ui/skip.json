@@ -1,0 +1,29 @@
+{"frames": [
+
+{
+	"filename": "0",
+	"frame": {"x":0,"y":0,"w":61,"h":87},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":61,"h":87},
+	"sourceSize": {"w":61,"h":87}
+}
+,{
+	"filename": "1",
+	"frame": {"x":61,"y":0,"w":61,"h":87},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":61,"h":87},
+	"sourceSize": {"w":61,"h":87}
+}
+
+],
+"meta": {
+	"app": "Adobe Flash Professional",
+	"version": "13.0.0.759",
+	"image": "backAnimation.png",
+	"format": "RGBA8888",
+	"size": {"w":256,"h":256},
+	"scale": "1"
+}
+}

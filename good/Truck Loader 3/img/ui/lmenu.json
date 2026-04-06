@@ -1,0 +1,35 @@
+{"frames": [
+
+{
+	"filename": "but_levelsMenu0000",
+	"frame": {"x":0,"y":0,"w":259,"h":60},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":259,"h":60},
+	"sourceSize": {"w":259,"h":60}
+}
+,{
+	"filename": "but_levelsMenu0001",
+	"frame": {"x":0,"y":60,"w":259,"h":60},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":259,"h":60},
+	"sourceSize": {"w":259,"h":60}
+}
+,{
+	"filename": "but_levelsMenu0002",
+	"frame": {"x":0,"y":120,"w":259,"h":60},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":259,"h":60},
+	"sourceSize": {"w":259,"h":60}
+}],
+"meta": {
+	"app": "Adobe Flash Professional",
+	"version": "13.0.0.759",
+	"image": "lmenuAnimation.png",
+	"format": "RGBA8888",
+	"size": {"w":512,"h":512},
+	"scale": "1"
+}
+}

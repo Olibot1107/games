@@ -1,0 +1,35 @@
+{"frames": [
+
+{
+	"filename": "Tr0000",
+	"frame": {"x":0,"y":0,"w":76,"h":44},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":76,"h":44},
+	"sourceSize": {"w":76,"h":44}
+}
+,{
+	"filename": "Tr0001",
+	"frame": {"x":0,"y":44,"w":76,"h":44},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":76,"h":44},
+	"sourceSize": {"w":76,"h":44}
+}
+,{
+	"filename": "Tr0002",
+	"frame": {"x":0,"y":88,"w":76,"h":44},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":76,"h":44},
+	"sourceSize": {"w":76,"h":44}
+}],
+"meta": {
+	"app": "Adobe Flash Professional",
+	"version": "13.0.0.759",
+	"image": "TransformerVaultAnimation.png",
+	"format": "RGBA8888",
+	"size": {"w":128,"h":256},
+	"scale": "1"
+}
+}

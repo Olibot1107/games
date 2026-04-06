@@ -1,0 +1,171 @@
+{"frames": [
+
+{
+	"filename": "OrangeLight0000",
+	"frame": {"x":0,"y":0,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0001",
+	"frame": {"x":24,"y":0,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0002",
+	"frame": {"x":48,"y":0,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0003",
+	"frame": {"x":72,"y":0,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0004",
+	"frame": {"x":96,"y":0,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0005",
+	"frame": {"x":0,"y":14,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0006",
+	"frame": {"x":24,"y":14,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0007",
+	"frame": {"x":48,"y":14,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0008",
+	"frame": {"x":72,"y":14,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0009",
+	"frame": {"x":96,"y":14,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0010",
+	"frame": {"x":0,"y":28,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0011",
+	"frame": {"x":24,"y":28,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0012",
+	"frame": {"x":48,"y":28,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0013",
+	"frame": {"x":72,"y":28,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0014",
+	"frame": {"x":96,"y":28,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0015",
+	"frame": {"x":0,"y":42,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0016",
+	"frame": {"x":24,"y":42,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0017",
+	"frame": {"x":48,"y":42,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0018",
+	"frame": {"x":72,"y":42,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}
+,{
+	"filename": "OrangeLight0019",
+	"frame": {"x":96,"y":42,"w":24,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":14},
+	"sourceSize": {"w":24,"h":14}
+}],
+"meta": {
+	"app": "Adobe Flash Professional",
+	"version": "13.0.0.759",
+	"image": "orangeLightBAnimation.png",
+	"format": "RGBA8888",
+	"size": {"w":128,"h":128},
+	"scale": "1"
+}
+}

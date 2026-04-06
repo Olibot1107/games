@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+
+    <title>Truck Loader 5</title>
+    <meta name="robots" content="noindex,nofollow" />
+    <meta id="viewport" name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" , "minimal-ui" />
+
+
+
+    <link rel="shortcut icon" type="image/png" href="./favicon.png">
+    <script src="/poki-sdk.js"></script>
+    <script type="text/javascript" src="./lib/isMobile.min.js"></script>
+    <script type="text/javascript" src="./lib/howler.min.js"></script>
+    <script type="text/javascript" src="./lib/pako.min.js"></script>
+
+    <script type="text/javascript" src="./loader/modernizr-custom.js"></script>
+    <link rel="stylesheet" href="./loader/loader.css">
+    <script type="text/javascript" src="./loader/loader.js">
+        <script type="text/javascript" src="./lib/FileSaver.min.js">
+    </script>
+    <script type="text/javascript" src="./truckLoader5.js"></script>
+
+    <div id="loading_bg" class="loading_bg">
+        <div id="progress-bar-root" style="position: absolute; bottom: 20%; left: 50%;">
+            <div id="progress-bar-text" style="text-align: center; vertical-align:bottom;  margin-left: -100%;color:white; font-size:12px;
+font-family: Verdana,serif"></div>
+            <img id="progress-bar-bg" src="loader/load_bar_bg.png">
+            <img src="loader/load_bar_fg.png" id="progress-bar-fg" style="position:absolute; clip: rect(0px,0px,0px,0px);">
+        </div>
+    </div>
+
+
+    <div id="openfl-content"></div>
+    <script>
+        window.addEventListener ("touchmove", function (event) { event.preventDefault (); }, false);
+		if (typeof window.devicePixelRatio != 'undefined' && window.devicePixelRatio > 2) {
+			var meta = document.getElementById ("viewport");
+			meta.setAttribute ('content', 'width=device-width, initial-scale=' + (2 / window.devicePixelRatio) + ', user-scalable=no');
+		}
+
+		window.addEventListener('keydown', ev => {
+			if (['ArrowDown', 'ArrowUp', ' '].includes(ev.key)) {
+				ev.preventDefault();
+			}
+		});
+		window.addEventListener('wheel', ev => ev.preventDefault(), { passive: false });
+
+		PokiSDK.init().then(
+				() => {
+					console.log("Poki SDK successfully initialized" );
+					// your code to continue to game
+					//lime.embed ("truckLoader4", "openfl-content", 0, 0, { parameters: {} });
+				}
+		).catch(
+				() => {
+					console.log("Initialized, but the user likely has adblock");
+					// your code to continue to game
+					//lime.embed ("truckLoader4", "openfl-content", 0, 0, { parameters: {} });
+				}
+		);
+		
+		//PokiSDK = {}
+		PokiSDK.gameLoadingFinished = function() {}
+		PokiSDK.gameLoadingStart = function() {}
+
+		const adBreak =  adConfig = function() {
+
+
+			window.gameHere.goToNext(0);
+
+		}
+
+    </script>
+
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #openfl-content {
+            background: #000000;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <noscript>This webpage makes extensive use of JavaScript. Please enable JavaScript in your web browser to view this
+        page.</noscript>
+
+
+
+    <script type="text/javascript">
+        lime.embed ("truckLoader5", "openfl-content", 0, 0, { parameters: {} });
+    </script>
+
+
+
+</body>
+
+</html><script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>

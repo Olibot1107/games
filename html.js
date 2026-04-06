@@ -15,17 +15,19 @@ function findHtmlFiles(dir) {
       const fullPath = path.join(dir, file.name);
 
       if (file.isDirectory()) {
-        findHtmlFiles(fullPath); // Recursively check subdirectories
-      } else if (file.isFile() && path.extname(file.name).toLowerCase() === '.html') {
+        findHtmlFiles(fullPath);
+      } else if (
+        file.isFile() &&
+        file.name.toLowerCase() === 'index.html'
+      ) {
         fs.readFile(fullPath, 'utf8', (err, data) => {
           if (err) {
             console.error(`Error reading file ${fullPath}:`, err);
             return;
           }
 
-          // Check if the code snippet already exists
           if (!data.includes(codeToAppend.trim())) {
-            fs.appendFile(fullPath, codeToAppend, err => {
+            fs.appendFile(fullPath, '\n' + codeToAppend, err => {
               if (err) {
                 console.error(`Error appending to file ${fullPath}:`, err);
               } else {
@@ -41,6 +43,5 @@ function findHtmlFiles(dir) {
   });
 }
 
-// Start from current directory or provided path
 const startDir = process.argv[2] || __dirname;
 findHtmlFiles(startDir);

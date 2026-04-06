@@ -1,0 +1,35 @@
+{"frames": [
+
+{
+	"filename": "verticalBox3_0000",
+	"frame": {"x":0,"y":0,"w":82,"h":42},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":82,"h":42},
+	"sourceSize": {"w":82,"h":42}
+}
+,{
+	"filename": "verticalBox3_0001",
+	"frame": {"x":0,"y":42,"w":82,"h":42},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":82,"h":42},
+	"sourceSize": {"w":82,"h":42}
+}
+,{
+	"filename": "verticalBox3_0002",
+	"frame": {"x":0,"y":84,"w":82,"h":42},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":82,"h":42},
+	"sourceSize": {"w":82,"h":42}
+}],
+"meta": {
+	"app": "Adobe Flash Professional",
+	"version": "13.0.0.759",
+	"image": "VerticalBox3Animation.png",
+	"format": "RGBA8888",
+	"size": {"w":128,"h":128},
+	"scale": "1"
+}
+}

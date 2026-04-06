@@ -1,0 +1,44 @@
+{"frames": [
+
+{
+	"filename": "but_back0000",
+	"frame": {"x":0,"y":0,"w":189,"h":60},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":189,"h":60},
+	"sourceSize": {"w":189,"h":60}
+}
+,{
+	"filename": "but_back0001",
+	"frame": {"x":0,"y":60,"w":189,"h":60},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":189,"h":60},
+	"sourceSize": {"w":189,"h":60}
+}
+,{
+	"filename": "but_back0002",
+	"frame": {"x":0,"y":120,"w":189,"h":60},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":189,"h":60},
+	"sourceSize": {"w":189,"h":60}
+},
+,{
+	"filename": "but_back0002",
+	"frame": {"x":0,"y":120,"w":189,"h":60},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":189,"h":60},
+	"sourceSize": {"w":189,"h":60}
+}
+],
+"meta": {
+	"app": "Adobe Flash Professional",
+	"version": "13.0.0.759",
+	"image": "backAnimation.png",
+	"format": "RGBA8888",
+	"size": {"w":256,"h":256},
+	"scale": "1"
+}
+}
