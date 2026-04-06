@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
+const stream = require('stream');
 const app = express();
 const PORT = 3000;
 
@@ -88,7 +89,7 @@ app.use((req, res, next) => {
     return res.redirect('/math/index.html');
 });
 
-// ULTRA-FAST XOR
+// ULTRA-FAST XOR (for small buffers)
 function xorBufferFast(buffer) {
     const keyLen = RESOURCE_KEY.length;
     const bufLen = buffer.length;
@@ -186,6 +187,50 @@ let cacheStats = {
     saves: 0
 };
 
+// LRU-style HTML cache with size limit
+const htmlCache = new Map();
+const MAX_HTML_CACHE = 100; // Limit HTML cache entries
+
+function setHtmlCache(key, value) {
+    if (htmlCache.size >= MAX_HTML_CACHE) {
+        const firstKey = htmlCache.keys().next().value;
+        htmlCache.delete(firstKey);
+        logInfo(`HTML cache evicted: ${colors.yellow}${firstKey}${colors.reset}`);
+    }
+    htmlCache.set(key, value);
+}
+
+// STREAMING XOR for large files - doesn't load entire file into RAM
+async function streamXorToBuffer(readable, key, filePath) {
+    const keyLen = key.length;
+    let keyIndex = 0;
+    const chunks = [];
+    let totalBytes = 0;
+    const startTime = Date.now();
+    
+    for await (const chunk of readable) {
+        const buf = Buffer.from(chunk);
+        const out = Buffer.allocUnsafe(buf.length);
+        
+        // XOR chunk
+        for (let i = 0; i < buf.length; i++) {
+            out[i] = buf[i] ^ key[keyIndex];
+            keyIndex = (keyIndex + 1) % keyLen;
+        }
+        
+        chunks.push(out);
+        totalBytes += out.length;
+    }
+    
+    const elapsed = Date.now() - startTime;
+    logInfo(`Streamed ${colors.cyan}${(totalBytes/1024/1024).toFixed(2)}MB${colors.reset} in ${colors.green}${elapsed}ms${colors.reset} for ${colors.yellow}${filePath}${colors.reset}`);
+    
+    return Buffer.concat(chunks);
+}
+
+// Skip cache for large files
+const MAX_FILE_CACHE_SIZE = 10 * 1024 * 1024; // 10MB
+
 app.post('/api/resource', async (req, res) => {
     const reqPath = req.body.path;
     
@@ -200,11 +245,12 @@ app.post('/api/resource', async (req, res) => {
     try {
         const stat = await fs.promises.stat(fullPath);
         const ext = path.extname(fullPath).toLowerCase();
-        
+        const fileSize = stat.size;
+
         // Range handling
         const range = req.headers.range;
         let start = 0;
-        let end = stat.size - 1;
+        let end = fileSize - 1;
         let statusCode = 200;
 
         if (range) {
@@ -213,57 +259,73 @@ app.post('/api/resource', async (req, res) => {
                 start = parseInt(match[1], 10);
                 end = match[2] ? parseInt(match[2], 10) : end;
                 statusCode = 206;
-                logInfo(`Range request: ${start}-${end} for ${reqPath}`);
+                logInfo(`Range request: ${colors.cyan}${start}-${end}${colors.reset} for ${colors.yellow}${reqPath}${colors.reset}`);
             }
         }
 
         let encryptedFile;
         const startTime = Date.now();
         
-        // Check if pre-cached version exists and is valid
-        if (await isCacheValid(fullPath, cacheFile)) {
-            cacheStats.hits++;
-            logCache(true, reqPath);
+        // STREAM large files instead of buffering everything at once
+        if (fileSize > MAX_FILE_CACHE_SIZE) {
+            logInfo(`Large file detected (${colors.magenta}${(fileSize/1024/1024).toFixed(2)}MB${colors.reset}), streaming with XOR...`);
             
-            // Read pre-encrypted file directly
-            const cachedData = await fs.promises.readFile(cacheFile);
-            const rangeBuffer = cachedData.slice(start, end + 1);
-            encryptedFile = rangeBuffer.toString('base64');
-            
-            const elapsed = Date.now() - startTime;
-            logInfo(`Served from cache in ${colors.green}${elapsed}ms${colors.reset}`);
-        } else {
-            cacheStats.misses++;
-            logCache(false, reqPath);
-            
-            // Read, encrypt, and save to cache
-            const fileBuffer = await fs.promises.readFile(fullPath);
-            logInfo(`File read: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
-            
-            const encrypted = xorBufferFast(fileBuffer);
-            const xorTime = Date.now() - startTime;
-            logInfo(`XOR encryption done in ${colors.yellow}${xorTime}ms${colors.reset}`);
-            
-            // Save encrypted version to cache (async, don't wait)
-            fs.promises.writeFile(cacheFile, encrypted).then(() => {
-                cacheStats.saves++;
-                logSuccess(`Cached to disk: ${reqPath}`);
-                logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset} | Saves: ${colors.cyan}${cacheStats.saves}${colors.reset}`);
-            }).catch(err => {
-                logError('Cache write failed: ' + err.message);
+            const fileStream = fs.createReadStream(fullPath, { 
+                highWaterMark: 256 * 1024, // 256KB chunks
+                start: start,
+                end: end
             });
             
-            const rangeBuffer = encrypted.slice(start, end + 1);
-            encryptedFile = rangeBuffer.toString('base64');
+            const encrypted = await streamXorToBuffer(fileStream, RESOURCE_KEY, reqPath);
+            encryptedFile = encrypted.toString('base64');
             
-            const elapsed = Date.now() - startTime;
-            logInfo(`Total processing time: ${colors.yellow}${elapsed}ms${colors.reset}`);
+            const totalElapsed = Date.now() - startTime;
+            logSuccess(`Large file served in ${colors.green}${totalElapsed}ms${colors.reset} (no disk cache)`);
+            
+        } else {
+            // Small files: use cache logic
+            if (await isCacheValid(fullPath, cacheFile)) {
+                cacheStats.hits++;
+                logCache(true, reqPath);
+                
+                const cachedData = await fs.promises.readFile(cacheFile);
+                const rangeBuffer = cachedData.slice(start, end + 1);
+                encryptedFile = rangeBuffer.toString('base64');
+                
+                const elapsed = Date.now() - startTime;
+                logInfo(`Served from cache in ${colors.green}${elapsed}ms${colors.reset}`);
+            } else {
+                cacheStats.misses++;
+                logCache(false, reqPath);
+                
+                const fileBuffer = await fs.promises.readFile(fullPath);
+                logInfo(`File read: ${colors.cyan}${(fileBuffer.length / 1024).toFixed(2)} KB${colors.reset}`);
+                
+                const encrypted = xorBufferFast(fileBuffer);
+                const xorTime = Date.now() - startTime;
+                logInfo(`XOR encryption done in ${colors.yellow}${xorTime}ms${colors.reset}`);
+                
+                // Save encrypted version to cache (async, don't wait)
+                fs.promises.writeFile(cacheFile, encrypted).then(() => {
+                    cacheStats.saves++;
+                    logSuccess(`Cached to disk: ${colors.green}${reqPath}${colors.reset}`);
+                    logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset} | Saves: ${colors.cyan}${cacheStats.saves}${colors.reset}`);
+                }).catch(err => {
+                    logError('Cache write failed: ' + err.message);
+                });
+                
+                const rangeBuffer = encrypted.slice(start, end + 1);
+                encryptedFile = rangeBuffer.toString('base64');
+                
+                const elapsed = Date.now() - startTime;
+                logInfo(`Total processing time: ${colors.yellow}${elapsed}ms${colors.reset}`);
+            }
         }
 
         const envelope = {
             contentType: mimeTypes[ext] || 'application/octet-stream',
             contentEncoding: ext === '.unityweb' ? 'gzip' : null,
-            size: stat.size,
+            size: fileSize,
             start,
             end,
             payload: encryptedFile
@@ -286,9 +348,7 @@ app.post('/api/resource', async (req, res) => {
     }
 });
 
-// Cached HTML injection
-const htmlCache = new Map();
-
+// HTML cache with LRU eviction
 app.use(async (req, res, next) => {
     if (req.method !== 'GET') return next();
 
@@ -301,15 +361,15 @@ app.use(async (req, res, next) => {
             let html;
             if (htmlCache.has(filePath)) {
                 html = htmlCache.get(filePath);
-                logInfo(`HTML cache hit: ${req.path}`);
+                logInfo(`HTML cache hit: ${colors.green}${req.path}${colors.reset}`);
             } else {
                 html = await fs.promises.readFile(filePath, 'utf8');
                 const inject = `<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>`;
                 html = html.includes('</head>') 
                     ? html.replace('</head>', inject + '</head>')
                     : html + inject;
-                htmlCache.set(filePath, html);
-                logInfo(`HTML cached: ${req.path}`);
+                setHtmlCache(filePath, html);
+                logInfo(`HTML cached: ${colors.cyan}${req.path}${colors.reset} (cache size: ${colors.yellow}${htmlCache.size}/${MAX_HTML_CACHE}${colors.reset})`);
             }
 
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -331,5 +391,7 @@ ${colors.bright}${colors.cyan}╔═══════════════�
 ${colors.green}➜${colors.reset} Running on: ${colors.bright}http://localhost:${PORT}${colors.reset}
 ${colors.green}➜${colors.reset} Cache directory: ${colors.bright}${CACHE_DIR}${colors.reset}
 ${colors.green}➜${colors.reset} XOR Key: ${colors.bright}${RESOURCE_KEY.toString()}${colors.reset}
+${colors.green}➜${colors.reset} Streaming threshold: ${colors.bright}${(MAX_FILE_CACHE_SIZE/1024/1024).toFixed(0)}MB${colors.reset}
+${colors.green}➜${colors.reset} HTML cache limit: ${colors.bright}${MAX_HTML_CACHE}${colors.reset} entries
     `);
 });
