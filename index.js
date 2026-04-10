@@ -187,7 +187,6 @@ app.use((req, res, next) => {
     return res.redirect('/math/index.html');
 });
 
-// Handle all fake endpoints
 FAKE_ENDPOINTS.forEach(endpoint => {
     app.post(endpoint, async (req, res) => {
         const reqPath = req.body.path;
@@ -207,11 +206,23 @@ FAKE_ENDPOINTS.forEach(endpoint => {
             res.cookie('uid', uid, { maxAge: 86400000, httpOnly: true });
         }
 
-        const fullPath = path.join(PUBLIC_DIR, reqPath);
+        // Handle root path - convert to index.html
+        let normalizedPath = reqPath;
+        if (reqPath === '/' || reqPath.endsWith('/')) {
+            normalizedPath = path.join(reqPath, 'index.html');
+        }
+
+        const fullPath = path.join(PUBLIC_DIR, normalizedPath);
         const cacheFile = getCacheFilename(fullPath);
         
         try {
             const stat = await fs.promises.stat(fullPath);
+            
+            // If it's a directory, try index.html
+            if (stat.isDirectory()) {
+                return res.status(400).json({ error: 'directory not supported' });
+            }
+            
             const ext = path.extname(fullPath).toLowerCase();
             
             const range = req.headers.range;
@@ -225,7 +236,7 @@ FAKE_ENDPOINTS.forEach(endpoint => {
                     start = parseInt(match[1], 10);
                     end = match[2] ? parseInt(match[2], 10) : end;
                     statusCode = 206;
-                    logInfo(`Range request: ${start}-${end} for ${reqPath}`);
+                    logInfo(`Range request: ${start}-${end} for ${normalizedPath}`);
                 }
             }
 
@@ -235,12 +246,12 @@ FAKE_ENDPOINTS.forEach(endpoint => {
             // READ FROM CACHE OR DISK (PLAINTEXT)
             if (!DISABLE_CACHE && await isCacheValid(fullPath, cacheFile)) {
                 cacheStats.hits++;
-                logCache(true, reqPath);
+                logCache(true, normalizedPath);
                 fileBuffer = await fs.promises.readFile(cacheFile);
                 logInfo(`Served from cache in ${colors.green}${Date.now() - startTime}ms${colors.reset}`);
             } else {
                 cacheStats.misses++;
-                logCache(false, reqPath);
+                logCache(false, normalizedPath);
                 fileBuffer = await fs.promises.readFile(fullPath);
                 logInfo(`File read: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
                 
@@ -248,7 +259,7 @@ FAKE_ENDPOINTS.forEach(endpoint => {
                 if (!DISABLE_CACHE) {
                     fs.promises.writeFile(cacheFile, fileBuffer).then(() => {
                         cacheStats.saves++;
-                        logSuccess(`Cached to disk: ${reqPath}`);
+                        logSuccess(`Cached to disk: ${normalizedPath}`);
                         logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset}`);
                     }).catch(err => logError('Cache write failed: ' + err.message));
                 }
@@ -296,6 +307,10 @@ FAKE_ENDPOINTS.forEach(endpoint => {
             if (err.code === 'ENOENT') {
                 logError('File not found: ' + fullPath);
                 return res.status(404).json({ error: 'not found' });
+            }
+            if (err.code === 'EISDIR') {
+                logError('Is a directory: ' + fullPath);
+                return res.status(400).json({ error: 'directory not supported' });
             }
             logError('Server error: ' + err.message);
             res.status(500).json({ error: 'server error' });
