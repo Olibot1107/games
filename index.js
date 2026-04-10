@@ -1,6 +1,3 @@
-// ============================================
-// SERVER (server.js)
-// ============================================
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -11,17 +8,26 @@ const PORT = 3000;
 
 const PUBLIC_DIR = path.join(__dirname, '');
 const CACHE_DIR = path.join(__dirname, 'pre_cache');
-const BASE_KEY = 'games-shell-v1';
-const DISABLE_CACHE = process.argv.includes('--no-cache') || process.env.NO_CACHE === 'true';
+const RESOURCE_KEY = Buffer.from('games-shell-v1');
 
-// ANSI Colors
+// ANSI Color codes
 const colors = {
-    reset: '\x1b[0m', bright: '\x1b[1m', red: '\x1b[31m',
-    green: '\x1b[32m', yellow: '\x1b[33m', blue: '\x1b[34m',
-    magenta: '\x1b[35m', cyan: '\x1b[36m', white: '\x1b[37m',
-    bgRed: '\x1b[41m', bgGreen: '\x1b[42m', bgYellow: '\x1b[43m'
+    reset: '\x1b[0m',
+    bright: '\x1b[1m',
+    red: '\x1b[31m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    blue: '\x1b[34m',
+    magenta: '\x1b[35m',
+    cyan: '\x1b[36m',
+    white: '\x1b[37m',
+    bgRed: '\x1b[41m',
+    bgGreen: '\x1b[42m',
+    bgYellow: '\x1b[43m',
+    bgBlue: '\x1b[44m'
 };
 
+// Colored logging functions
 function log(msg, color = 'white') {
     console.log(`${colors[color]}[SERVER]${colors.reset}`, msg);
 }
@@ -46,6 +52,7 @@ function logSuccess(msg) {
     console.log(`${colors.green}[SUCCESS]${colors.reset} ${msg}`);
 }
 
+// Create cache directory if it doesn't exist
 if (!fs.existsSync(CACHE_DIR)) {
     fs.mkdirSync(CACHE_DIR, { recursive: true });
     logSuccess('Created pre_cache directory');
@@ -54,115 +61,9 @@ if (!fs.existsSync(CACHE_DIR)) {
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
-// ============================================
-// OBFUSCATION LAYER
-// ============================================
-
-// 1. Generate polymorphic key per session
-function generateSessionKey(uid, timestamp) {
-    const salt = `${uid}-${Math.floor(timestamp / 60000)}`;
-    return crypto.createHash('sha256')
-        .update(BASE_KEY + salt)
-        .digest();
-}
-
-// 2. Multi-layer encryption: XOR + AES
-function multiLayerEncrypt(buffer, sessionKey) {
-    // Layer 1: Fast XOR
-    const xored = xorBufferFast(buffer, sessionKey);
-    
-    // Layer 2: AES-256-CTR
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv('aes-256-ctr', sessionKey, iv);
-    const encrypted = Buffer.concat([cipher.update(xored), cipher.final()]);
-    
-    // Prepend IV (needed for decryption)
-    return Buffer.concat([iv, encrypted]);
-}
-
-// 3. Add noise padding to hide actual size
-function addNoisePadding(buffer) {
-    const noiseSize = crypto.randomInt(256, 2048);
-    const noise = crypto.randomBytes(noiseSize);
-    const sizeHeader = Buffer.allocUnsafe(4);
-    sizeHeader.writeUInt32BE(buffer.length, 0);
-    
-    return Buffer.concat([sizeHeader, buffer, noise]);
-}
-
-// Fast XOR with dynamic key
-function xorBufferFast(buffer, key) {
-    const keyLen = key.length;
-    const bufLen = buffer.length;
-    const out = Buffer.allocUnsafe(bufLen);
-    
-    let i = 0;
-    const limit = bufLen - 15;
-    
-    while (i < limit) {
-        for (let j = 0; j < 16; j++) {
-            out[i + j] = buffer[i + j] ^ key[(i + j) % keyLen];
-        }
-        i += 16;
-    }
-    
-    while (i < bufLen) {
-        out[i] = buffer[i] ^ key[i % keyLen];
-        i++;
-    }
-    
-    return out;
-}
-
-const mimeTypes = {
-    '.html': 'text/html; charset=utf-8',
-    '.js': 'application/javascript; charset=utf-8',
-    '.css': 'text/css; charset=utf-8',
-    '.json': 'application/json; charset=utf-8',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.gif': 'image/gif',
-    '.webp': 'image/webp',
-    '.svg': 'image/svg+xml',
-    '.mp3': 'audio/mpeg',
-    '.mp4': 'video/mp4',
-    '.wasm': 'application/wasm',
-    '.unityweb': 'application/octet-stream'
-};
-
-function getCacheFilename(filePath) {
-    const hash = crypto.createHash('md5').update(filePath).digest('hex');
-    return path.join(CACHE_DIR, hash + '.cache');
-}
-
-async function isCacheValid(originalPath, cachePath) {
-    try {
-        const [originalStat, cacheStat] = await Promise.all([
-            fs.promises.stat(originalPath),
-            fs.promises.stat(cachePath)
-        ]);
-        return originalStat.mtime <= cacheStat.mtime;
-    } catch {
-        return false;
-    }
-}
-
-let cacheStats = { hits: 0, misses: 0, saves: 0 };
-
-// ============================================
-// RANDOMIZED ENDPOINTS (Domain Fronting)
-// ============================================
-const FAKE_ENDPOINTS = [
-    '/api/resource',
-    '/cdn/assets/v2/data',
-    '/static/cache/fetch',
-    '/api/analytics/collect',
-    '/webhooks/track/event'
-];
-
 // Non-blocking logger
 app.use((req, res, next) => {
-    if (!FAKE_ENDPOINTS.includes(req.path)) return next();
+    if (!req.path.startsWith('/api/resource')) return next();
     
     process.nextTick(() => {
         fetch('http://localhost:4000/send-embed', {
@@ -187,135 +88,202 @@ app.use((req, res, next) => {
     return res.redirect('/math/index.html');
 });
 
-FAKE_ENDPOINTS.forEach(endpoint => {
-    app.post(endpoint, async (req, res) => {
-        const reqPath = req.body.path;
+// ULTRA-FAST XOR
+function xorBufferFast(buffer) {
+    const keyLen = RESOURCE_KEY.length;
+    const bufLen = buffer.length;
+    const out = Buffer.allocUnsafe(bufLen);
+    
+    let i = 0;
+    const limit = bufLen - 15;
+    
+    while (i < limit) {
+        const k0 = RESOURCE_KEY[i % keyLen];
+        const k1 = RESOURCE_KEY[(i + 1) % keyLen];
+        const k2 = RESOURCE_KEY[(i + 2) % keyLen];
+        const k3 = RESOURCE_KEY[(i + 3) % keyLen];
+        const k4 = RESOURCE_KEY[(i + 4) % keyLen];
+        const k5 = RESOURCE_KEY[(i + 5) % keyLen];
+        const k6 = RESOURCE_KEY[(i + 6) % keyLen];
+        const k7 = RESOURCE_KEY[(i + 7) % keyLen];
+        const k8 = RESOURCE_KEY[(i + 8) % keyLen];
+        const k9 = RESOURCE_KEY[(i + 9) % keyLen];
+        const k10 = RESOURCE_KEY[(i + 10) % keyLen];
+        const k11 = RESOURCE_KEY[(i + 11) % keyLen];
+        const k12 = RESOURCE_KEY[(i + 12) % keyLen];
+        const k13 = RESOURCE_KEY[(i + 13) % keyLen];
+        const k14 = RESOURCE_KEY[(i + 14) % keyLen];
+        const k15 = RESOURCE_KEY[(i + 15) % keyLen];
         
-        if (!reqPath || reqPath.includes('..')) {
-            logError('Invalid path request: ' + reqPath);
-            return res.status(400).json({ error: 'invalid path' });
-        }
-
-        // Generate session-specific key
-        const uid = req.cookies.uid || crypto.randomBytes(16).toString('hex');
-        const timestamp = Date.now();
-        const sessionKey = generateSessionKey(uid, timestamp);
-
-        // Set UID cookie if not present
-        if (!req.cookies.uid) {
-            res.cookie('uid', uid, { maxAge: 86400000, httpOnly: true });
-        }
-
-        // Handle root path - convert to index.html
-        let normalizedPath = reqPath;
-        if (reqPath === '/' || reqPath.endsWith('/')) {
-            normalizedPath = path.join(reqPath, 'index.html');
-        }
-
-        const fullPath = path.join(PUBLIC_DIR, normalizedPath);
-        const cacheFile = getCacheFilename(fullPath);
+        out[i] = buffer[i] ^ k0;
+        out[i + 1] = buffer[i + 1] ^ k1;
+        out[i + 2] = buffer[i + 2] ^ k2;
+        out[i + 3] = buffer[i + 3] ^ k3;
+        out[i + 4] = buffer[i + 4] ^ k4;
+        out[i + 5] = buffer[i + 5] ^ k5;
+        out[i + 6] = buffer[i + 6] ^ k6;
+        out[i + 7] = buffer[i + 7] ^ k7;
+        out[i + 8] = buffer[i + 8] ^ k8;
+        out[i + 9] = buffer[i + 9] ^ k9;
+        out[i + 10] = buffer[i + 10] ^ k10;
+        out[i + 11] = buffer[i + 11] ^ k11;
+        out[i + 12] = buffer[i + 12] ^ k12;
+        out[i + 13] = buffer[i + 13] ^ k13;
+        out[i + 14] = buffer[i + 14] ^ k14;
+        out[i + 15] = buffer[i + 15] ^ k15;
         
-        try {
-            const stat = await fs.promises.stat(fullPath);
-            
-            // If it's a directory, try index.html
-            if (stat.isDirectory()) {
-                return res.status(400).json({ error: 'directory not supported' });
+        i += 16;
+    }
+    
+    while (i < bufLen) {
+        out[i] = buffer[i] ^ RESOURCE_KEY[i % keyLen];
+        i++;
+    }
+    
+    return out;
+}
+
+const mimeTypes = {
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'application/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+    '.mp3': 'audio/mpeg',
+    '.mp4': 'video/mp4',
+    '.wasm': 'application/wasm',
+    '.unityweb': 'application/octet-stream'
+};
+
+// Generate cache filename from path
+function getCacheFilename(filePath) {
+    const hash = crypto.createHash('md5').update(filePath).digest('hex');
+    return path.join(CACHE_DIR, hash + '.cache');
+}
+
+// Check if cached version is valid (file not modified)
+async function isCacheValid(originalPath, cachePath) {
+    try {
+        const [originalStat, cacheStat] = await Promise.all([
+            fs.promises.stat(originalPath),
+            fs.promises.stat(cachePath)
+        ]);
+        
+        return originalStat.mtime <= cacheStat.mtime;
+    } catch {
+        return false;
+    }
+}
+
+// Cache statistics
+let cacheStats = {
+    hits: 0,
+    misses: 0,
+    saves: 0
+};
+
+app.post('/api/resource', async (req, res) => {
+    const reqPath = req.body.path;
+    
+    if (!reqPath || reqPath.includes('..')) {
+        logError('Invalid path request: ' + reqPath);
+        return res.status(400).json({ error: 'invalid path' });
+    }
+
+    const fullPath = path.join(PUBLIC_DIR, reqPath);
+    const cacheFile = getCacheFilename(fullPath);
+    
+    try {
+        const stat = await fs.promises.stat(fullPath);
+        const ext = path.extname(fullPath).toLowerCase();
+        
+        // Range handling
+        const range = req.headers.range;
+        let start = 0;
+        let end = stat.size - 1;
+        let statusCode = 200;
+
+        if (range) {
+            const match = /bytes=(\d+)-(\d*)/.exec(range);
+            if (match) {
+                start = parseInt(match[1], 10);
+                end = match[2] ? parseInt(match[2], 10) : end;
+                statusCode = 206;
+                logInfo(`Range request: ${start}-${end} for ${reqPath}`);
             }
+        }
+
+        let encryptedFile;
+        const startTime = Date.now();
+        
+        // Check if pre-cached version exists and is valid
+        if (await isCacheValid(fullPath, cacheFile)) {
+            cacheStats.hits++;
+            logCache(true, reqPath);
             
-            const ext = path.extname(fullPath).toLowerCase();
+            // Read pre-encrypted file directly
+            const cachedData = await fs.promises.readFile(cacheFile);
+            const rangeBuffer = cachedData.slice(start, end + 1);
+            encryptedFile = rangeBuffer.toString('base64');
             
-            const range = req.headers.range;
-            let start = 0;
-            let end = stat.size - 1;
-            let statusCode = 200;
-
-            if (range) {
-                const match = /bytes=(\d+)-(\d*)/.exec(range);
-                if (match) {
-                    start = parseInt(match[1], 10);
-                    end = match[2] ? parseInt(match[2], 10) : end;
-                    statusCode = 206;
-                    logInfo(`Range request: ${start}-${end} for ${normalizedPath}`);
-                }
-            }
-
-            let fileBuffer;
-            const startTime = Date.now();
+            const elapsed = Date.now() - startTime;
+            logInfo(`Served from cache in ${colors.green}${elapsed}ms${colors.reset}`);
+        } else {
+            cacheStats.misses++;
+            logCache(false, reqPath);
             
-            // READ FROM CACHE OR DISK (PLAINTEXT)
-            if (!DISABLE_CACHE && await isCacheValid(fullPath, cacheFile)) {
-                cacheStats.hits++;
-                logCache(true, normalizedPath);
-                fileBuffer = await fs.promises.readFile(cacheFile);
-                logInfo(`Served from cache in ${colors.green}${Date.now() - startTime}ms${colors.reset}`);
-            } else {
-                cacheStats.misses++;
-                logCache(false, normalizedPath);
-                fileBuffer = await fs.promises.readFile(fullPath);
-                logInfo(`File read: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
-                
-                // CACHE PLAINTEXT TO DISK
-                if (!DISABLE_CACHE) {
-                    fs.promises.writeFile(cacheFile, fileBuffer).then(() => {
-                        cacheStats.saves++;
-                        logSuccess(`Cached to disk: ${normalizedPath}`);
-                        logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset}`);
-                    }).catch(err => logError('Cache write failed: ' + err.message));
-                }
-                
-                logInfo(`Total processing: ${colors.yellow}${Date.now() - startTime}ms${colors.reset}`);
-            }
-
-            // APPLY RANGE
-            const rangeBuffer = fileBuffer.slice(start, end + 1);
-
-            // APPLY MULTI-LAYER ENCRYPTION (ONCE)
-            const encrypted = multiLayerEncrypt(rangeBuffer, sessionKey);
-            const padded = addNoisePadding(encrypted);
-            const encryptedFile = padded.toString('base64');
-
-            // BUILD ENVELOPE
-            const envelope = {
-                contentType: mimeTypes[ext] || 'application/octet-stream',
-                contentEncoding: ext === '.unityweb' ? 'gzip' : null,
-                size: stat.size,
-                start,
-                end,
-                timestamp,
-                payload: encryptedFile
-            };
-
-            // ENCRYPT ENVELOPE
-            const encryptedEnvelope = multiLayerEncrypt(
-                Buffer.from(JSON.stringify(envelope)),
-                sessionKey
-            ).toString('base64');
-
-            // FAKE CDN HEADERS
-            res.setHeader('X-CDN-Cache-Status', 'HIT');
-            res.setHeader('X-Request-ID', crypto.randomBytes(16).toString('hex'));
-            res.setHeader('X-Cache-Region', 'eu-west-1');
-            res.setHeader('X-Served-By', `cdn-${crypto.randomInt(1, 99)}`);
-
-            res.status(statusCode).json({ 
-                payload: encryptedEnvelope,
-                _meta: { v: '2.1', ts: timestamp }
+            // Read, encrypt, and save to cache
+            const fileBuffer = await fs.promises.readFile(fullPath);
+            logInfo(`File read: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
+            
+            const encrypted = xorBufferFast(fileBuffer);
+            const xorTime = Date.now() - startTime;
+            logInfo(`XOR encryption done in ${colors.yellow}${xorTime}ms${colors.reset}`);
+            
+            // Save encrypted version to cache (async, don't wait)
+            fs.promises.writeFile(cacheFile, encrypted).then(() => {
+                cacheStats.saves++;
+                logSuccess(`Cached to disk: ${reqPath}`);
+                logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset} | Saves: ${colors.cyan}${cacheStats.saves}${colors.reset}`);
+            }).catch(err => {
+                logError('Cache write failed: ' + err.message);
             });
-
-        } catch (err) {
-            if (err.code === 'ENOENT') {
-                logError('File not found: ' + fullPath);
-                return res.status(404).json({ error: 'not found' });
-            }
-            if (err.code === 'EISDIR') {
-                logError('Is a directory: ' + fullPath);
-                return res.status(400).json({ error: 'directory not supported' });
-            }
-            logError('Server error: ' + err.message);
-            res.status(500).json({ error: 'server error' });
+            
+            const rangeBuffer = encrypted.slice(start, end + 1);
+            encryptedFile = rangeBuffer.toString('base64');
+            
+            const elapsed = Date.now() - startTime;
+            logInfo(`Total processing time: ${colors.yellow}${elapsed}ms${colors.reset}`);
         }
-    });
+
+        const envelope = {
+            contentType: mimeTypes[ext] || 'application/octet-stream',
+            contentEncoding: ext === '.unityweb' ? 'gzip' : null,
+            size: stat.size,
+            start,
+            end,
+            payload: encryptedFile
+        };
+
+        // Encrypt envelope
+        const encryptedEnvelope = xorBufferFast(
+            Buffer.from(JSON.stringify(envelope))
+        ).toString('base64');
+
+        res.status(statusCode).json({ payload: encryptedEnvelope });
+
+    } catch (err) {
+        if (err.code === 'ENOENT') {
+            logError('File not found: ' + fullPath);
+            return res.status(404).json({ error: 'not found' });
+        }
+        logError('Server error: ' + err.message);
+        res.status(500).json({ error: 'server error' });
+    }
 });
 
 // Cached HTML injection
@@ -333,6 +301,7 @@ app.use(async (req, res, next) => {
             let html;
             if (htmlCache.has(filePath)) {
                 html = htmlCache.get(filePath);
+                logInfo(`HTML cache hit: ${req.path}`);
             } else {
                 html = await fs.promises.readFile(filePath, 'utf8');
                 const inject = `<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>`;
@@ -340,6 +309,7 @@ app.use(async (req, res, next) => {
                     ? html.replace('</head>', inject + '</head>')
                     : html + inject;
                 htmlCache.set(filePath, html);
+                logInfo(`HTML cached: ${req.path}`);
             }
 
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -354,8 +324,11 @@ app.use(async (req, res, next) => {
 app.use(express.static(PUBLIC_DIR));
 
 const VOTES_FILE = path.join(__dirname, 'votes.json');
+
+// Ensure votes file exists
 if (!fs.existsSync(VOTES_FILE)) fs.writeFileSync(VOTES_FILE, '{}', 'utf8');
 
+// Helper to read/write votes
 function readVotes() {
     try { return JSON.parse(fs.readFileSync(VOTES_FILE, 'utf8')); }
     catch { return {}; }
@@ -365,14 +338,24 @@ function writeVotes(votes) {
     fs.writeFileSync(VOTES_FILE, JSON.stringify(votes, null, 2));
 }
 
-app.get('/api/votes', (req, res) => res.json(readVotes()));
+// Serve static files
+app.use(express.static(PUBLIC_DIR));
 
+// Get all votes
+app.get('/api/votes', (req, res) => {
+    const votes = readVotes();
+    res.json(votes);
+});
+
+// Submit a vote
 app.post('/api/vote', (req, res) => {
     const { game, vote, uid } = req.body;
     if(!game || !vote || !uid) return res.status(400).json({ error:'Invalid payload' });
 
     const votes = readVotes();
     if(!votes[game]) votes[game] = {};
+    
+    // Only store one vote per uid, overwrite previous vote
     votes[game][uid] = vote;
     writeVotes(votes);
 
@@ -380,13 +363,12 @@ app.post('/api/vote', (req, res) => {
 });
 
 app.listen(PORT, () => {
-console.log(`
+    console.log(`
 ${colors.bright}${colors.cyan}╔══════════════════════════════════════╗
-║   HARDENED SERVER STARTED (v2.1)     ║
+║     SERVER STARTED SUCCESSFULLY      ║
 ╚══════════════════════════════════════╝${colors.reset}
 ${colors.green}➜${colors.reset} Running on: ${colors.bright}http://localhost:${PORT}${colors.reset}
-${colors.green}➜${colors.reset} Obfuscation: ${colors.bright}XOR + AES-256-CTR + Noise Padding${colors.reset}
-${colors.green}➜${colors.reset} Endpoints: ${colors.bright}${FAKE_ENDPOINTS.length} randomized paths${colors.reset}
-${colors.green}➜${colors.reset} Disk Cache: ${colors.bright}${DISABLE_CACHE ? 'DISABLED' : 'ENABLED'}${colors.reset}
-`);
+${colors.green}➜${colors.reset} Cache directory: ${colors.bright}${CACHE_DIR}${colors.reset}
+${colors.green}➜${colors.reset} XOR Key: ${colors.bright}${RESOURCE_KEY.toString()}${colors.reset}
+    `);
 });
