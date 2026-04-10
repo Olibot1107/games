@@ -1,17 +1,20 @@
+// ============================================
+// SERVER (server.js)
+// ============================================
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 const app = express();
-const PORT = 4001;
+const PORT = 3000;
 
 const PUBLIC_DIR = path.join(__dirname, '');
 const CACHE_DIR = path.join(__dirname, 'pre_cache');
 const BASE_KEY = 'games-shell-v1';
 const DISABLE_CACHE = process.argv.includes('--no-cache') || process.env.NO_CACHE === 'true';
 
-// ANSI Colors (keeping your existing code)
+// ANSI Colors
 const colors = {
     reset: '\x1b[0m', bright: '\x1b[1m', red: '\x1b[31m',
     green: '\x1b[32m', yellow: '\x1b[33m', blue: '\x1b[34m',
@@ -65,7 +68,7 @@ function generateSessionKey(uid, timestamp) {
 
 // 2. Multi-layer encryption: XOR + AES
 function multiLayerEncrypt(buffer, sessionKey) {
-    // Layer 1: Fast XOR (existing)
+    // Layer 1: Fast XOR
     const xored = xorBufferFast(buffer, sessionKey);
     
     // Layer 2: AES-256-CTR
@@ -226,66 +229,59 @@ FAKE_ENDPOINTS.forEach(endpoint => {
                 }
             }
 
-            let encryptedFile;
+            let fileBuffer;
             const startTime = Date.now();
             
+            // READ FROM CACHE OR DISK (PLAINTEXT)
             if (!DISABLE_CACHE && await isCacheValid(fullPath, cacheFile)) {
                 cacheStats.hits++;
                 logCache(true, reqPath);
-                
-                const cachedData = await fs.promises.readFile(cacheFile);
-                const rangeBuffer = cachedData.slice(start, end + 1);
-                
-                // Apply multi-layer encryption
-                const encrypted = multiLayerEncrypt(rangeBuffer, sessionKey);
-                const padded = addNoisePadding(encrypted);
-                encryptedFile = padded.toString('base64');
-                
+                fileBuffer = await fs.promises.readFile(cacheFile);
                 logInfo(`Served from cache in ${colors.green}${Date.now() - startTime}ms${colors.reset}`);
             } else {
                 cacheStats.misses++;
                 logCache(false, reqPath);
-                
-                const fileBuffer = await fs.promises.readFile(fullPath);
+                fileBuffer = await fs.promises.readFile(fullPath);
                 logInfo(`File read: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
                 
-                const encrypted = xorBufferFast(fileBuffer, Buffer.from(BASE_KEY));
-                
+                // CACHE PLAINTEXT TO DISK
                 if (!DISABLE_CACHE) {
-                    fs.promises.writeFile(cacheFile, encrypted).then(() => {
+                    fs.promises.writeFile(cacheFile, fileBuffer).then(() => {
                         cacheStats.saves++;
                         logSuccess(`Cached to disk: ${reqPath}`);
                         logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset}`);
                     }).catch(err => logError('Cache write failed: ' + err.message));
                 }
                 
-                const rangeBuffer = encrypted.slice(start, end + 1);
-                
-                // Apply multi-layer encryption
-                const finalEncrypted = multiLayerEncrypt(rangeBuffer, sessionKey);
-                const padded = addNoisePadding(finalEncrypted);
-                encryptedFile = padded.toString('base64');
-                
                 logInfo(`Total processing: ${colors.yellow}${Date.now() - startTime}ms${colors.reset}`);
             }
 
+            // APPLY RANGE
+            const rangeBuffer = fileBuffer.slice(start, end + 1);
+
+            // APPLY MULTI-LAYER ENCRYPTION (ONCE)
+            const encrypted = multiLayerEncrypt(rangeBuffer, sessionKey);
+            const padded = addNoisePadding(encrypted);
+            const encryptedFile = padded.toString('base64');
+
+            // BUILD ENVELOPE
             const envelope = {
                 contentType: mimeTypes[ext] || 'application/octet-stream',
                 contentEncoding: ext === '.unityweb' ? 'gzip' : null,
                 size: stat.size,
                 start,
                 end,
-                timestamp, // Client needs this to derive same key
+                timestamp,
                 payload: encryptedFile
             };
 
-            // Encrypt envelope with session key
+            // ENCRYPT ENVELOPE
             const encryptedEnvelope = multiLayerEncrypt(
                 Buffer.from(JSON.stringify(envelope)),
                 sessionKey
             ).toString('base64');
 
-            // Fake headers to look like CDN traffic
+            // FAKE CDN HEADERS
             res.setHeader('X-CDN-Cache-Status', 'HIT');
             res.setHeader('X-Request-ID', crypto.randomBytes(16).toString('hex'));
             res.setHeader('X-Cache-Region', 'eu-west-1');
@@ -293,7 +289,7 @@ FAKE_ENDPOINTS.forEach(endpoint => {
 
             res.status(statusCode).json({ 
                 payload: encryptedEnvelope,
-                _meta: { v: '2.1', ts: Date.now() } // Looks innocent
+                _meta: { v: '2.1', ts: timestamp }
             });
 
         } catch (err) {
@@ -371,7 +367,7 @@ app.post('/api/vote', (req, res) => {
 app.listen(PORT, () => {
 console.log(`
 ${colors.bright}${colors.cyan}╔══════════════════════════════════════╗
-║   HARDENED SERVER STARTED (v2.0)     ║
+║   HARDENED SERVER STARTED (v2.1)     ║
 ╚══════════════════════════════════════╝${colors.reset}
 ${colors.green}➜${colors.reset} Running on: ${colors.bright}http://localhost:${PORT}${colors.reset}
 ${colors.green}➜${colors.reset} Obfuscation: ${colors.bright}XOR + AES-256-CTR + Noise Padding${colors.reset}

@@ -1,3 +1,6 @@
+// ============================================
+// SERVICE WORKER (sw.js)
+// ============================================
 const BASE_KEY = 'games-shell-v1';
 
 // Randomized endpoints matching server
