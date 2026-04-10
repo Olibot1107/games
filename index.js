@@ -362,6 +362,16 @@ app.post('/api/vote', (req, res) => {
     res.json({ success:true });
 });
 
+app.get('/kill', (req, res) => {
+    logInfo('Shutdown requested via GET');
+
+    res.send('Server shutting down');
+
+    setTimeout(() => {
+        process.exit(0);
+    }, 100);
+});
+
 app.listen(PORT, () => {
     console.log(`
 ${colors.bright}${colors.cyan}╔══════════════════════════════════════╗
