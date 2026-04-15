@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Voidbase Speed Test</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0b1220;
+      color: white;
+      text-align: center;
+      padding: 25px;
+    }
+
+    h1 {
+      font-size: 40px;
+    }
+
+    button {
+      padding: 14px 28px;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      background: #3b82f6;
+      color: white;
+      cursor: pointer;
+      margin-top: 15px;
+    }
+
+    .grid {
+      display: flex;
+      justify-content: center;
+      gap: 25px;
+      flex-wrap: wrap;
+      margin-top: 25px;
+    }
+
+    .box {
+      width: 380px;
+    }
+
+    canvas {
+      background: #111827;
+      border-radius: 12px;
+      margin-top: 10px;
+    }
+
+    .value {
+      font-size: 22px;
+      margin-top: 5px;
+    }
+
+    .label {
+      opacity: 0.7;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>Voidbase speed test</h1>
+
+<div style="margin-top: 15px;">
+  <button id="startBtn">Start Test</button>
+  <button onclick="window.location.href='/'"
+    style="margin-left:10px; background:#22c55e;">
+    Home
+  </button>
+</div>
+
+<div class="grid">
+
+  <div class="box">
+    <div class="label">Ping</div>
+    <div class="value" id="ping">- ms</div>
+    <canvas id="pingGraph" width="380" height="140"></canvas>
+  </div>
+
+  <div class="box">
+    <div class="label">Download</div>
+    <div class="value" id="down">- Mbps</div>
+    <canvas id="downGraph" width="380" height="140"></canvas>
+  </div>
+
+  <div class="box">
+    <div class="label">Upload</div>
+    <div class="value" id="up">- Mbps</div>
+    <canvas id="upGraph" width="380" height="140"></canvas>
+  </div>
+
+</div>
+
+<script>
+
+let phase = "idle";
+let intervals = [];
+
+const TEST_TIME = 18000;
+const CHUNK = 1024 * 1024;
+
+let graphFrozen = false;
+const MAX_WORKERS = 24;
+const START_WORKERS = 4;
+
+/* ---------------- GRAPH ---------------- */
+function createGraph(canvas, color) {
+  const ctx = canvas.getContext("2d");
+  const data = [];
+
+  return {
+    add(v) {
+      if (graphFrozen) return;
+
+      data.push(v);
+      if (data.length > 40) data.shift();
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const max = Math.max(...data, 1);
+
+      // grid
+      ctx.strokeStyle = "#1f2937";
+      ctx.lineWidth = 1;
+
+      for (let i = 0; i < 5; i++) {
+        const y = (canvas.height / 5) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // line
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+
+      data.forEach((val, i) => {
+        const x = (i / (data.length - 1)) * canvas.width;
+        const y = canvas.height - (val / max) * canvas.height;
+
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+
+      ctx.stroke();
+
+      // numbers
+      ctx.fillStyle = "white";
+      ctx.font = "12px Arial";
+      ctx.fillText("Max: " + max.toFixed(1), 5, 15);
+      ctx.fillText("Now: " + (data[data.length - 1] || 0).toFixed(1), 5, 30);
+    }
+  };
+}
+
+const pingGraph = createGraph(document.getElementById("pingGraph"), "#22c55e");
+const downGraph = createGraph(document.getElementById("downGraph"), "#3b82f6");
+const upGraph = createGraph(document.getElementById("upGraph"), "#f97316");
+
+/* ---------------- LIVE ---------------- */
+function live(counter, id, graph, p) {
+  const el = document.getElementById(id);
+
+  let lastBytes = 0;
+  let lastTime = performance.now();
+  let smooth = 0;
+
+  const interval = setInterval(() => {
+
+    if (phase !== p) return;
+
+    const now = performance.now();
+    const bytes = counter.bytes;
+
+    const deltaBytes = bytes - lastBytes;
+    const deltaTime = (now - lastTime) / 1000;
+
+    let instant = 0;
+
+    if (deltaTime > 0 && deltaBytes > 0) {
+      instant =
+        (deltaBytes * 8) / deltaTime / 1024 / 1024;
+    }
+
+    smooth = smooth * 0.8 + instant * 0.2;
+
+    const val = Math.max(smooth, 0.1);
+
+    el.innerText = val.toFixed(2) + " Mbps";
+    graph.add(val);
+
+    lastBytes = bytes;
+    lastTime = now;
+
+  }, 250);
+
+  intervals.push(interval);
+}
+
+/* ---------------- ADAPTIVE WORKERS ---------------- */
+function createAdaptiveWorkers(workerFn, counter, phaseName, endTime) {
+  let workers = [];
+
+  function spawn() {
+    if (phase !== phaseName) return;
+    if (workers.length >= MAX_WORKERS) return;
+
+    workers.push(workerFn(counter, endTime));
+  }
+
+  for (let i = 0; i < START_WORKERS; i++) spawn();
+
+  const ramp = setInterval(() => {
+    if (phase !== phaseName) return clearInterval(ramp);
+    spawn();
+    spawn();
+  }, 700);
+
+  return Promise.all(workers);
+}
+
+/* ---------------- PING ---------------- */
+async function pingTest() {
+  let avg = 0;
+
+  for (let i = 0; i < 15 && phase === "ping"; i++) {
+    const start = performance.now();
+    await fetch("/speed/ping?x=" + Math.random());
+    const ms = performance.now() - start;
+
+    avg = avg * 0.7 + ms * 0.3;
+
+    document.getElementById("ping").innerText = avg.toFixed(1) + " ms";
+    pingGraph.add(avg);
+
+    await new Promise(r => setTimeout(r, 200));
+  }
+}
+
+/* ---------------- DOWNLOAD ---------------- */
+async function downloadWorker(counter, endTime) {
+  while (performance.now() < endTime && phase === "download") {
+    const res = await fetch("/speed/download", { cache: "no-store" });
+    const reader = res.body.getReader();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      counter.bytes += value.length;
+    }
+  }
+}
+
+/* ---------------- UPLOAD ---------------- */
+async function uploadWorker(counter, endTime) {
+  const data = new Uint8Array(CHUNK);
+
+  while (performance.now() < endTime && phase === "upload") {
+    await fetch("/speed/upload", {
+      method: "POST",
+      body: data
+    });
+
+    counter.bytes += CHUNK;
+  }
+}
+
+/* ---------------- PHASES ---------------- */
+async function downloadPhase() {
+  phase = "download";
+  graphFrozen = false;
+
+  const counter = { bytes: 0 };
+  const end = performance.now() + TEST_TIME;
+
+  live(counter, "down", downGraph, "download");
+
+  await createAdaptiveWorkers(downloadWorker, counter, "download", end);
+
+  graphFrozen = true;
+
+  document.getElementById("down").innerText =
+    (counter.bytes * 8 / (TEST_TIME / 1000) / 1024 / 1024).toFixed(2) + " Mbps";
+}
+
+async function uploadPhase() {
+  phase = "upload";
+  graphFrozen = false;
+
+  const counter = { bytes: 0 };
+  const end = performance.now() + TEST_TIME;
+
+  live(counter, "up", upGraph, "upload");
+
+  await createAdaptiveWorkers(uploadWorker, counter, "upload", end);
+
+  graphFrozen = true;
+
+  document.getElementById("up").innerText =
+    (counter.bytes * 8 / (TEST_TIME / 1000) / 1024 / 1024).toFixed(2) + " Mbps";
+}
+
+/* ---------------- MAIN ---------------- */
+async function runTest() {
+  if (phase !== "idle") return;
+
+  intervals.forEach(clearInterval);
+  intervals = [];
+
+  phase = "ping";
+  await pingTest();
+
+  await downloadPhase();
+  await uploadPhase();
+
+  phase = "idle";
+
+  intervals.forEach(clearInterval);
+  intervals = [];
+}
+
+document.getElementById("startBtn")
+  .addEventListener("click", runTest);
+
+</script>
+
+</body>
+</html>

@@ -76,7 +76,7 @@ async function a() {
     logSuccess('Cache directory ready');
 }
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.raw({ type: "*/*", limit: "90mb" }));
 app.use(cookieParser());
 
 // Non-blocking logger
@@ -549,6 +549,51 @@ app.post('/api/reports/delete', (req, res) => {
 app.post('/api/reports/clear', (req, res) => {
     writeReports({});
     res.json({ success: true });
+});
+
+// DOWNLOAD TEST (streams data)
+app.get("/speed/download", (req, res) => {
+  const size = 1 * 1024 * 1024; // 50MB
+  res.setHeader("Content-Type", "application/octet-stream");
+  res.setHeader("Content-Length", size);
+
+  const chunk = Buffer.alloc(64 * 1024); // 64KB
+  let sent = 0;
+
+  function sendChunk() {
+    while (sent < size) {
+      if (!res.write(chunk)) {
+        res.once("drain", sendChunk);
+        return;
+      }
+      sent += chunk.length;
+    }
+    res.end();
+  }
+
+  sendChunk();
+});
+
+// UPLOAD TEST
+app.post("/speed/upload", (req, res) => {
+  let bytes = 0;
+
+  req.on("data", (chunk) => {
+    bytes += chunk.length;
+  });
+
+  req.on("end", () => {
+    res.json({ received: bytes });
+  });
+
+  req.on("error", (err) => {
+    console.error("Upload error:", err);
+    res.sendStatus(500);
+  });
+});
+
+app.get("/speed/ping", (req, res) => {
+  res.json({ t: Date.now() });
 });
 
 app.listen(PORT, () => {

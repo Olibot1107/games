@@ -176,6 +176,7 @@ self.addEventListener('fetch', event => {
   if (url.pathname.startsWith('/math/')) return;
   if (url.pathname.includes('/client_status')) return;
   if (url.pathname.startsWith('/sounds/')) return;
+  if (url.pathname.startsWith('/speed/')) return;
 
   event.respondWith((async () => {
     try {
