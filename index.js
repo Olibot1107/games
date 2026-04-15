@@ -59,10 +59,16 @@ function logSuccess(msg) {
     console.log(`${colors.green}[SUCCESS]${colors.reset} ${msg}`);
 }
 
-// Create cache directory if it doesn't exist
-if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
-    logSuccess('Created pre_cache directory');
+a()
+
+async function a() {
+    if (!fs.existsSync(CACHE_DIR)) {
+        logInfo('Deleting and recreating pre_cache directory');
+        await fse.removeSync(CACHE_DIR)
+        logInfo('Creating cache directory...');
+        await fs.mkdirSync(CACHE_DIR);
+        logSuccess('Cache directory ready');
+    }
 }
 
 app.use(express.json({ limit: '10mb' }));
