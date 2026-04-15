@@ -3,12 +3,19 @@ const fs = require('fs');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
+const https = require('https');
+const unzipper = require('unzipper');
+const fse = require('fs-extra');
 const app = express();
 const PORT = 3000;
 
 const PUBLIC_DIR = path.join(__dirname, '');
 const CACHE_DIR = path.join(__dirname, 'pre_cache');
 const RESOURCE_KEY = Buffer.from('games-shell-v1');
+const ZIP_URL = 'https://github.com/Olibot1107/games-math/archive/refs/heads/main.zip';
+const TEMP_ZIP = path.join(__dirname, 'repo.zip');
+const TEMP_DIR = path.join(__dirname, 'temp_extract');
+const FINAL_DIR = path.join(__dirname, 'math');
 
 // ANSI Color codes
 const colors = {
@@ -372,6 +379,93 @@ app.get('/kill', (req, res) => {
     }, 100);
 });
 
+async function downloadZip(url = ZIP_URL, redirectCount = 0) {
+    return new Promise((resolve, reject) => {
+        if (redirectCount > 5) {
+            return reject(new Error('Too many redirects'));
+        }
+
+        https.get(url, (res) => {
+            // handle redirect
+            if (res.statusCode === 301 || res.statusCode === 302) {
+                return downloadZip(res.headers.location, redirectCount + 1)
+                    .then(resolve)
+                    .catch(reject);
+            }
+
+            if (res.statusCode !== 200) {
+                return reject(new Error('Bad status code: ' + res.statusCode));
+            }
+
+            const file = fs.createWriteStream(TEMP_ZIP);
+            res.pipe(file);
+
+            file.on('finish', () => {
+                file.close(resolve);
+            });
+
+            file.on('error', reject);
+        }).on('error', reject);
+    });
+}
+
+async function extractZip() {
+    await fse.remove(TEMP_DIR);
+    await fse.ensureDir(TEMP_DIR);
+
+    const buffer = await fs.promises.readFile(TEMP_ZIP);
+
+    await unzipper.Open.buffer(buffer)
+        .then(d => d.extract({ path: TEMP_DIR }));
+}
+
+async function moveToMathFolder() {
+    await fse.ensureDir(FINAL_DIR);
+
+    const extractedRoot = fs.readdirSync(TEMP_DIR)[0];
+    const extractedPath = path.join(TEMP_DIR, extractedRoot);
+
+    await fse.copy(extractedPath, FINAL_DIR, {
+        overwrite: true
+    });
+
+    const gitPath = path.join(FINAL_DIR, '.git');
+    if (await fse.pathExists(gitPath)) {
+        await fse.remove(gitPath);
+    }
+}
+
+async function setupMathRepo() {
+    try {
+        logInfo('Cleaning old math folder...');
+        await fse.remove(FINAL_DIR);
+
+        logInfo('Downloading math repo...');
+        await downloadZip();
+
+        logInfo('Extracting zip...');
+        await extractZip();
+
+        logInfo('Moving files into /math...');
+        await moveToMathFolder();
+
+        // cleanup temp files
+        if (await fse.pathExists(TEMP_ZIP)) {
+            await fse.remove(TEMP_ZIP);
+            logInfo('Deleted repo.zip');
+        }
+
+        if (await fse.pathExists(TEMP_DIR)) {
+            await fse.remove(TEMP_DIR);
+            logInfo('Deleted temp extract folder');
+        }
+
+        logSuccess('Math repo ready');
+    } catch (err) {
+        logError('Setup failed: ' + err.message);
+    }
+}
+
 app.listen(PORT, () => {
     console.log(`
 ${colors.bright}${colors.cyan}╔══════════════════════════════════════╗
@@ -381,4 +475,5 @@ ${colors.green}➜${colors.reset} Running on: ${colors.bright}http://localhost:$
 ${colors.green}➜${colors.reset} Cache directory: ${colors.bright}${CACHE_DIR}${colors.reset}
 ${colors.green}➜${colors.reset} XOR Key: ${colors.bright}${RESOURCE_KEY.toString()}${colors.reset}
     `);
+    setupMathRepo();
 });

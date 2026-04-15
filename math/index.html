@@ -1,24 +1,146 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Math Blast Game 🚀</title>
-<link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoidBase - Learn Maths</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="game-container">
-  <h1>🚀 Math Blast!</h1>
-  <div class="info-bar">
-    <div id="score">Score: 0</div>
-    <div id="highscore">High Score: 0</div>
-    <div id="timer">Time: 20</div>
-  </div>
-  <div id="question" class="question-box">Loading...</div>
-  <div id="answers" class="answers-box"></div>
-  <div id="result"></div>
-  <button id="nextBtn" class="next-btn">Next</button>
-</div>
-<script src="script.js"></script>
+    <div class="combo-popup" id="comboPopup"></div>
+    <div class="xp-popup" id="xpPopup"></div>
+    
+    <div class="modal" id="startModal">
+        <div class="modal-content">
+            <div class="modal-icon" id="modalIcon">🎯</div>
+            <h2 id="modalTitle">Ready?</h2>
+            <p id="modalDesc">Let's do this!</p>
+            <button class="btn" onclick="startGame()">START</button>
+        </div>
+    </div>
+
+    <div class="modal" id="endModal">
+        <div class="modal-content">
+            <div class="modal-icon">🎉</div>
+            <h2 id="endTitle">Great Job!</h2>
+            <p id="endMessage"></p>
+            <div id="endStats"></div>
+            <button class="btn" onclick="goHome()">CONTINUE</button>
+        </div>
+    </div>
+
+    <div id="mainApp">
+        <header>
+            <div class="logo">
+                <i class="fas fa-calculator"></i>
+                <span>VoidBase</span>
+            </div>
+            <div class="header-right">
+                <div class="streak-box">
+                    <i class="fas fa-fire"></i>
+                    <span id="streakVal">0</span>
+                </div>
+                <div class="xp-box">
+                    <i class="fas fa-star"></i>
+                    <span id="xpVal">0</span>
+                </div>
+                <div class="level-box">
+                    <i class="fas fa-crown"></i>
+                    <span id="levelVal">1</span>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <div class="welcome">
+                <h1>Hey there! 👋</h1>
+                <p>Pick a topic and start learning!</p>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-info">
+                    <span>Level <span id="levelNum">1</span></span>
+                    <span id="xpText">0 / 50 XP</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="level-title" id="levelTitle">Beginner</div>
+            </div>
+
+            <h2 class="section-title">📚 Topics</h2>
+            <div class="topics-grid" id="topicsGrid"></div>
+
+            <h2 class="section-title">🎮 Practice</h2>
+            <div class="practice-grid">
+                <div class="practice-card" onclick="startFlash()">
+                    <i class="fas fa-bolt"></i>
+                    <div>
+                        <h3>Speed Run</h3>
+                        <p>60 seconds</p>
+                    </div>
+                </div>
+                <div class="practice-card" onclick="startChain()">
+                    <i class="fas fa-link"></i>
+                    <div>
+                        <h3>Chain</h3>
+                        <p>Don't slip up!</p>
+                    </div>
+                </div>
+                <div class="practice-card" onclick="startMemory()">
+                    <i class="fas fa-puzzle-piece"></i>
+                    <div>
+                        <h3>Memory</h3>
+                        <p>Match numbers</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="gameApp" style="display: none;">
+        <header>
+            <div class="logo" onclick="quitGame()">
+                <i class="fas fa-arrow-left"></i>
+                <span>VoidBase</span>
+            </div>
+            <div class="header-right">
+                <div class="streak-box">
+                    <i class="fas fa-fire"></i>
+                    <span id="gameStreak">0</span>
+                </div>
+                <div class="xp-box">
+                    <i class="fas fa-star"></i>
+                    <span id="gameXp">0</span>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <div class="game-header">
+                <div class="topic-name" id="gameTopic">Topic</div>
+                <div class="timer" id="gameTimer">60s</div>
+            </div>
+
+            <div class="question-box">
+                <div class="question-num" id="questionNum">Question 1/10</div>
+                <div class="question-text" id="questionText">Loading...</div>
+                <input type="text" class="answer-input" id="answerInput" placeholder="Your answer..." autocomplete="off">
+                <button class="btn" onclick="submitAnswer()">CHECK</button>
+                <div class="feedback" id="feedback"></div>
+            </div>
+
+            <button class="hint-btn" id="hintBtn" onclick="showHint()">
+                <i class="fas fa-lightbulb"></i> Need a hint?
+            </button>
+            <div class="hint-box" id="hintBox"></div>
+        </main>
+    </div>
+
+    <script src="game.js"></script>
 </body>
-</html><script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
+</html>

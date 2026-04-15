@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -22,6 +23,7 @@ jobs:
         run: |
           node <<'EOF'
           const fs = require("fs");
+
           function getDirs(base) {
             return fs.existsSync(base)
               ? fs.readdirSync(base, { withFileTypes: true })
@@ -29,17 +31,29 @@ jobs:
                   .map(d => d.name)
               : [];
           }
+
           const good = getDirs("good");
           const nova = getDirs("nova");
-          const output = { generated: new Date().toISOString(), good, nova };
+
+          const output = {
+            generated: new Date().toISOString(),
+            good,
+            nova
+          };
+
           fs.writeFileSync("list.json", JSON.stringify(output, null, 2));
-          console.log("✅ games.json generated:", output);
+          console.log("✅ list.json generated:", output);
           EOF
+
+      - name: Run html.js
+        run: node html.js
 
       - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add list.json
-          git commit -m "Auto-update games.json" || echo "No changes to commit"
+
+          git add -A
+
+          git commit -m "Auto-update generated files" || echo "No changes to commit"
           git push

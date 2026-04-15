@@ -179,16 +179,21 @@ function fetchVotes(){
     .catch(e=>log(e.message));
 }
 
-// ================= SEND =================
 function sendVote(game, vote){
+
+    if (game === 'five-nights-at-epsteins' && vote === 'down') {
+        alert('bad boy not happening');
+        return;
+    }
+
     const current = voteData[game]?.userVote;
-    if(current===vote) return;
+    if(current === vote) return;
 
-    if(current==='up') voteData[game].up--;
-    if(current==='down') voteData[game].down--;
+    if(current === 'up') voteData[game].up--;
+    if(current === 'down') voteData[game].down--;
 
-    if(vote==='up') voteData[game].up++;
-    if(vote==='down') voteData[game].down++;
+    if(vote === 'up') voteData[game].up++;
+    if(vote === 'down') voteData[game].down++;
 
     voteData[game].userVote = vote;
 
