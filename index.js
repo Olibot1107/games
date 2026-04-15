@@ -62,13 +62,16 @@ function logSuccess(msg) {
 a()
 
 async function a() {
-    if (!fs.existsSync(CACHE_DIR)) {
-        logInfo('Deleting and recreating pre_cache directory');
+    logInfo('Deleting and recreating pre_cache directory');
+    if (fs.existsSync(CACHE_DIR)) {
         await fse.removeSync(CACHE_DIR)
-        logInfo('Creating cache directory...');
-        await fs.mkdirSync(CACHE_DIR);
-        logSuccess('Cache directory ready');
+        logSuccess('Old cache directory deleted');
+    } else {
+        logInfo('No existing cache directory found, creating new one');
     }
+    logInfo('Creating cache directory...');
+    await fs.mkdirSync(CACHE_DIR);
+    logSuccess('Cache directory ready');
 }
 
 app.use(express.json({ limit: '10mb' }));
