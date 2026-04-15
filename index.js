@@ -551,8 +551,6 @@ app.post('/api/reports/clear', (req, res) => {
     res.json({ success: true });
 });
 
-
-
 app.listen(PORT, () => {
     console.log(`
 ${colors.bright}${colors.cyan}╔══════════════════════════════════════╗
