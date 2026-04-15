@@ -16,6 +16,7 @@ const ZIP_URL = 'https://github.com/Olibot1107/games-math/archive/refs/heads/mai
 const TEMP_ZIP = path.join(__dirname, 'repo.zip');
 const TEMP_DIR = path.join(__dirname, 'temp_extract');
 const FINAL_DIR = path.join(__dirname, 'math');
+const REPORTS_FILE = path.join(__dirname, 'reports.json');
 
 // ANSI Color codes
 const colors = {
@@ -474,6 +475,80 @@ async function setupMathRepo() {
         logError('Setup failed: ' + err.message);
     }
 }
+
+if (!fs.existsSync(REPORTS_FILE)) fs.writeFileSync(REPORTS_FILE, '{}', 'utf8');
+
+function readReports() {
+    try { return JSON.parse(fs.readFileSync(REPORTS_FILE, 'utf8')); }
+    catch { return {}; }
+}
+
+function writeReports(data) {
+    fs.writeFileSync(REPORTS_FILE, JSON.stringify(data, null, 2));
+}
+
+app.post('/api/report', (req, res) => {
+    const { game, uid, reason } = req.body;
+    if(!game || !uid || !reason) {
+        return res.status(400).json({ error: 'Invalid payload' });
+    }
+
+    const reports = readReports();
+
+    if(!reports[game]) reports[game] = [];
+
+    reports[game].push({
+        uid,
+        reason,
+        time: Date.now()
+    });
+
+    writeReports(reports);
+
+    res.json({ success: true });
+});
+
+app.get('/api/reports_admin', (req, res) => {
+    const reports = readReports();
+    res.json(reports);
+});
+
+app.get('/api/reports', (req, res) => {
+    const reports = readReports();
+
+    const counts = {};
+
+    for (const game in reports) {
+        counts[game] = reports[game].length;
+    }
+
+    res.json({
+        reports,
+        counts
+    });
+});
+
+app.post('/api/reports/delete', (req, res) => {
+    const { game, index } = req.body;
+
+    const reports = readReports();
+    if (!reports[game]) return res.json({ success: true });
+
+    reports[game].splice(index, 1);
+
+    if (reports[game].length === 0) {
+        delete reports[game];
+    }
+
+    writeReports(reports);
+
+    res.json({ success: true });
+});
+
+app.post('/api/reports/clear', (req, res) => {
+    writeReports({});
+    res.json({ success: true });
+});
 
 app.listen(PORT, () => {
     console.log(`
