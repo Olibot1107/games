@@ -78,44 +78,89 @@ function streamResponse(bytes, contentType) {
 // =======================
 async function loadViaEndpoint(request, referrerPath) {
   const url = new URL(request.url);
+  let apiRes;
+  let apiBody;
+
+  // =======================
+  // DEBUG TRACKING
+  // =======================
+  let debug = {
+    originalPath: url.pathname + url.search,
+    encodedPath: null,
+    referrer: referrerPath || '',
+    stage: 'init',
+    envelopeSize: 0,
+    fileSize: 0
+  };
 
   log('Fetching via API:', url.pathname);
 
-  const apiRes = await fetch('/api/resource', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      path: url.pathname + url.search,
-      referrer: referrerPath || ''
-    })
-  });
-
-  log('API status:', apiRes.status);
-
-  if (!apiRes.ok) {
-    log('API failed, fallback');
-    return fetch(request);
-  }
-
-  const data = await apiRes.json();
-
   try {
-    log('Decoding envelope');
+    // =======================
+    // ENCODE PATH
+    // =======================
+    const cleanPath = url.pathname
+      .split('/')
+      .map(part => encodeURIComponent(part))
+      .join('/');
+
+    debug.encodedPath = cleanPath;
+    debug.stage = 'requesting_api';
+
+    apiRes = await fetch('/api/resource', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        path: cleanPath,
+        referrer: referrerPath || ''
+      })
+    });
+
+    log('API status:', apiRes.status);
+
+    if (!apiRes.ok) {
+      apiBody = await apiRes.json().catch(() => ({ error: 'Could not parse error response' }));
+      log('API failed:', apiBody);
+
+      return generateErrorPage(
+        new Error(`API returned ${apiRes.status}`),
+        url,
+        { status: apiRes.status, body: apiBody, requestMethod: 'POST' },
+        request,
+        debug
+      );
+    }
+
+    const data = await apiRes.json();
+    apiBody = data;
+
+    // =======================
+    // DECODE ENVELOPE
+    // =======================
+    debug.stage = 'decoding_envelope';
+    debug.envelopeSize = data.payload?.length || 0;
 
     const envelopeBytes = xorBytes(bytesFromBase64(data.payload));
     const envelope = JSON.parse(new TextDecoder().decode(envelopeBytes));
 
     log('Envelope:', envelope.contentType);
 
+    // =======================
+    // DECODE FILE
+    // =======================
     const fileBytes = xorBytes(bytesFromBase64(envelope.payload));
+    debug.stage = 'decoded_file';
+    debug.fileSize = fileBytes.length;
 
     log('File size:', fileBytes.length);
 
     const contentType = envelope.contentType || 'application/octet-stream';
 
+    // =======================
     // RANGE SUPPORT
+    // =======================
     const rangeHeader = request.headers.get('range');
     if (rangeHeader) {
       log('Range request:', rangeHeader);
@@ -140,13 +185,147 @@ async function loadViaEndpoint(request, referrerPath) {
       }
     }
 
-    // STREAM EVERYTHING (this is the key change)
     return streamResponse(fileBytes, contentType);
 
   } catch (err) {
     log('Decode error:', err);
-    return fetch(request);
+
+    return generateErrorPage(
+      err,
+      url,
+      {
+        status: apiRes?.status,
+        body: apiBody,
+        requestMethod: 'POST'
+      },
+      request,
+      debug
+    );
   }
+}
+// =======================
+// ERROR PAGE GENERATOR
+// =======================
+function generateErrorPage(error, url, apiResponse, request, debug) {
+  const headers = {};
+  if (request) {
+    request.headers.forEach((v, k) => headers[k] = v);
+  }
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Load Failed - ${url.pathname}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: #1a1a1a;
+      color: #00ff00;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #0a0a0a;
+      border: 2px solid #00ff00;
+      padding: 20px;
+    }
+    h1 {
+      color: #ff0000;
+      border-bottom: 2px solid #ff0000;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    h2 {
+      color: #ffff00;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+    pre {
+      background: #000;
+      padding: 15px;
+      overflow-x: auto;
+      border-left: 3px solid #00ff00;
+      margin: 10px 0;
+    }
+    .error { color: #ff0000; }
+    .info { color: #00ffff; }
+    .warn { color: #ffaa00; }
+    .url { color: #ffff00; word-break: break-all; }
+    button {
+      background: #000;
+      border: 1px solid #00ff00;
+      color: #00ff00;
+      padding: 10px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>RESOURCE LOAD FAILED</h1>
+
+    <h2>Requested URL:</h2>
+    <pre class="url">${url.href}</pre>
+
+    <h2>Original Path:</h2>
+    <pre class="warn">${debug?.originalPath}</pre>
+
+    <h2>Encoded Path (API):</h2>
+    <pre class="warn">${debug?.encodedPath}</pre>
+
+    <h2>Referrer:</h2>
+    <pre class="info">${debug?.referrer || 'None'}</pre>
+
+    <h2>Failure Stage:</h2>
+    <pre class="warn">${debug?.stage}</pre>
+
+    <h2>Error:</h2>
+    <pre class="error">${error.message || error.toString()}</pre>
+
+    <h2>Stack:</h2>
+    <pre class="error">${error.stack || 'No stack trace available'}</pre>
+
+    <h2>API Status:</h2>
+    <pre class="info">${apiResponse?.status || 'N/A'}</pre>
+
+    <h2>API Response:</h2>
+    <pre>${apiResponse?.body ? JSON.stringify(apiResponse.body, null, 2) : 'No response body'}</pre>
+
+    <h2>Request Headers:</h2>
+    <pre>${JSON.stringify(headers, null, 2)}</pre>
+
+    <h2>Payload Info:</h2>
+    <pre class="info">
+Envelope Size: ${debug?.envelopeSize} bytes
+Decoded File Size: ${debug?.fileSize} bytes
+    </pre>
+
+    <h2>Environment:</h2>
+    <pre class="info">
+Timestamp: ${new Date().toISOString()}
+SW Scope: ${self.registration.scope}
+User Agent: ${navigator.userAgent}
+RESOURCE_KEY: ${RESOURCE_KEY}
+    </pre>
+
+    <button onclick="location.reload()">Retry</button>
+  </div>
+</body>
+</html>
+  `;
+
+  return new Response(html, {
+    status: 500,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8'
+    }
+  });
 }
 
 // =======================
@@ -175,8 +354,8 @@ self.addEventListener('fetch', event => {
   if (url.pathname.startsWith('/api/')) return;
   if (url.pathname.startsWith('/math/')) return;
   if (url.pathname.includes('/client_status')) return;
-  if (url.pathname.startsWith('/sounds/')) return;
   if (url.pathname.startsWith('/speed/')) return;
+  if (url.pathname === '/') return; // ADD THIS - let Express handle root
 
   event.respondWith((async () => {
     try {

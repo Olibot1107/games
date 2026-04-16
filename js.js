@@ -5,12 +5,8 @@ const searchInput = document.getElementById('search');
 const favoritesList = document.getElementById('favorites-list');
 const debugPanel = document.getElementById('debug-panel');
 
-const REPORT_KEY = "last_report_time";
-let lastReportTime = JSON.parse(localStorage.getItem(REPORT_KEY) || "{}");
-
 let allGames = [];
 let voteData = {};
-let reportData = {}; // 🔥 ADDED
 let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
 
 // UID
@@ -21,24 +17,6 @@ const uid = localStorage.getItem('uid');
 
 function log(msg){
     if(debugPanel) debugPanel.textContent += "\n" + msg;
-}
-
-// ================= REPORTS FETCH =================
-function fetchReports(){
-    fetch('/api/reports')
-    .then(r => r.json())
-    .then(data => {
-        const reports = data.reports || {};
-
-        reportData = {};
-
-        allGames.forEach(g => {
-            reportData[g.name] = (reports[g.name] || []).length;
-        });
-
-        renderGames();
-    })
-    .catch(e => log(e.message));
 }
 
 // ================= FAVORITES =================
@@ -130,16 +108,7 @@ function createGameItem(game, votes){
         <span class="text-red-600">${votes.down}</span> 👎
     `;
 
-    // ================= ⚠️ REPORT BUTTON WITH COUNT =================
-    const reportCount = reportData[game.name] || 0;
-
-    const report = document.createElement('button');
-    report.textContent = `⚠️ ${reportCount}`;
-    report.className = "bg-orange-200 px-2 rounded";
-    report.title = "Report broken game";
-    report.onclick = () => sendReport(game.name);
-
-    right.append(up, down, count, report);
+    right.append(up, down, count);
     li.append(left, right);
 
     return li;
@@ -205,48 +174,6 @@ function fetchVotes(){
 
         renderGames();
         log('votes loaded');
-
-        fetchReports(); // 🔥 IMPORTANT
-    })
-    .catch(e=>log(e.message));
-}
-
-// ================= REPORT =================
-function sendReport(game){
-    const now = Date.now();
-
-    const cooldown = 5 * 60 * 60 * 1000;
-
-    if(now - lastReportTime < cooldown){
-        const mins = Math.ceil((cooldown - (now - lastReportTime)) / 60000);
-        alert(`You can report again in ${mins} minutes`);
-        return;
-    }
-
-    const reason = prompt("Why is this game broken?");
-    if(!reason || !reason.trim()) return;
-
-    fetch('/api/report', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-            game,
-            uid,
-            reason: reason.trim()
-        })
-    })
-    .then(res => {
-        if(res.status === 429){
-            alert("Cooldown active");
-            return;
-        }
-
-        lastReportTime = now;
-        localStorage.setItem(REPORT_KEY, String(lastReportTime));
-
-        fetchReports();
-
-        alert("Report submitted");
     })
     .catch(e=>log(e.message));
 }

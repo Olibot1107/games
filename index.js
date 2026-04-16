@@ -205,7 +205,14 @@ let cacheStats = {
 };
 
 app.post('/api/resource', async (req, res) => {
-    const reqPath = req.body.path;
+    let body;
+    try {
+        body = JSON.parse(req.body.toString());
+    } catch {
+        return res.status(400).json({ error: 'invalid body' });
+    }
+    
+    const reqPath = body.path;
     
     if (!reqPath || reqPath.includes('..')) {
         logError('Invalid path request: ' + reqPath);
