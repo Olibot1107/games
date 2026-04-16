@@ -374,17 +374,27 @@ app.get('/api/votes', (req, res) => {
 
 // Submit a vote
 app.post('/api/vote', (req, res) => {
-    const { game, vote, uid } = req.body;
-    if(!game || !vote || !uid) return res.status(400).json({ error:'Invalid payload' });
+    let data;
+
+    try {
+        data = JSON.parse(req.body.toString());
+    } catch {
+        return res.status(400).json({ error: 'Invalid JSON' });
+    }
+
+    const { game, vote, uid } = data;
+
+    if (!game || !vote || !uid) {
+        return res.status(400).json({ error: 'Invalid payload' });
+    }
 
     const votes = readVotes();
-    if(!votes[game]) votes[game] = {};
-    
-    // Only store one vote per uid, overwrite previous vote
+    if (!votes[game]) votes[game] = {};
+
     votes[game][uid] = vote;
     writeVotes(votes);
 
-    res.json({ success:true });
+    res.json({ success: true });
 });
 
 app.get('/kill', (req, res) => {
