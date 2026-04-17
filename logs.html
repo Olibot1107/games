@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Server Logs</title>
+<style>
+body {
+    background: #000;
+    color: #0f0;
+    font-family: 'Courier New', monospace;
+    margin: 0;
+    padding: 10px;
+    min-height: 100vh;
+}
+
+.header {
+    text-align: center;
+    border-bottom: 1px solid #0f0;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+.controls {
+    background: #111;
+    border: 1px solid #0f0;
+    padding: 10px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.terminal {
+    background: #000;
+    border: 1px solid #0f0;
+    height: calc(100vh - 120px);
+    overflow-y: auto;
+    padding: 10px;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+button {
+    background: #000;
+    color: #0f0;
+    border: 1px solid #0f0;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+button:hover {
+    background: #0f0;
+    color: #000;
+}
+
+input, select {
+    background: #000;
+    color: #0f0;
+    border: 1px solid #0f0;
+    padding: 5px;
+    font-family: inherit;
+}
+
+.log-entry {
+    margin-bottom: 2px;
+}
+
+.timestamp {
+    color: #888;
+}
+
+.level-info { color: #0ff; }
+.level-error { color: #f44; }
+.level-success { color: #0f0; }
+.level-cache_hit { color: #0f0; }
+.level-cache_miss { color: #ff0; }
+
+.blink {
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+</style>
+</head>
+
+<body>
+<div class="header">
+  <h1>SERVER LOGS TERMINAL</h1>
+  <a href="/" style="color: #0ff;">[BACK TO HUB]</a>
+</div>
+
+<div class="controls">
+  <button id="auto-refresh-btn">AUTO REFRESH: OFF</button>
+  <button id="clear-btn">CLEAR LOGS</button>
+  <span>FILTER:</span>
+  <select id="filter-level">
+    <option value="all">ALL</option>
+    <option value="error">ERRORS</option>
+    <option value="info">INFO</option>
+    <option value="success">SUCCESS</option>
+    <option value="cache_hit">CACHE HITS</option>
+    <option value="cache_miss">CACHE MISSES</option>
+  </select>
+  <input type="text" id="search-input" placeholder="SEARCH LOGS..." style="flex: 1; min-width: 200px;">
+  <span id="log-count">0 logs</span>
+  <span id="status">READY</span>
+</div>
+
+<div id="logs-container" class="terminal">
+  <div id="logs-content">
+INITIALIZING LOG TERMINAL...
+  </div>
+</div>
+
+<script>
+let autoRefresh = false;
+let autoRefreshInterval;
+let lastLogCount = 0;
+
+function formatTimestamp(timestamp) {
+    const date = new Date(timestamp);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
+}
+
+function createLogEntry(log) {
+    const div = document.createElement('div');
+    div.className = 'log-entry';
+
+    const timestamp = document.createElement('span');
+    timestamp.className = 'timestamp';
+    timestamp.textContent = formatTimestamp(log.timestamp);
+
+    const level = document.createElement('span');
+    level.className = `level-${log.level}`;
+    level.textContent = `[${log.level.toUpperCase()}] `;
+
+    const message = document.createElement('span');
+    message.textContent = log.message;
+
+    div.appendChild(timestamp);
+    div.appendChild(level);
+    div.appendChild(message);
+
+    return div;
+}
+
+async function loadLogs() {
+    try {
+        const response = await fetch('/api/logs');
+        const logs = await response.json();
+
+        const container = document.getElementById('logs-content');
+        const oldScrollHeight = container.scrollHeight;
+        const oldScrollTop = container.scrollTop;
+        const wasAtTop = oldScrollTop <= 50; // Check if user was near the top
+
+        container.innerHTML = '';
+
+        const filter = document.getElementById('filter-level').value;
+        const searchTerm = document.getElementById('search-input').value.toLowerCase();
+        let visibleLogs = 0;
+        let filteredLogs = [];
+
+        // First collect all matching logs
+        logs.forEach(log => {
+            const matchesFilter = filter === 'all' || log.level === filter;
+            const matchesSearch = !searchTerm ||
+                log.message.toLowerCase().includes(searchTerm) ||
+                log.level.toLowerCase().includes(searchTerm);
+
+            if (matchesFilter && matchesSearch) {
+                filteredLogs.push(log);
+                visibleLogs++;
+            }
+        });
+
+        // Reverse order so newest logs appear at top
+        filteredLogs.reverse();
+
+        // Add logs to container (newest first)
+        filteredLogs.forEach(log => {
+            container.appendChild(createLogEntry(log));
+        });
+
+        document.getElementById('log-count').textContent = `${visibleLogs} logs`;
+
+        // Auto scroll to top if user was already at top (to see new logs)
+        if (wasAtTop) {
+            setTimeout(() => {
+                container.scrollTop = 0;
+            }, 10);
+        }
+
+        // Update status
+        const status = document.getElementById('status');
+        if (logs.length > lastLogCount) {
+            status.textContent = 'NEW LOGS';
+            status.className = 'blink';
+            setTimeout(() => {
+                status.textContent = 'READY';
+                status.className = '';
+            }, 2000);
+        } else {
+            status.textContent = 'READY';
+            status.className = '';
+        }
+        lastLogCount = logs.length;
+
+    } catch (error) {
+        console.error('Failed to load logs:', error);
+        document.getElementById('logs-content').textContent = 'CONNECTION ERROR - RETRYING...';
+    }
+}
+
+function clearLogs() {
+    if (confirm('CLEAR ALL SERVER LOGS?')) {
+        fetch('/api/logs', { method: 'DELETE' })
+            .then(() => loadLogs())
+            .catch(error => console.error('Failed to clear logs:', error));
+    }
+}
+
+function toggleAutoRefresh() {
+    autoRefresh = !autoRefresh;
+    const btn = document.getElementById('auto-refresh-btn');
+
+    if (autoRefresh) {
+        btn.textContent = 'AUTO REFRESH: ON';
+        btn.style.background = '#0f0';
+        btn.style.color = '#000';
+        autoRefreshInterval = setInterval(loadLogs, 1000); // Faster refresh
+    } else {
+        btn.textContent = 'AUTO REFRESH: OFF';
+        btn.style.background = '#000';
+        btn.style.color = '#0f0';
+        clearInterval(autoRefreshInterval);
+    }
+}
+
+// Event listeners
+document.getElementById('auto-refresh-btn').addEventListener('click', toggleAutoRefresh);
+document.getElementById('clear-btn').addEventListener('click', clearLogs);
+document.getElementById('filter-level').addEventListener('change', loadLogs);
+document.getElementById('search-input').addEventListener('input', loadLogs);
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey) {
+        switch(e.key) {
+            case 'r':
+                e.preventDefault();
+                loadLogs();
+                break;
+            case 'l':
+                e.preventDefault();
+                clearLogs();
+                break;
+            case 'a':
+                e.preventDefault();
+                toggleAutoRefresh();
+                break;
+        }
+    }
+    if (e.key === 'Escape') {
+        document.getElementById('search-input').focus();
+    }
+});
+
+// Initial load
+loadLogs();
+</script>
+
+</body>
+</html>

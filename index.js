@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const https = require('https');
 const unzipper = require('unzipper');
 const fse = require('fs-extra');
+const os = require('os');
 const app = express();
 const PORT = 3000;
 
@@ -18,6 +19,9 @@ const TEMP_ZIP = path.join(__dirname, 'repo.zip');
 const TEMP_DIR = path.join(__dirname, 'temp_extract');
 const FINAL_DIR = path.join(__dirname, 'math');
 const REPORTS_FILE = path.join(__dirname, 'reports.json');
+
+// Global logs array
+let serverLogs = [];
 
 // ANSI Color codes
 const colors = {
@@ -38,27 +42,49 @@ const colors = {
 
 // Colored logging functions
 function log(msg, color = 'white') {
+    const timestamp = new Date().toISOString();
+    const cleanMsg = msg.replace(/\x1b\[[0-9;]*m/g, ''); // Strip ANSI codes
+    const logEntry = `[${timestamp}] [SERVER] ${cleanMsg}`;
     console.log(`${colors[color]}[SERVER]${colors.reset}`, msg);
+    serverLogs.push({ timestamp, level: 'info', message: cleanMsg, color });
+    // Keep only last 1000 logs
+    if (serverLogs.length > 1000) serverLogs.shift();
 }
 
 function logCache(hit, file) {
-    if (hit) {
-        console.log(`${colors.bgGreen}${colors.bright} CACHE HIT ${colors.reset} ${colors.green}${file}${colors.reset}`);
-    } else {
-        console.log(`${colors.bgYellow}${colors.bright} CACHE MISS ${colors.reset} ${colors.yellow}${file}${colors.reset}`);
-    }
+    const timestamp = new Date().toISOString();
+    const cleanFile = file.replace(/\x1b\[[0-9;]*m/g, ''); // Strip ANSI codes
+    const msg = hit ? `CACHE HIT ${cleanFile}` : `CACHE MISS ${cleanFile}`;
+    const color = hit ? 'green' : 'yellow';
+    const bgColor = hit ? 'bgGreen' : 'bgYellow';
+    console.log(`${colors[bgColor]}${colors.bright} ${hit ? 'CACHE HIT' : 'CACHE MISS'} ${colors.reset} ${colors[color]}${file}${colors.reset}`);
+    serverLogs.push({ timestamp, level: hit ? 'cache_hit' : 'cache_miss', message: msg, color });
+    if (serverLogs.length > 1000) serverLogs.shift();
 }
 
 function logError(msg) {
+    const timestamp = new Date().toISOString();
+    const cleanMsg = msg.replace(/\x1b\[[0-9;]*m/g, ''); // Strip ANSI codes
+    const logEntry = `[${timestamp}] [ERROR] ${cleanMsg}`;
     console.log(`${colors.bgRed}${colors.bright} ERROR ${colors.reset} ${colors.red}${msg}${colors.reset}`);
+    serverLogs.push({ timestamp, level: 'error', message: cleanMsg, color: 'red' });
+    if (serverLogs.length > 1000) serverLogs.shift();
 }
 
 function logInfo(msg) {
+    const timestamp = new Date().toISOString();
+    const cleanMsg = msg.replace(/\x1b\[[0-9;]*m/g, ''); // Strip ANSI codes
     console.log(`${colors.cyan}[INFO]${colors.reset} ${msg}`);
+    serverLogs.push({ timestamp, level: 'info', message: cleanMsg, color: 'cyan' });
+    if (serverLogs.length > 1000) serverLogs.shift();
 }
 
 function logSuccess(msg) {
+    const timestamp = new Date().toISOString();
+    const cleanMsg = msg.replace(/\x1b\[[0-9;]*m/g, ''); // Strip ANSI codes
     console.log(`${colors.green}[SUCCESS]${colors.reset} ${msg}`);
+    serverLogs.push({ timestamp, level: 'success', message: cleanMsg, color: 'green' });
+    if (serverLogs.length > 1000) serverLogs.shift();
 }
 
 a()
@@ -78,6 +104,12 @@ async function a() {
 
 app.use(express.raw({ type: "*/*", limit: "90mb" }));
 app.use(cookieParser());
+
+// Request counter middleware
+app.use((req, res, next) => {
+    requestCount++;
+    next();
+});
 
 // Non-blocking logger
 app.use((req, res, next) => {
@@ -203,6 +235,9 @@ let cacheStats = {
     misses: 0,
     saves: 0
 };
+
+// Request counter
+let requestCount = 0;
 
 app.post('/api/resource', async (req, res) => {
     let body;
@@ -612,6 +647,74 @@ app.post("/speed/upload", (req, res) => {
 app.get("/speed/ping", (req, res) => {
   res.json({ t: Date.now() });
 });
+
+// Logs API
+app.get('/api/logs', (req, res) => {
+    res.json(serverLogs);
+});
+
+app.delete('/api/logs', (req, res) => {
+    serverLogs = [];
+    res.json({ success: true });
+});
+
+// Server Info API
+app.get('/api/server-info', (req, res) => {
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    const usedMemory = totalMemory - freeMemory;
+
+    // Simple CPU usage (this is approximate)
+    const cpus = os.cpus();
+    let totalIdle = 0;
+    let totalTick = 0;
+
+    cpus.forEach(cpu => {
+        for (let type in cpu.times) {
+            totalTick += cpu.times[type];
+        }
+        totalIdle += cpu.times.idle;
+    });
+
+    const idle = totalIdle / cpus.length;
+    const total = totalTick / cpus.length;
+    const cpuUsage = 100 - ~~(100 * idle / total);
+
+    // Calculate uptime
+    const uptime = process.uptime();
+    const uptimeString = formatUptime(uptime);
+
+    res.json({
+        platform: os.platform(),
+        arch: os.arch(),
+        hostname: os.hostname(),
+        nodeVersion: process.version,
+        uptime: uptimeString,
+        memory: {
+            total: totalMemory,
+            used: usedMemory,
+            free: freeMemory,
+            usedPercent: (usedMemory / totalMemory * 100).toFixed(1)
+        },
+        cpu: cpuUsage,
+        cache: cacheStats,
+        requests: requestCount || 0
+    });
+});
+
+function formatUptime(seconds) {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+
+    if (days > 0) {
+        return `${days}d ${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    } else {
+        return `${minutes}m`;
+    }
+}
 
 app.listen(PORT, () => {
     console.log(`
