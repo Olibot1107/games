@@ -350,6 +350,12 @@ self.addEventListener('fetch', event => {
 
   log('Intercept:', request.method, url.pathname);
 
+  // ✅ ONLY handle requests for THIS origin
+  if (url.origin !== self.location.origin) {
+    // External request → let browser handle normally
+    return;
+  }
+  
   // skip API to avoid loop and client ot avoid problems
   if (url.pathname.startsWith('/api/')) return;
   if (url.pathname.startsWith('/math/')) return;
