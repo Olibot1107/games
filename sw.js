@@ -361,6 +361,7 @@ self.addEventListener('fetch', event => {
   if (url.pathname.startsWith('/math/')) return;
   if (url.pathname.includes('/client_status')) return;
   if (url.pathname.startsWith('/speed/')) return;
+  if (url.pathname.startsWith('/auth/postback/')) return;
   if (url.pathname === '/') return; // ADD THIS - let Express handle root
 
   event.respondWith((async () => {

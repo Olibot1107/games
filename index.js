@@ -6,7 +6,6 @@ const crypto = require('crypto');
 const https = require('https');
 const unzipper = require('unzipper');
 const fse = require('fs-extra');
-const os = require('os');
 const app = express();
 const PORT = 3000;
 
@@ -18,10 +17,7 @@ const ZIP_URL = 'https://github.com/Olibot1107/games-math/archive/refs/heads/mai
 const TEMP_ZIP = path.join(__dirname, 'repo.zip');
 const TEMP_DIR = path.join(__dirname, 'temp_extract');
 const FINAL_DIR = path.join(__dirname, 'math');
-const REPORTS_FILE = path.join(__dirname, 'reports.json');
-
-// Global logs array
-let serverLogs = [];
+const DEBUG = process.env.DEBUG === 'true'; // run with: DEBUG=true node server.js
 
 // ANSI Color codes
 const colors = {
@@ -42,49 +38,27 @@ const colors = {
 
 // Colored logging functions
 function log(msg, color = 'white') {
-    const timestamp = new Date().toISOString();
-    const cleanMsg = msg.replace(/\x1b\[[0-9;]*m/g, ''); // Strip ANSI codes
-    const logEntry = `[${timestamp}] [SERVER] ${cleanMsg}`;
     console.log(`${colors[color]}[SERVER]${colors.reset}`, msg);
-    serverLogs.push({ timestamp, level: 'info', message: cleanMsg, color });
-    // Keep only last 1000 logs
-    if (serverLogs.length > 1000) serverLogs.shift();
 }
 
 function logCache(hit, file) {
-    const timestamp = new Date().toISOString();
-    const cleanFile = file.replace(/\x1b\[[0-9;]*m/g, ''); // Strip ANSI codes
-    const msg = hit ? `CACHE HIT ${cleanFile}` : `CACHE MISS ${cleanFile}`;
-    const color = hit ? 'green' : 'yellow';
-    const bgColor = hit ? 'bgGreen' : 'bgYellow';
-    console.log(`${colors[bgColor]}${colors.bright} ${hit ? 'CACHE HIT' : 'CACHE MISS'} ${colors.reset} ${colors[color]}${file}${colors.reset}`);
-    serverLogs.push({ timestamp, level: hit ? 'cache_hit' : 'cache_miss', message: msg, color });
-    if (serverLogs.length > 1000) serverLogs.shift();
+    if (hit) {
+        console.log(`${colors.bgGreen}${colors.bright} CACHE HIT ${colors.reset} ${colors.green}${file}${colors.reset}`);
+    } else {
+        console.log(`${colors.bgYellow}${colors.bright} CACHE MISS ${colors.reset} ${colors.yellow}${file}${colors.reset}`);
+    }
 }
 
 function logError(msg) {
-    const timestamp = new Date().toISOString();
-    const cleanMsg = msg.replace(/\x1b\[[0-9;]*m/g, ''); // Strip ANSI codes
-    const logEntry = `[${timestamp}] [ERROR] ${cleanMsg}`;
     console.log(`${colors.bgRed}${colors.bright} ERROR ${colors.reset} ${colors.red}${msg}${colors.reset}`);
-    serverLogs.push({ timestamp, level: 'error', message: cleanMsg, color: 'red' });
-    if (serverLogs.length > 1000) serverLogs.shift();
 }
 
 function logInfo(msg) {
-    const timestamp = new Date().toISOString();
-    const cleanMsg = msg.replace(/\x1b\[[0-9;]*m/g, ''); // Strip ANSI codes
     console.log(`${colors.cyan}[INFO]${colors.reset} ${msg}`);
-    serverLogs.push({ timestamp, level: 'info', message: cleanMsg, color: 'cyan' });
-    if (serverLogs.length > 1000) serverLogs.shift();
 }
 
 function logSuccess(msg) {
-    const timestamp = new Date().toISOString();
-    const cleanMsg = msg.replace(/\x1b\[[0-9;]*m/g, ''); // Strip ANSI codes
     console.log(`${colors.green}[SUCCESS]${colors.reset} ${msg}`);
-    serverLogs.push({ timestamp, level: 'success', message: cleanMsg, color: 'green' });
-    if (serverLogs.length > 1000) serverLogs.shift();
 }
 
 a()
@@ -105,35 +79,87 @@ async function a() {
 app.use(express.raw({ type: "*/*", limit: "90mb" }));
 app.use(cookieParser());
 
-// Request counter middleware
 app.use((req, res, next) => {
-    requestCount++;
+    if (!DEBUG) return next();
+
+    try {
+        const bodyPreview = req.body
+            ? (Buffer.isBuffer(req.body)
+                ? req.body.toString().slice(0, 500)
+                : JSON.stringify(req.body).slice(0, 500))
+            : null;
+
+        console.log(`
+${colors.bgBlue}${colors.bright} DEBUG REQUEST ${colors.reset}
+${colors.cyan}Time:${colors.reset} ${new Date().toISOString()}
+${colors.cyan}Method:${colors.reset} ${req.method}
+${colors.cyan}URL:${colors.reset} ${req.originalUrl}
+${colors.cyan}IP:${colors.reset} ${req.ip}
+
+${colors.magenta}Headers:${colors.reset}
+${JSON.stringify(req.headers, null, 2)}
+
+${colors.yellow}Query:${colors.reset}
+${JSON.stringify(req.query, null, 2)}
+
+${colors.green}Cookies:${colors.reset}
+${JSON.stringify(req.cookies, null, 2)}
+
+${colors.white}Body (preview):${colors.reset}
+${bodyPreview}
+        `);
+    } catch (err) {
+        logError('Debug logging failed: ' + err.message);
+    }
+
     next();
 });
 
-// Non-blocking logger
 app.use((req, res, next) => {
     if (!req.path.startsWith('/api/resource')) return next();
-    
-    process.nextTick(() => {
+    if (req.method !== 'POST') return next();
+
+    const start = Date.now();
+
+    let bodyPath = 'N/A';
+
+    try {
+        if (req.body && req.body.length) {
+            const parsed = JSON.parse(req.body.toString());
+            bodyPath = parsed.path || 'N/A';
+        }
+    } catch {
+        bodyPath = 'INVALID_JSON';
+    }
+
+    res.on('finish', () => {
+        const ms = Date.now() - start;
+
         fetch('http://localhost:4000/send-embed', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                color: '#FFA500',
+                color:
+                    res.statusCode >= 500 ? '#FF0000' :
+                    res.statusCode >= 400 ? '#FFA500' :
+                    '#00FF00',
+
                 fields: [
                     { name: 'Method', value: `\`\`\`${req.method}\`\`\``, inline: true },
-                    { name: 'Path', value: `\`\`\`${req.path}\`\`\``, inline: true },
-                    { name: 'IP', value: `\`\`\`${req.ip}\`\`\``, inline: true }
+                    { name: 'Path', value: `\`\`\`${bodyPath}\`\`\``, inline: true },
+                    { name: 'Status', value: `\`\`\`${res.statusCode}\`\`\``, inline: true },
+                    { name: 'Time', value: `\`\`\`${ms}ms\`\`\``, inline: true },
+                    { name: 'IP', value: `\`\`\`${req.ip}\`\`\``, inline: false }
                 ]
             })
         }).catch(() => {});
     });
+
     next();
 });
 
 app.use((req, res, next) => {
-    if (req.path.startsWith('/auth') || req.path.startsWith('/math')) return next();
+    if (req.path.startsWith('/wow') || req.path.startsWith('/math')) return next();
     if (req.cookies?.ok === 'true') return next();
     return res.redirect('/math/index.html');
 });
@@ -235,9 +261,6 @@ let cacheStats = {
     misses: 0,
     saves: 0
 };
-
-// Request counter
-let requestCount = 0;
 
 app.post('/api/resource', async (req, res) => {
     let body;
@@ -401,12 +424,6 @@ function writeVotes(votes) {
 // Serve static files
 app.use(express.static(PUBLIC_DIR));
 
-// Get all votes
-app.get('/api/votes', (req, res) => {
-    const votes = readVotes();
-    res.json(votes);
-});
-
 // Submit a vote
 app.post('/api/vote', (req, res) => {
     let data;
@@ -529,80 +546,6 @@ async function setupMathRepo() {
     }
 }
 
-if (!fs.existsSync(REPORTS_FILE)) fs.writeFileSync(REPORTS_FILE, '{}', 'utf8');
-
-function readReports() {
-    try { return JSON.parse(fs.readFileSync(REPORTS_FILE, 'utf8')); }
-    catch { return {}; }
-}
-
-function writeReports(data) {
-    fs.writeFileSync(REPORTS_FILE, JSON.stringify(data, null, 2));
-}
-
-app.post('/api/report', (req, res) => {
-    const { game, uid, reason } = req.body;
-    if(!game || !uid || !reason) {
-        return res.status(400).json({ error: 'Invalid payload' });
-    }
-
-    const reports = readReports();
-
-    if(!reports[game]) reports[game] = [];
-
-    reports[game].push({
-        uid,
-        reason,
-        time: Date.now()
-    });
-
-    writeReports(reports);
-
-    res.json({ success: true });
-});
-
-app.get('/api/reports_admin', (req, res) => {
-    const reports = readReports();
-    res.json(reports);
-});
-
-app.get('/api/reports', (req, res) => {
-    const reports = readReports();
-
-    const counts = {};
-
-    for (const game in reports) {
-        counts[game] = reports[game].length;
-    }
-
-    res.json({
-        reports,
-        counts
-    });
-});
-
-app.post('/api/reports/delete', (req, res) => {
-    const { game, index } = req.body;
-
-    const reports = readReports();
-    if (!reports[game]) return res.json({ success: true });
-
-    reports[game].splice(index, 1);
-
-    if (reports[game].length === 0) {
-        delete reports[game];
-    }
-
-    writeReports(reports);
-
-    res.json({ success: true });
-});
-
-app.post('/api/reports/clear', (req, res) => {
-    writeReports({});
-    res.json({ success: true });
-});
-
 // DOWNLOAD TEST (streams data)
 app.get("/speed/download", (req, res) => {
   const size = 1 * 1024 * 1024; // 50MB
@@ -647,74 +590,6 @@ app.post("/speed/upload", (req, res) => {
 app.get("/speed/ping", (req, res) => {
   res.json({ t: Date.now() });
 });
-
-// Logs API
-app.get('/api/logs', (req, res) => {
-    res.json(serverLogs);
-});
-
-app.delete('/api/logs', (req, res) => {
-    serverLogs = [];
-    res.json({ success: true });
-});
-
-// Server Info API
-app.get('/api/server-info', (req, res) => {
-    const totalMemory = os.totalmem();
-    const freeMemory = os.freemem();
-    const usedMemory = totalMemory - freeMemory;
-
-    // Simple CPU usage (this is approximate)
-    const cpus = os.cpus();
-    let totalIdle = 0;
-    let totalTick = 0;
-
-    cpus.forEach(cpu => {
-        for (let type in cpu.times) {
-            totalTick += cpu.times[type];
-        }
-        totalIdle += cpu.times.idle;
-    });
-
-    const idle = totalIdle / cpus.length;
-    const total = totalTick / cpus.length;
-    const cpuUsage = 100 - ~~(100 * idle / total);
-
-    // Calculate uptime
-    const uptime = process.uptime();
-    const uptimeString = formatUptime(uptime);
-
-    res.json({
-        platform: os.platform(),
-        arch: os.arch(),
-        hostname: os.hostname(),
-        nodeVersion: process.version,
-        uptime: uptimeString,
-        memory: {
-            total: totalMemory,
-            used: usedMemory,
-            free: freeMemory,
-            usedPercent: (usedMemory / totalMemory * 100).toFixed(1)
-        },
-        cpu: cpuUsage,
-        cache: cacheStats,
-        requests: requestCount || 0
-    });
-});
-
-function formatUptime(seconds) {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-
-    if (days > 0) {
-        return `${days}d ${hours}h ${minutes}m`;
-    } else if (hours > 0) {
-        return `${hours}h ${minutes}m`;
-    } else {
-        return `${minutes}m`;
-    }
-}
 
 app.listen(PORT, () => {
     console.log(`

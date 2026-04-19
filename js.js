@@ -149,7 +149,7 @@ function renderGames(){
 
 // ================= VOTES =================
 function fetchVotes(){
-    fetch('/api/votes')
+    fetch('/votes.json')
     .then(r=>r.json())
     .then(data=>{
         voteData = {};

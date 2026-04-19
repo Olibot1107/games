@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authenticate</title>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #f4f4f4;
+    }
+
+    .container {
+      text-align: center;
+      padding: 2rem;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      width: 260px;
+    }
+
+    .pin-display {
+      font-size: 1.5rem;
+      letter-spacing: 8px;
+      margin: 10px 0 20px;
+      min-height: 30px;
+    }
+
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    button {
+      padding: 15px;
+      font-size: 1.2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #eee;
+    }
+
+    button:active {
+      background: #ddd;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 0.9rem;
+      min-height: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Enter PIN</h1>
+
+    <div class="pin-display" id="pinDisplay"></div>
+
+    <div class="keypad">
+      <button onclick="press(1)">1</button>
+      <button onclick="press(2)">2</button>
+      <button onclick="press(3)">3</button>
+      <button onclick="press(4)">4</button>
+      <button onclick="press(5)">5</button>
+      <button onclick="press(6)">6</button>
+      <button onclick="press(7)">7</button>
+      <button onclick="press(8)">8</button>
+      <button onclick="press(9)">9</button>
+      <button onclick="clearPin()">C</button>
+      <button onclick="press(0)">0</button>
+      <button onclick="submitPin()">OK</button>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    let pin = "";
+    const correctPin = atob("MTIxMQ=="); // "1211" in base64
+    let locked = false;
+
+    function press(num) {
+      if (locked) return;
+
+      if (pin.length < 6) {
+        pin += num;
+        updateDisplay();
+
+        if (pin.length === 4) {
+          submitPin();
+        }
+      }
+    }
+
+    function updateDisplay() {
+      document.getElementById("pinDisplay").textContent = "*".repeat(pin.length);
+    }
+
+    function clearPin() {
+      if (locked) return;
+      pin = "";
+      updateDisplay();
+    }
+
+    function redirect() {
+      locked = true;
+      setTimeout(() => {
+        window.location.href = "index.html";
+      }, 1000);
+    }
+
+    function submitPin() {
+      if (locked) return;
+
+      const status = document.getElementById("status");
+
+      if (pin === correctPin) {
+        const expires = new Date();
+        expires.setFullYear(expires.getFullYear() + 10);
+        document.cookie = `ok=true; expires=${expires.toUTCString()}; path=/`;
+
+        status.style.color = "green";
+        status.textContent = "Access granted";
+
+        redirect();
+      } else {
+        status.style.color = "red";
+        status.textContent = "Wrong PIN";
+
+        pin = "";
+        updateDisplay();
+
+        redirect();
+      }
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (locked) return;
+
+      if (e.key >= "0" && e.key <= "9") {
+        press(Number(e.key));
+      }
+
+      if (e.key === "Backspace") {
+        pin = pin.slice(0, -1);
+        updateDisplay();
+      }
+
+      if (e.key === "Enter") {
+        submitPin();
+      }
+
+      if (e.key.toLowerCase() === "c") {
+        clearPin();
+      }
+    });
+  </script>
+
+  <script src="/lib/fps.js"></script>
+  <script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
+</body>
+</html>
