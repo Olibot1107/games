@@ -13,7 +13,7 @@
 html {
 	height: 100%;
 	width: 100%;
-	background: #C8ECFE url(../images/bgimage.png) no-repeat top center;
+	background: #C8ECFE url(/imgs/random_pixels.png) no-repeat top center;
 	background-size: cover;
 }
 
