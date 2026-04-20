@@ -1,0 +1,90 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+      <html>
+
+         <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+            <title>Site Blocked</title>
+      <link rel="stylesheet" href="https://blockpageassets.smoothwall.com/styles.css">
+            <link rel="stylesheet" href="https://blockpageassets.smoothwall.com/MooDialog.css">
+            <link rel="stylesheet" href="https://blockpageassets.smoothwall.com/MooDialog_ca_popup.css">
+            <script type="text/javascript" src="https://blockpageassets.smoothwall.com/mootools-core.min.js"></script>
+            <script type="text/javascript" src="https://blockpageassets.smoothwall.com/MooDialog.min.js"></script>
+            <script type="text/javascript" src="https://blockpageassets.smoothwall.com/Overlay.min.js"></script>
+            <script type="text/javascript" src="https://blockpageassets.smoothwall.com/jscript.min.js"></script>
+            </head>        <body>
+
+      <div class='endusermessage' style='background-image: url("https://blockpageassets.smoothwall.com/denied-pale.jpg"); '>
+      <div class='endUserBgImage'>
+            <img src='https://blockpageassets.smoothwall.com/logo-sw-qoria.png'>
+      </div>
+<h2 style=''>This page has been blocked.</h2>
+
+<h3>The request was logged.</h3>
+
+      <div class='endUserAttributes''>
+<dl>
+
+
+<dt>Category</dt>
+<dd> Custom Blocked Domains Added by (Sknott)</dd>
+
+<dt>Group</dt>
+<dd>Year 7/8/9/10/11, Students</dd>
+
+<dt>Hostname</dt>
+<dd>192.253.dyn</dd>
+
+<dt>IP</dt>
+<dd>253.192.2.102</dd>
+
+<dt>Reason</dt>
+<dd>Content of type Custom ( Domain/URL filtering ) blocked.</dd>
+
+<dt>Username</dt>
+<dd>CSE2K</dd>
+
+<dt>URL</dt>
+<dd>https://math.voidbase.uk</dd>
+
+
+</dl>
+      </div>
+
+
+      </div>
+      <script type="text/javascript">
+            function format_time(time) {
+                  var hours = Math.floor(time / 60);
+                  var minutes = Math.round(time % 60);
+
+                  var hourstring;
+                  switch(hours) {
+                        case 0:
+                              hourstring = "";
+                              break;
+                        case 1:
+                              hourstring = "1 hour ";
+                              break;
+                        default:
+                              hourstring = hours + " hours "
+                              break;
+                  }
+
+                  var minutestring = "";
+                  if ( !((minutes == 0) && (hours != 0)) ) {
+                        minutestring = minutes + " minutes";
+                  }
+                  return  hourstring + minutestring;
+            }
+
+            function do_onload() {
+                  var message = document.getElementById("quota_message");
+                  var button_message = document.getElementById("quota_button_message");
+                  message.innerHTML = message.innerHTML.replace("-QUOTATIME1-", format_time(60));
+                  button_message.value = button_message.value.replace("-QUOTATIME2-", format_time(10));
+            }
+
+            window.onload = do_onload;
+      </script>
+</body>
+</html>
