@@ -1,0 +1,373 @@
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Video Call</title>
+  <!-- Firebase (compat) -->
+  <script src="/script.js"></script>
+  <script src="https://www.google.com/recaptcha/api.js?render=6LdbVcMrAAAAANpTUNdcbxt16-1W6_GpH2FjnXaw"></script>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <style>
+    :root{--bg:#0f1724;--card:#111827;--accent:#60a5fa;--muted:#94a3b8}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#071028 0%, #071a2b 100%);color:#e6eef8;font-family:Inter,Segoe UI,system-ui;padding:20px;transition:background 0.5s ease; position:relative; }
+    body.streaming{background:linear-gradient(180deg,#1e3a8a 0%, #1e40af 100%)}
+    .streaming-bg{position:fixed; top:0; left:0; width:100%; height:100%; background:linear-gradient(180deg,#071028 0%, #071a2b 100%); filter: blur(2px); opacity:1; z-index:-1; display: none; }
+    body.streaming .streaming-bg{display: block;}
+    h1{color:var(--accent);margin:0 0 12px}
+    .container{max-width:980px;margin:0 auto}
+    .rooms{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}
+    .room{background:var(--card);padding:10px;border-radius:8px;text-align:center}
+    .room h3{margin:0 0 8px;font-size:16px}
+    .room .count{color:var(--muted);font-size:13px}
+    .btn{display:inline-block;padding:8px 10px;border-radius:8px;background:#2c2c3f;border:none;color:white;cursor:pointer;margin-top:8px}
+    .btn.danger{background:#ef4444}
+    .btn.home{background:#10b981}
+    .videos{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:14px}
+    body.in-call .videos{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+  video{width:100%;height:160px;background:#000;border-radius:8px;object-fit:cover;transition:transform 0.3s ease;border:2px solid transparent}
+  video.speaking{border-color:#10b981}
+  video.muted::after{content:'🔇';position:absolute;top:5px;left:5px;background:rgba(0,0,0,0.7);color:white;border-radius:50%;width:25px;height:25px;display:flex;align-items:center;justify-content:center;font-size:12px}
+    body.in-call video{height:300px}
+    .logs{background:#0b1220;padding:10px;border-radius:8px;max-height:180px;overflow:auto;border:1px solid rgba(255,255,255,0.03)}
+    .muted{color:var(--muted);font-size:13px}
+    .chat{background:#111827;padding:10px;border-radius:8px;margin-top:12px}
+    .chat-messages{max-height:150px;overflow-y:auto;background:#0b1220;padding:8px;border-radius:6px;margin-bottom:8px}
+    .chat-input{display:flex;gap:6px}
+    .chat-input input{flex:1;padding:6px;border-radius:6px;border:none}
+    .chat-input button{padding:6px 10px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer}
+  </style>
+</head>
+<body>
+  <div class="streaming-bg"></div>
+  <div class="container">
+    <h1>Video Call</h1>
+
+    <div style="margin-bottom:16px;">
+      <button class="btn home" onclick="window.location.href='/pages/chat.html'">🏠 Home</button>
+    </div>
+
+    <!-- Private room controls -->
+    <div style="margin-bottom:14px;">
+      <input id="room-code-input" type="text" placeholder="Enter room code..." style="padding:6px;border-radius:6px;border:none"/>
+      <button id="room-create" class="btn">➕ Create Room</button>
+      <button id="room-join-code" class="btn">🔑 Join by Code</button>
+    </div>
+
+    <div class="rooms" id="rooms"></div>
+
+    <div class="videos" id="videos"></div>
+
+    <div style="margin:10px 0;">
+      <button id="btn-mic" class="btn">🎤 Toggle Mic</button>
+      <button id="btn-cam" class="btn">📹 Toggle Camera</button>
+      <button id="btn-screen" class="btn">🖥️ Share Screen</button>
+      <button id="btn-sound" class="btn">🔈 Toggle Sound</button>
+    </div>
+
+    <div class="chat">
+      <h3 style="margin-top:0">Chat</h3>
+      <div id="chat-messages" class="chat-messages"></div>
+      <div class="chat-input">
+        <input id="chat-input" type="text" placeholder="Type a message..."/>
+        <button id="chat-send">Send</button>
+      </div>
+    </div>
+
+    <h3 style="margin-top:14px">Logs</h3>
+    <div id="logs" class="logs"></div>
+  </div>
+
+<script>
+(function(){
+  const logsEl = () => document.getElementById('logs');
+  function log(msg, level='info'){
+    try{ const el = logsEl(); if(el){ const p = document.createElement('div'); p.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`; el.prepend(p); }}catch(e){}
+    if(level==='error') console.error(msg); else console.log(msg);
+  }
+
+  window.addEventListener('error', e => log('Window error: '+(e?.message||'Unknown error'),'error'));
+  window.addEventListener('unhandledrejection', e => log('Unhandled rejection: '+(e?.reason||e),'error'));
+
+  if(typeof firebase === 'undefined' || !firebase.apps){
+    log('Firebase library not loaded.','error'); return;
+  }
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyA4BYjOa__uKZjOBvS5p_uMxmJ6AMsKcpg",
+    authDomain: "chat1-6cc2e.firebaseapp.com",
+    databaseURL: "https://chat1-6cc2e-default-rtdb.firebaseio.com",
+    projectId: "chat1-6cc2e",
+    storageBucket: "chat1-6cc2e.firebasestorage.app",
+    messagingSenderId: "771765903902",
+    appId: "1:771765903902:web:a6fb2e71b059c20ba7840f"
+  };
+  try{ firebase.initializeApp(firebaseConfig); }catch(e){}
+  const db = firebase.database();
+
+  firebase.auth().signInAnonymously().then(()=> log('Signed in anonymously')).catch(err=> log('Auth error: '+err.message, 'error'));
+
+  const roomsContainer = document.getElementById('rooms');
+  const videosContainer = document.getElementById('videos');
+  const chatMessagesEl = document.getElementById('chat-messages');
+  const chatInputEl = document.getElementById('chat-input');
+  const chatSendBtn = document.getElementById('chat-send');
+  const ROOM_NAMES = ['VC1','VC2','VC3','VC4','VC5','VC6','VC7','VC8','VC9','VC10'];
+  const uid = Math.random().toString(36).slice(2);
+  let localStream=null,screenStream=null,currentRoom=null,roomRef=null,heartbeatInterval=null,audioContext=null;
+  const peers={},analysers={};
+  let micEnabled=true,soundEnabled=true,videoEnabled=true,screenSharing=false;
+
+  function setupSpeechDetection(video, audioTrack){
+    if(!audioTrack) return;
+    if(!audioContext) audioContext=new AudioContext();
+    const source=audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
+    const analyser=audioContext.createAnalyser();
+    analyser.fftSize=256;
+    source.connect(analyser);
+    analysers[video.id]=analyser;
+    const checkVolume=()=>{
+      const dataArray=new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(dataArray);
+      const avg=dataArray.reduce((a,b)=>a+b)/dataArray.length;
+      video.classList.toggle('speaking',avg>5);
+    };
+    setInterval(checkVolume,100);
+  }
+
+  const STUN_SERVERS={iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
+
+  // render public rooms
+  ROOM_NAMES.forEach(name=> renderRoomBox(name,true));
+
+  function renderRoomBox(name,isPublic=false){
+    const box=document.createElement('div'); box.className='room';
+    const title=document.createElement('h3'); title.textContent=name; box.appendChild(title);
+    const count=document.createElement('div'); count.className='count'; count.id=`count-${name}`; count.textContent='Connected: 0'; box.appendChild(count);
+    const list=document.createElement('div'); list.id=`list-${name}`; list.className='muted'; list.style.marginTop='6px'; if(!window.innerWidth>600) list.style.display='none'; box.appendChild(list);
+    const btnDiv=document.createElement('div'); btnDiv.style.display='flex'; btnDiv.style.gap='4px'; btnDiv.style.justifyContent='center';
+    const joinBtn=document.createElement('button'); joinBtn.className='btn'; joinBtn.textContent='Join'; btnDiv.appendChild(joinBtn);
+    const leaveBtn=document.createElement('button'); leaveBtn.className='btn danger'; leaveBtn.textContent='Leave'; btnDiv.appendChild(leaveBtn);
+    box.appendChild(btnDiv);
+    roomsContainer.appendChild(box);
+
+    const rref=db.ref('vcRooms/'+name);
+    rref.on('value',snap=>{
+      const val=snap.val()||{}; const keys=Object.keys(val);
+      count.textContent='Connected: '+keys.length;
+      list.textContent=keys.join(', ');
+    });
+
+    joinBtn.addEventListener('click',()=> joinRoom(name,isPublic));
+    leaveBtn.addEventListener('click',()=>{ if(currentRoom===name) disconnectCall(isPublic); });
+  }
+
+  async function ensureLocalStream(){
+    if(localStream) return localStream;
+    localStream=await navigator.mediaDevices.getUserMedia({video:{width:320,height:180,frameRate:60},audio:true});
+    const v=document.createElement('video'); v.autoplay=true; v.muted=true; v.playsInline=true; v.id=`local-${uid}`; v.srcObject=localStream; videosContainer.prepend(v);
+    setupSpeechDetection(v, localStream.getAudioTracks()[0]);
+    log('Local media started');
+    document.body.classList.add('streaming'); return localStream;
+  }
+
+  async function joinRoom(roomName,isPublic=false){
+    try{
+      log('Joining room: '+roomName);
+      if(currentRoom) await disconnectCall();
+      await ensureLocalStream();
+      currentRoom=roomName;
+      document.body.classList.add('in-call');
+      roomRef=db.ref('vcRooms/'+currentRoom);
+      await roomRef.child(uid).set({joined:true,ts:Date.now(),lastSeen:Date.now()});
+      roomRef.child(uid).onDisconnect().remove();
+
+      if(heartbeatInterval) clearInterval(heartbeatInterval);
+      heartbeatInterval=setInterval(()=>{ if(roomRef) roomRef.child(uid).update({lastSeen:Date.now()}); },5000);
+
+      roomRef.on('value',snap=>{
+        const data=snap.val()||{}; const now=Date.now();
+        Object.keys(data).forEach(id=>{
+          if(now-(data[id].lastSeen||0)>15000){ log('Pruning stale user: '+id); roomRef.child(id).remove(); }
+        });
+        // Auto-delete private empty rooms
+        if(!isPublic && Object.keys(data).length===0){ log('Deleting empty private room: '+roomName); db.ref('vcRooms/'+roomName).remove(); }
+      });
+
+      roomRef.on('child_added',snap=>{
+        const otherId=snap.key; if(otherId===uid) return;
+        log('Participant joined: '+otherId); connectToPeer(otherId).catch(err=>log('connectToPeer error: '+err,'error'));
+      });
+      roomRef.on('child_removed',snap=>{
+        const otherId=snap.key; log('Participant left: '+otherId); cleanupPeer(otherId);
+      });
+
+      setupChat(isPublic);
+    }catch(e){ log('joinRoom error: '+(e?.message||e),'error'); }
+  }
+
+  async function connectToPeer(otherId){
+    if(!currentRoom) throw new Error('Not in a room');
+    if(peers[otherId]){ log('Already connected to '+otherId); return; }
+    if(!localStream) await ensureLocalStream();
+
+    const pc=new RTCPeerConnection(STUN_SERVERS);
+    localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+
+    const remoteVid=document.createElement('video'); remoteVid.autoplay=true; remoteVid.playsInline=true; remoteVid.id=`remote-${otherId}`;
+    let remoteAppended=false;
+    pc.ontrack=e=>{ setupSpeechDetection(remoteVid, e.streams[0].getAudioTracks()[0]); remoteVid.srcObject=e.streams[0]; if(!remoteAppended){ remoteVid.style.position='relative'; const muteBtn=document.createElement('button'); muteBtn.textContent='🔇'; muteBtn.className='mute-btn'; muteBtn.style.position='absolute'; muteBtn.style.top='5px'; muteBtn.style.right='5px'; muteBtn.style.background='rgba(0,0,0,0.7)'; muteBtn.style.color='white'; muteBtn.style.border='none'; muteBtn.style.borderRadius='50%'; muteBtn.style.width='30px'; muteBtn.style.height='30px'; muteBtn.style.cursor='pointer'; muteBtn.addEventListener('click',()=> db.ref('chat/'+currentRoom).push({from:uid,type:'mute',target:otherId,ts:Date.now()})); videosContainer.appendChild(remoteVid); videosContainer.appendChild(muteBtn); remoteAppended=true; } };
+
+    pc.onicecandidate=e=>{
+      if(e.candidate){ db.ref(`signals/${currentRoom}/candidates/${uid}`).push(e.candidate.toJSON()); }
+    };
+
+    const sdpRef=db.ref(`signals/${currentRoom}/sdp/${otherId}/${uid}`);
+    const sdpCallback=sdpRef.on('value',async snap=>{
+      const data=snap.val(); if(!data) return;
+      try{
+        await pc.setRemoteDescription(new RTCSessionDescription(data));
+        if(data.type==='offer'){ const answer=await pc.createAnswer(); await pc.setLocalDescription(answer); await db.ref(`signals/${currentRoom}/sdp/${uid}/${otherId}`).set(answer); }
+        sdpRef.remove();
+      }catch(e){ log('Error handling remote SDP: '+(e?.message||e),'error'); }
+    });
+
+    const candRef=db.ref(`signals/${currentRoom}/candidates/${otherId}`);
+    const candCallback=candRef.on('child_added',snap=>{
+      const c=snap.val(); if(c) pc.addIceCandidate(new RTCIceCandidate(c)).catch(err=>log('ICE error: '+err,'error'));
+    });
+
+    peers[otherId]={pc,sdpRef,sdpCallback,candRef,candCallback};
+
+    if(uid<otherId){
+      const offer=await pc.createOffer(); await pc.setLocalDescription(offer);
+      await db.ref(`signals/${currentRoom}/sdp/${uid}/${otherId}`).set(offer);
+    }
+  }
+
+  function cleanupPeer(otherId){
+    const entry=peers[otherId]; if(!entry) return;
+    try{ entry.sdpRef.off('value',entry.sdpCallback); }catch(e){}
+    try{ entry.candRef.off('child_added',entry.candCallback); }catch(e){}
+    try{ entry.pc.close(); }catch(e){}
+    const v=document.getElementById('remote-'+otherId); if(v) { delete analysers[v.id]; v.remove(); }
+    delete peers[otherId];
+  }
+
+  async function disconnectCall(isPublic=false){
+    if(!currentRoom) return;
+    if(heartbeatInterval){ clearInterval(heartbeatInterval); heartbeatInterval=null; }
+    try{ if(roomRef) await roomRef.child(uid).remove(); }catch(e){}
+    try{ await db.ref(`signals/${currentRoom}/sdp/${uid}`).remove(); }catch(e){}
+    try{ await db.ref(`signals/${currentRoom}/candidates/${uid}`).remove(); }catch(e){}
+
+    Object.keys(peers).forEach(id=>cleanupPeer(id));
+    if(localStream){ localStream.getTracks().forEach(t=>t.stop()); const lv=document.getElementById('local-'+uid); if(lv) lv.remove(); localStream=null; }
+
+    if(roomRef) roomRef.off();
+    // If private and empty, delete room
+    if(!isPublic){ const snap=await db.ref('vcRooms/'+currentRoom).once('value'); if(!snap.val()) db.ref('vcRooms/'+currentRoom).remove(); }
+
+    currentRoom=null; roomRef=null;
+    document.body.classList.remove('streaming');
+    document.body.classList.remove('in-call');
+  }
+
+  // mic toggle
+  document.getElementById('btn-mic').addEventListener('click',()=>{
+    if(!localStream) return; micEnabled=!micEnabled;
+    localStream.getAudioTracks().forEach(t=>t.enabled=micEnabled);
+    document.getElementById('btn-mic').textContent = micEnabled ? '🎤 Toggle Mic' : '🔇 Muted';
+  });
+
+  // sound toggle
+  document.getElementById('btn-sound').addEventListener('click',()=>{
+    soundEnabled=!soundEnabled;
+    document.querySelectorAll('video').forEach(v=>{ if(!v.id.startsWith('local-')) v.muted=!soundEnabled; });
+    document.getElementById('btn-sound').textContent = soundEnabled ? '🔈 Toggle Sound' : '🔇 Sound Off';
+  });
+
+  // camera toggle
+  document.getElementById('btn-cam').addEventListener('click',()=>{
+    if(!localStream) return; videoEnabled=!videoEnabled;
+    localStream.getVideoTracks().forEach(t=>t.enabled=videoEnabled);
+    document.getElementById('btn-cam').textContent = videoEnabled ? '📹 Toggle Camera' : '📷 Camera Off';
+    log('Camera '+(videoEnabled?'enabled':'disabled'));
+  });
+
+  // screen share toggle
+  document.getElementById('btn-screen').addEventListener('click',async ()=>{
+    if(!navigator.userAgent.includes('Windows')){ log('Screen sharing is only available on Windows PCs.'); return; }
+    if(screenSharing){
+      // stop
+      if(screenStream && currentRoom){
+        const videoTrack=localStream.getVideoTracks()[0];
+        for(let id in peers){
+          const sender=peers[id].pc.getSenders().find(s=>s.track&&s.track.kind==='video');
+          if(sender) await sender.replaceTrack(videoTrack);
+        }
+        screenStream.getTracks().forEach(t=>t.stop()); screenStream=null;
+        const lv=document.getElementById('local-'+uid); if(lv) lv.srcObject=localStream;
+        screenSharing=false; log('Stopped screen sharing');
+      }
+    }else{
+      // start
+      try{
+        screenStream=await navigator.mediaDevices.getDisplayMedia({video:true});
+        const screenTrack=screenStream.getVideoTracks()[0];
+        for(let id in peers){
+          const sender=peers[id].pc.getSenders().find(s=>s.track&&s.track.kind==='video');
+          if(sender) await sender.replaceTrack(screenTrack);
+        }
+        const lv=document.getElementById('local-'+uid); if(lv) lv.srcObject=screenStream;
+        screenSharing=true; log('Started screen sharing');
+        screenTrack.addEventListener('ended',()=>{ if(screenSharing) document.getElementById('btn-screen').click(); });
+      }catch(e){ log('Screen share error: '+e.message,'error'); }
+    }
+    document.getElementById('btn-screen').textContent = screenSharing ? '🖥️ Sharing' : '🖥️ Share Screen';
+  });
+
+
+
+  function setupChat(isPublic){
+    if(!currentRoom) return;
+    const chatRef=db.ref('chat/'+currentRoom);
+    chatRef.off();
+    chatRef.on('child_added',snap=>{
+      const msg=snap.val(); if(!msg) return;
+      if(msg.type === 'mute' && msg.target === uid){
+        log('Muted by ' + msg.from);
+        micEnabled = false;
+        if(localStream) localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
+      }else if(msg.text){
+        const div=document.createElement('div'); div.textContent=`[${new Date(msg.ts).toLocaleTimeString()}] ${msg.from}: ${msg.text}`;
+        chatMessagesEl.appendChild(div); chatMessagesEl.scrollTop=chatMessagesEl.scrollHeight;
+      }
+    });
+    chatSendBtn.onclick=()=>{ const text=chatInputEl.value.trim(); if(!text) return; chatRef.push({from:uid,text,ts:Date.now()}); chatInputEl.value=''; };
+  }
+
+  // Private room controls
+  document.getElementById('room-join-code').addEventListener('click',()=>{
+    const code=document.getElementById('room-code-input').value.trim(); if(!code){ log('Enter room code'); return; }
+    renderRoomBox(code,false); joinRoom(code,false);
+  });
+  document.getElementById('room-create').addEventListener('click',()=>{
+    const code='ROOM-'+Math.random().toString(36).slice(2,8).toUpperCase();
+    document.getElementById('room-code-input').value=code;
+    renderRoomBox(code,false); joinRoom(code,false);
+    log('Created private room code: '+code);
+  });
+
+  // Handle join from URL
+  const params=new URLSearchParams(window.location.search); const roomFromLink=params.get('room');
+  if(roomFromLink){ renderRoomBox(roomFromLink,false); joinRoom(roomFromLink,false); }
+
+  window._vac={joinRoom,disconnectCall,uid};
+  log('Client ready — uid: '+uid);
+})();
+</script>
+</body>
+</html>
