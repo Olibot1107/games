@@ -1,7 +1,0 @@
-- [x] math.ojdawson1107.workers.dev
-- [x] math.voidium.uk
-- [x] games-mht0.onrender.com
-- [x] hello.voidium.uk
-- [x] api.voidium.uk
-- [x] help.voidium.uk
-- [x] rizz.voidium.uk

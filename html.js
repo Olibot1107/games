@@ -114,7 +114,16 @@ function findHtmlFiles(dir) {
         return;
       }
 
-      // ✅ ALL HTML FILES NOW
+      if (file.isFile() && file.name.toLowerCase().endsWith('.html')) {
+
+        if (file.name.toLowerCase() === 'blocked.html') {
+          log(`Skipped: ${fullPath}`, 'yellow');
+          return;
+        }
+
+        processFile(fullPath);
+      }
+
       if (file.isFile() && file.name.toLowerCase().endsWith('.html')) {
         processFile(fullPath);
       }
