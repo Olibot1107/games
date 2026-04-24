@@ -270,103 +270,84 @@ app.post('/api/resource', async (req, res) => {
         return res.status(400).json({ error: 'invalid body' });
     }
     
-    const reqPath = body.path;
+    const paths = body.paths || [body.path]; // Support both batch and single
     
-    if (!reqPath || reqPath.includes('..')) {
-        logError('Invalid path request: ' + reqPath);
-        return res.status(400).json({ error: 'invalid path' });
+    if (!Array.isArray(paths)) {
+        return res.status(400).json({ error: 'paths must be array' });
     }
-
-    const fullPath = path.join(PUBLIC_DIR, reqPath);
-    const cacheFile = getCacheFilename(fullPath);
     
-    try {
-        const stat = await fs.promises.stat(fullPath);
-        const ext = path.extname(fullPath).toLowerCase();
+    logInfo(`Batch request: ${paths.length} files`);
+    
+    const results = await Promise.all(paths.map(async (reqPath) => {
+        if (!reqPath || reqPath.includes('..')) {
+            return { error: 'invalid path' };
+        }
         
-        // Range handling
-        const range = req.headers.range;
-        let start = 0;
-        let end = stat.size - 1;
-        let statusCode = 200;
-
-        if (range) {
-            const match = /bytes=(\d+)-(\d*)/.exec(range);
-            if (match) {
-                start = parseInt(match[1], 10);
-                end = match[2] ? parseInt(match[2], 10) : end;
-                statusCode = 206;
-                logInfo(`Range request: ${start}-${end} for ${reqPath}`);
+        const fullPath = path.join(PUBLIC_DIR, reqPath);
+        const cacheFile = getCacheFilename(fullPath);
+        
+        try {
+            const stat = await fs.promises.stat(fullPath);
+            const ext = path.extname(fullPath).toLowerCase();
+            
+            let encryptedFile;
+            const startTime = Date.now();
+            
+            if (await isCacheValid(fullPath, cacheFile)) {
+                cacheStats.hits++;
+                logCache(true, reqPath);
+                const cachedData = await fs.promises.readFile(cacheFile);
+                encryptedFile = cachedData.toString('base64');
+                const elapsed = Date.now() - startTime;
+                logInfo(`Served from cache in ${colors.green}${elapsed}ms${colors.reset}`);
+            } else {
+                cacheStats.misses++;
+                logCache(false, reqPath);
+                const fileBuffer = await fs.promises.readFile(fullPath);
+                logInfo(`File read: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
+                
+                const encrypted = xorBufferFast(fileBuffer);
+                const xorTime = Date.now() - startTime;
+                logInfo(`XOR encryption done in ${colors.yellow}${xorTime}ms${colors.reset}`);
+                
+                // Save encrypted version to cache (async, don't wait)
+                fs.promises.writeFile(cacheFile, encrypted).then(() => {
+                    cacheStats.saves++;
+                    logSuccess(`Cached to disk: ${reqPath}`);
+                    logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset} | Saves: ${colors.cyan}${cacheStats.saves}${colors.reset}`);
+                }).catch(err => {
+                    logError('Cache write failed: ' + err.message);
+                });
+                
+                encryptedFile = encrypted.toString('base64');
+                const elapsed = Date.now() - startTime;
+                logInfo(`Total processing time: ${colors.yellow}${elapsed}ms${colors.reset}`);
             }
+            
+            const envelope = {
+                contentType: mimeTypes[ext] || 'application/octet-stream',
+                contentEncoding: ext === '.unityweb' ? 'gzip' : null,
+                size: stat.size,
+                payload: encryptedFile
+            };
+            
+            const encryptedEnvelope = xorBufferFast(
+                Buffer.from(JSON.stringify(envelope))
+            ).toString('base64');
+            
+            return { payload: encryptedEnvelope };
+            
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                logError('File not found: ' + fullPath);
+                return { error: 'not found' };
+            }
+            logError('Server error: ' + err.message);
+            return { error: 'server error' };
         }
-
-        let encryptedFile;
-        const startTime = Date.now();
-        
-        // Check if pre-cached version exists and is valid
-        if (await isCacheValid(fullPath, cacheFile)) {
-            cacheStats.hits++;
-            logCache(true, reqPath);
-            
-            // Read pre-encrypted file directly
-            const cachedData = await fs.promises.readFile(cacheFile);
-            const rangeBuffer = cachedData.slice(start, end + 1);
-            encryptedFile = rangeBuffer.toString('base64');
-            
-            const elapsed = Date.now() - startTime;
-            logInfo(`Served from cache in ${colors.green}${elapsed}ms${colors.reset}`);
-        } else {
-            cacheStats.misses++;
-            logCache(false, reqPath);
-            
-            // Read, encrypt, and save to cache
-            const fileBuffer = await fs.promises.readFile(fullPath);
-            logInfo(`File read: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
-            
-            const encrypted = xorBufferFast(fileBuffer);
-            const xorTime = Date.now() - startTime;
-            logInfo(`XOR encryption done in ${colors.yellow}${xorTime}ms${colors.reset}`);
-            
-            // Save encrypted version to cache (async, don't wait)
-            fs.promises.writeFile(cacheFile, encrypted).then(() => {
-                cacheStats.saves++;
-                logSuccess(`Cached to disk: ${reqPath}`);
-                logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset} | Saves: ${colors.cyan}${cacheStats.saves}${colors.reset}`);
-            }).catch(err => {
-                logError('Cache write failed: ' + err.message);
-            });
-            
-            const rangeBuffer = encrypted.slice(start, end + 1);
-            encryptedFile = rangeBuffer.toString('base64');
-            
-            const elapsed = Date.now() - startTime;
-            logInfo(`Total processing time: ${colors.yellow}${elapsed}ms${colors.reset}`);
-        }
-
-        const envelope = {
-            contentType: mimeTypes[ext] || 'application/octet-stream',
-            contentEncoding: ext === '.unityweb' ? 'gzip' : null,
-            size: stat.size,
-            start,
-            end,
-            payload: encryptedFile
-        };
-
-        // Encrypt envelope
-        const encryptedEnvelope = xorBufferFast(
-            Buffer.from(JSON.stringify(envelope))
-        ).toString('base64');
-
-        res.status(statusCode).json({ payload: encryptedEnvelope });
-
-    } catch (err) {
-        if (err.code === 'ENOENT') {
-            logError('File not found: ' + fullPath);
-            return res.status(404).json({ error: 'not found' });
-        }
-        logError('Server error: ' + err.message);
-        res.status(500).json({ error: 'server error' });
-    }
+    }));
+    
+    res.json({ files: results });
 });
 
 // Cached HTML injection
