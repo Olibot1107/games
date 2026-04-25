@@ -1,13 +1,44 @@
 const RESOURCE_KEY = 'games-shell-v1';
-const BATCH_DELAY = 1000; // 100ms batch window
+const BATCH_DELAY = 600; // Send batch if no new requests for 500ms
 let pendingRequests = [];
 let batchTimer = null;
 
 // =======================
 // LOGGING
 // =======================
-function log(...args) {
-  console.log('[SW]', ...args);
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  dim: '\x1b[2m',
+  
+  // Foreground colors
+  cyan: '\x1b[36m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  red: '\x1b[31m',
+  magenta: '\x1b[35m',
+  blue: '\x1b[34m',
+  gray: '\x1b[90m',
+};
+
+function log(category, message, ...args) {
+  const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+  const categories = {
+    info: { color: colors.cyan, icon: 'ℹ' },
+    success: { color: colors.green, icon: '✓' },
+    warn: { color: colors.yellow, icon: '⚠' },
+    error: { color: colors.red, icon: '✗' },
+    batch: { color: colors.magenta, icon: '⚡' },
+    fetch: { color: colors.blue, icon: '↓' },
+    lifecycle: { color: colors.green, icon: '◆' },
+  };
+  
+  const cat = categories[category] || categories.info;
+  
+  console.log(
+    `${colors.gray}[${timestamp}]${colors.reset} ${cat.color}${cat.icon} [SW]${colors.reset} ${colors.bright}${message}${colors.reset}`,
+    ...args
+  );
 }
 
 // =======================
@@ -29,6 +60,12 @@ function xorBytes(bytes) {
     output[i] = bytes[i] ^ keyBytes[i % keyBytes.length];
   }
   return output;
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 // =======================
@@ -71,9 +108,14 @@ function processBatch() {
   pendingRequests = [];
   batchTimer = null;
   
-  log(`Processing batch of ${batch.length} requests`);
+  const batchId = Math.random().toString(36).slice(2, 8);
+  log('batch', `Processing batch #${batchId}`, {
+    requests: batch.length,
+    paths: batch.map(r => r.path)
+  });
   
   const paths = batch.map(req => req.path);
+  const batchStart = performance.now();
   
   fetch('/api/resource', {
     method: 'POST',
@@ -82,10 +124,14 @@ function processBatch() {
   })
   .then(res => res.json())
   .then(data => {
+    const batchTime = (performance.now() - batchStart).toFixed(0);
+    log('success', `Batch #${batchId} complete in ${batchTime}ms`);
+    
     data.files.forEach((fileData, idx) => {
       const req = batch[idx];
       
       if (fileData.error) {
+        log('error', `Failed: ${req.path}`, fileData.error);
         req.reject(new Error(fileData.error));
         return;
       }
@@ -95,26 +141,47 @@ function processBatch() {
         const envelope = JSON.parse(new TextDecoder().decode(envelopeBytes));
         const fileBytes = xorBytes(bytesFromBase64(envelope.payload));
         
+        log('success', `Decoded: ${req.path}`, {
+          size: formatBytes(fileBytes.length),
+          type: envelope.contentType
+        });
+        
         req.resolve({
           bytes: fileBytes,
           contentType: envelope.contentType || 'application/octet-stream'
         });
       } catch (err) {
+        log('error', `Decode failed: ${req.path}`, err.message);
         req.reject(err);
       }
     });
   })
   .catch(err => {
+    log('error', `Batch #${batchId} failed`, err.message);
     batch.forEach(req => req.reject(err));
   });
 }
 
 function queueRequest(path, referrer) {
+  log('info', `Queued: ${path}`, { 
+    referrer,
+    queueSize: pendingRequests.length + 1
+  });
+  
   return new Promise((resolve, reject) => {
     pendingRequests.push({ path, referrer, resolve, reject });
     
-    if (batchTimer) clearTimeout(batchTimer);
-    batchTimer = setTimeout(processBatch, BATCH_DELAY);
+    // Clear existing timer and start fresh 500ms countdown
+    if (batchTimer) {
+      clearTimeout(batchTimer);
+      log('info', 'Batch timer reset - new request arrived');
+    }
+    
+    // Process batch if no new requests arrive within BATCH_DELAY
+    batchTimer = setTimeout(() => {
+      log('batch', `Batch delay elapsed (${BATCH_DELAY}ms idle) - sending now`);
+      processBatch();
+    }, BATCH_DELAY);
   });
 }
 
@@ -141,6 +208,11 @@ async function loadViaEndpoint(request, referrerPath) {
         const end = match[2] ? parseInt(match[2], 10) : fileBytes.length - 1;
         const chunk = fileBytes.slice(start, end + 1);
         
+        log('fetch', `Range request: ${cleanPath}`, {
+          range: `${start}-${end}`,
+          size: formatBytes(chunk.length)
+        });
+        
         return new Response(chunk, {
           status: 206,
           headers: {
@@ -152,12 +224,16 @@ async function loadViaEndpoint(request, referrerPath) {
       }
     }
     
+    log('fetch', `Streaming: ${cleanPath}`, {
+      size: formatBytes(fileBytes.length),
+      type: contentType
+    });
+    
     return streamResponse(fileBytes, contentType);
     
   } catch (err) {
-    log('Load error:', err.message);
+    log('error', `Load failed: ${url.pathname}`, err.message);
     
-    // Return 404 for not found, 500 for other errors
     const status = err.message === 'not found' ? 404 : 500;
     return new Response(err.message, {
       status,
@@ -170,12 +246,12 @@ async function loadViaEndpoint(request, referrerPath) {
 // LIFECYCLE
 // =======================
 self.addEventListener('install', event => {
-  log('Installing');
+  log('lifecycle', 'Installing service worker');
   self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
-  log('Activated');
+  log('lifecycle', 'Service worker activated');
   event.waitUntil(self.clients.claim());
 });
 
@@ -200,7 +276,7 @@ self.addEventListener('fetch', event => {
       const referrerPath = client ? new URL(client.url).pathname : '';
       return await loadViaEndpoint(request, referrerPath);
     } catch (err) {
-      log('SW error:', err);
+      log('error', 'Service worker error', err);
       return new Response('Internal error', { status: 500 });
     }
   })());
