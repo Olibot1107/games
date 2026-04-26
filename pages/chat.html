@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sparx Maths</title>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.css">
+<script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
+
+<style>
+body { background: #1e1e2f; color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
+h2 { text-align: center; margin-bottom: 10px; color: #7289da; }
+#controls { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
+input, select, button { padding: 8px; border-radius: 8px; border: none; outline: none; background: #2c2c3f; color: white; }
+button { background: #7289da; cursor: pointer; }
+button:hover { background: #5b6dab; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+#currentPfp { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+#chat { background: #2c2c3f; padding: 15px; border-radius: 10px; height: 400px; overflow-y: auto; margin-bottom: 15px; }
+.message { display: flex; gap: 10px; margin-bottom: 12px; background: #393955; padding: 10px; border-radius: 10px; position: relative; }
+.message.filtered { background: #4a3333; border-left: 3px solid #ff5555; }
+.avatar img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.msg-content { flex-grow: 1; }
+.name { font-weight: bold; color: #7289da; }
+.time { font-size: 12px; color: #aaa; margin-left: 8px; }
+.text { margin-top: 5px; word-break: break-word; }
+.warning { color: #ff5555; font-size: 12px; margin-top: 3px; }
+.reaction { display: inline-block; padding: 2px 6px; border-radius: 12px; background: #444; cursor: pointer; font-size: 14px; margin-right: 4px; }
+.reaction.reacted { background: #7289da; }
+.picker-button { background: #444; border: none; border-radius: 6px; color: white; cursor: pointer; padding: 4px 8px; }
+.delete-btn { position: absolute; top: 8px; right: 8px; background: #ff5555; border: none; border-radius: 4px; padding: 4px 6px; font-size: 12px; cursor: pointer; color: white; }
+.delete-btn:hover { background: #dd4444; }
+emoji-picker { position: absolute; z-index: 999; }
+#rulesOverlay { position: fixed; top:0; left:0; width:100vw; height:100vh; background: rgba(0,0,0,0.7); z-index: 999; display:none; }
+#rulesPopup { position: fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#2c2c3f; border:2px solid #7289da; border-radius:12px; padding:20px; max-width:500px; z-index:1000; display:none; box-shadow:0 0 20px #000; color:white; }
+#rulesPopup h3 { margin-top:0; color:#7289da; }
+#rulesPopup ul { padding-left:20px; }
+#closeRules { background:#7289da; border:none; color:white; padding:10px 15px; border-radius:6px; cursor:not-allowed; opacity:0.5; }
+#closeRules.enabled { cursor:pointer; opacity:1; }
+#filterWarning { position: fixed; bottom: 20px; right: 20px; background: #ff5555; padding: 15px 20px; border-radius: 8px; display: none; z-index: 1000; animation: slideIn 0.3s; }
+@keyframes slideIn { from { transform: translateX(400px); } to { transform: translateX(0); } }
+.char-count { font-size: 12px; color: #aaa; margin-left: 10px; }
+.char-count.warning { color: #ff5555; }
+
+/* Typing Indicator Styles */
+#typingIndicator {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #2c2c3f;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #aaa;
+  border-left: 3px solid #7289da;
+  animation: fadeIn 0.2s ease-in;
+}
+#typingIndicator.active { display: flex; }
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  background: #7289da;
+  border-radius: 50%;
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+</head>
+
+<body>
+
+<div id="controls">
+  <input type="text" id="username" placeholder="Your name" maxlength="20">
+  <select id="groupSelector">
+    <option value="Main">Main</option>
+    <option value="Homework">Bruhhhh</option>
+    <option value="Yapping">Yapping</option>
+  </select>
+  <input type="file" id="pfpUpload" accept="image/*">
+  <button onclick="uploadPFP()">Upload PFP</button>
+  <img id="currentPfp" src="" alt="pfp">
+</div>
+
+<div id="chat"></div>
+
+<!-- Typing Indicator -->
+<div id="typingIndicator">
+  <div class="typing-dot"></div>
+  <div class="typing-dot"></div>
+  <div class="typing-dot"></div>
+  <span id="typingText">Someone is typing...</span>
+</div>
+
+<div id="rulesOverlay"></div>
+<div id="rulesPopup">
+  <h3>Chat Rules</h3>
+  <ul>
+    <li>✅ Be respectful to everyone</li>
+    <li>🚫 No swearing or inappropriate language</li>
+    <li>🚫 No spam or flooding</li>
+    <li>🔞 No inappropriate content</li>
+    <li>⚠️ Messages are filtered automatically</li>
+  </ul>
+  <button id="closeRules" disabled>Read for 20 seconds...</button>
+</div>
+
+<div id="controls">
+  <input type="text" id="message" placeholder="Type message" maxlength="500">
+  <span class="char-count" id="charCount">0/500</span>
+  <input type="file" id="imgUpload" accept="image/*">
+  <button id="myBtn" onclick="sendMessage()">Send</button>
+  <button onclick="sendImage()">Send Image</button>
+  <button onclick="clearChat()" style="background: red;">Clear</button>
+  <button onclick="window.location.href='/'" style="background: #7289da;">Exit to game list page</button>
+  <button onclick="window.location.href='/pages/video.html'" style="background: #7289da;">Go to video chat</button>
+</div>
+
+<div id="filterWarning"></div>
+
+<emoji-picker id="emojiPicker" style="display: none;"></emoji-picker>
+
+<script>
+// Profanity filter - comprehensive list
+let profanityList = atob("ZnVjayxmdWNraW5nLGZ1Y2tlcixmdWNrZWQsZnVrLGZjayxmdmNrLHNoaXQsc2h0LHNoeXQsY3JhcCxiaXRjaCxidGNoLGJpYXRjaCxiZW90Y2gsYXNzLGFyc2UsYXNzaG9sZSxhcnNlaG9sZSxhenosZGFtbixkYW1uZWQsZGFtbWl0LGRhbW5pdCxoZWxsLGhlY2sscGlzcyxwaXNzZWQscGlzc2luZyxkaWNrLGRjayxkaWssY29jayxjY2ssY29rLGJhc3RhcmQsYnN0YXJkLGN1bnQsY250LGt1bnQscHVzc3kscHN5LHB1c3MsYm9sbG9ja3MsYm9sbG9jayx3YW5rZXIsd2Fuayx3bmtlcix0d2F0LHR3QHQscHJpY2sscHJjayxidWxsc2hpdCxicyx3aG9yZSxob3JlLHNsdXQsc2x0LHNleCxzZXh5LHBvcm4scG9ybm8seHh4LHBlbmlzLHZhZ2luYSxib29iLGJvb2JzLHRpdCx0aXRzLHRpdHR5LGFuYWwsYW51cyxidXR0LHJhcGUsbW9sZXN0LGhvcm55LG9yZ2FzbSxjdW0saml6eixzZW1lbixtYXN0dXJiYXRlLGRpbGRvLHZpYnJhdG9yLGJsb3dqb2IsaGFuZGpvYixmb290am9iLG5pZ2dlcixuaWdnYSxuaWcsbmVncm8sZmFnLGZhZ2dvdCxmYWdvdCxob21vLGR5a2UsdHJhbm55LHRyYW5uaWUscmV0YXJkLHJldGFyZGVkLHRhcmQsYXV0aXN0LGF1dGlzdGljLHNwaWMsYmVhbmVyLHdldGJhY2ssY2hpbmssZ29vayx6aXBwZXJoZWFkLGtpa2UsaGVlYixoeW1pZSx0b3dlbGhlYWQsc2FuZG5pZ2dlcixwYWtpLGNyYWNrZXIsaG9ua3ksd2hpdGV5LGd5cCxneXBzeSxtaWRnZXQsZHdhcmYsa2lsbCB5b3Vyc2VsZixreXMsc3VpY2lkZSxkaWUsY2FuY2VyLGFpZHMsaGl2LG5hemksaGl0bGVyLHRlcnJvcmlzdCxib21iLHNob290aW5nLGRydWdzLGNvY2FpbmUsaGVyb2luLG1ldGgsd2VlZCxtYXJpanVhbmEscmFwZSxyYXBpc3QscGVkbyxwZWRvcGhpbGUsbW9sZXN0ZXIsZmNrLGZ1ayxwaHVjayxwaHVrLHNodCxzaHl0LHNoaXRlLGJ0Y2gsYjF0Y2gsYmVhY2gsYXp6LGEkLGRjayxkMWNrLGQhY2ssY250LGMwY2ssYzBudCxwc3NzeSxwKnNzeSxuMWdnZXIsbjFnZ2EsZmd0LGZAZyxmQGdnb3QsZ2F5LHRvc3NlcixnaW1wLE9saXZlcixEYXdzb24sUmlsZXksQ29wcGVyLENvb3BlcixDb29weg==")
+  .split(',')
+  .map(word => word.trim());
+
+const leetSpeakMap = {
+  '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '8': 'b', '@': 'a', '$': 's'
+};
+
+function normalizeLeetSpeak(text) {
+  return text.toLowerCase().split('').map(c => leetSpeakMap[c] || c).join('');
+}
+
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildSpacedPattern(word) {
+  return word
+    .split('')
+    .map(char => escapeRegExp(char))
+    .join('[\\s\\-_\\.]*');
+}
+
+function normalizeLeetSpeak(text) {
+  return text
+    .toLowerCase()
+    .split('')
+    .map(c => leetSpeakMap[c] || c)
+    .join('');
+}
+
+function containsProfanity(text) {
+  const normalized = normalizeLeetSpeak(text);
+  const compact = normalized.replace(/[\s\-_\.]/g, '');
+
+  for (const word of profanityList) {
+    const cleanWord = normalizeLeetSpeak(word.toLowerCase());
+
+    // direct match (fast)
+    if (compact.includes(cleanWord)) return true;
+
+    // obfuscated match (spaced, symbols, etc.)
+    const pattern = new RegExp(buildSpacedPattern(cleanWord), 'i');
+    if (pattern.test(normalized)) return true;
+  }
+
+  return false;
+}
+
+function filterMessage(text) {
+  let filtered = text;
+  const normalized = normalizeLeetSpeak(text);
+
+  for (const word of profanityList) {
+    const cleanWord = normalizeLeetSpeak(word.toLowerCase());
+
+    // exact word match
+    const exactPattern = new RegExp(`\\b${escapeRegExp(cleanWord)}\\b`, 'gi');
+    filtered = filtered.replace(exactPattern, m => '*'.repeat(m.length));
+
+    // obfuscated match (f.u.c.k, f-u-c-k, etc.)
+    const spacedPattern = new RegExp(buildSpacedPattern(cleanWord), 'gi');
+    filtered = filtered.replace(spacedPattern, m => '*'.repeat(m.length));
+  }
+
+  return filtered;
+}
+
+function showFilterWarning(message) {
+  const warning = document.getElementById('filterWarning');
+  warning.textContent = message;
+  warning.style.display = 'block';
+  setTimeout(() => { warning.style.display = 'none'; }, 3000);
+}
+
+// Character counter
+const msgInput = document.getElementById('message');
+const charCount = document.getElementById('charCount');
+msgInput.addEventListener('input', () => {
+  const len = msgInput.value.length;
+  charCount.textContent = `${len}/500`;
+  if (len > 450) charCount.classList.add('warning');
+  else charCount.classList.remove('warning');
+});
+
+// Rate limiting
+var input = document.getElementById("message");
+let lastSubmitTime = 0;
+const submitDelay = 2000;
+let messageCount = 0;
+let messageTimestamps = [];
+
+function checkRateLimit() {
+  const now = Date.now();
+  messageTimestamps = messageTimestamps.filter(t => now - t < 30000);
+  
+  if (messageTimestamps.length >= 5) {
+    showFilterWarning('⚠️ Slow down! You\'re sending messages too fast.');
+    return false;
+  }
+  
+  messageTimestamps.push(now);
+  return true;
+}
+
+input.addEventListener("keypress", function(event) {
+  if(event.key === "Enter"){ 
+    event.preventDefault(); 
+    if(Date.now()-lastSubmitTime >= submitDelay){ 
+      lastSubmitTime = Date.now(); 
+      document.getElementById("myBtn").click(); 
+    } else {
+      showFilterWarning('⏱️ Please wait before sending another message.');
+    }
+  }
+});
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA4BYjOa__uKZjOBvS5p_uMxmJ6AMsKcpg",
+  authDomain: "chat1-6cc2e.firebaseapp.com",
+  databaseURL: "https://chat1-6cc2e-default-rtdb.firebaseio.com",
+  projectId: "chat1-6cc2e",
+  storageBucket: "chat1-6cc2e.firebasestorage.app",
+  messagingSenderId: "771765903902",
+  appId: "1:771765903902:web:a6fb2e71b059c20ba7840f",
+  measurementId: "G-TMQM5K1T5R"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+
+const chatBox = document.getElementById('chat');
+const groupSelector = document.getElementById('groupSelector');
+const usernameInput = document.getElementById('username');
+const emojiPicker = document.getElementById('emojiPicker');
+const pfpUploadInput = document.getElementById('pfpUpload');
+const currentPfpImg = document.getElementById('currentPfp');
+const typingIndicator = document.getElementById('typingIndicator');
+const typingText = document.getElementById('typingText');
+
+let currentGroup = "Main";
+let currentUser = null;
+let currentRef = null;
+let pfpBase64 = getCookie('pfpBase64') || null;
+let pickerTargetMsgKey = null;
+
+// Typing indicator state
+let typingTimeout = null;
+const TYPING_TIMEOUT_MS = 2000; // Clear typing status after 2 seconds of inactivity
+let typingRef = null;
+
+if(getCookie('username')) usernameInput.value = getCookie('username');
+if(pfpBase64) currentPfpImg.src = pfpBase64;
+
+auth.signInAnonymously().then(user => { 
+  currentUser = user.user; 
+  switchGroup(currentGroup); 
+});
+
+groupSelector.addEventListener('change', ()=>{ 
+  currentGroup=groupSelector.value; 
+  switchGroup(currentGroup); 
+});
+
+function switchGroup(group){
+  chatBox.innerHTML='';
+  if(currentRef) currentRef.off();
+  
+  // Clean up old typing listener
+  if(typingRef) {
+    typingRef.off();
+    typingRef = null;
+  }
+  
+  currentRef=db.ref(`messages/${group}`);
+  currentRef.on('child_added', snap=>addMessage(snap.key, snap.val()));
+  currentRef.on('child_changed', snap=>refreshMessage(snap.key, snap.val()));
+  currentRef.on('child_removed', snap=>{
+    const msgElem=document.getElementById(`msg-${snap.key}`);
+    if(msgElem) msgElem.remove();
+  });
+  
+  // Listen for typing indicators in this group
+  typingRef = db.ref(`typing/${group}`);
+  typingRef.on('value', snapshot => {
+    const data = snapshot.val();
+    if (!data) {
+      typingIndicator.classList.remove('active');
+      return;
+    }
+    
+    const typers = Object.entries(data)
+      .filter(([uid, info]) => uid !== currentUser.uid && info.timestamp > Date.now() - 5000)
+      .map(([uid, info]) => info.name);
+    
+    if (typers.length === 0) {
+      typingIndicator.classList.remove('active');
+    } else if (typers.length === 1) {
+      typingText.textContent = `${typers[0]} is typing...`;
+      typingIndicator.classList.add('active');
+    } else if (typers.length === 2) {
+      typingText.textContent = `${typers[0]} and ${typers[1]} are typing...`;
+      typingIndicator.classList.add('active');
+    } else {
+      typingText.textContent = `${typers.length} people are typing...`;
+      typingIndicator.classList.add('active');
+    }
+  });
+}
+
+function addMessage(msgKey, msg){
+  const div = document.createElement('div');
+  div.className = msg.filtered ? 'message filtered' : 'message';
+  div.id=`msg-${msgKey}`;
+  
+  let contentHTML = '';
+  if(msg.text) {
+    contentHTML=`<div class="text">${escapeHTML(msg.text)}</div>`;
+    if(msg.filtered) {
+      contentHTML += `<div class="warning">⚠️ Message contained filtered content</div>`;
+    }
+  } else if(msg.image) {
+    contentHTML=`<div class="text"><img src="${msg.image}" style="max-width:200px;border-radius:10px;"></div>`;
+  }
+  
+  div.innerHTML=`
+    <div class="avatar"><img src="${msg.pfp||'http://math.voidium.uk/assets/IMG_0910.png'}" alt="pfp"></div>
+    <div class="msg-content">
+      <div><span class="name">${escapeHTML(msg.name)}</span><span class="time">${msg.time}</span></div>
+      ${contentHTML}
+      <div style="display:flex;align-items:center;margin-top:5px;">
+        <button class="picker-button" onclick="openMessageEmojiPicker(event,'${msgKey}')">😊</button>
+        <div class="reactions">${generateReactionHTML(msg.reactions||{},msgKey)}</div>
+      </div>
+    </div>
+    ${msg.uid===currentUser.uid?`<button class="delete-btn" onclick="deleteMessage('${msgKey}')">Delete</button>`:''}
+  `;
+  chatBox.appendChild(div);
+  chatBox.scrollTop=chatBox.scrollHeight;
+}
+
+function escapeHTML(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function refreshMessage(msgKey,msg){
+  const msgElem=document.getElementById(`msg-${msgKey}`);
+  if(msgElem) msgElem.querySelector('.reactions').innerHTML=generateReactionHTML(msg.reactions||{},msgKey);
+}
+
+function generateReactionHTML(reactions,msgKey){
+  if(!reactions) return '';
+  let html='';
+  for(const [emoji,userMap] of Object.entries(reactions)){
+    const userIds=Object.keys(userMap);
+    const count=userIds.length;
+    const hasReacted=userMap[currentUser.uid];
+    html+=`<span class="reaction ${hasReacted?'reacted':''}" onclick="toggleReaction('${msgKey}','${emoji}')">${emoji} ${count}</span>`;
+  }
+  return html;
+}
+
+function toggleReaction(msgKey,emoji){
+  const ref=db.ref(`messages/${currentGroup}/${msgKey}/reactions/${emoji}`);
+  ref.once('value').then(snapshot=>{
+    const data=snapshot.val()||{};
+    if(data[currentUser.uid]) ref.child(currentUser.uid).remove();
+    else ref.child(currentUser.uid).set(true);
+  });
+}
+
+function updateTypingStatus() {
+  if (!currentUser) return;
+  const name = usernameInput.value.trim() || 'Anonymous';
+  
+  const typingData = {
+    name: name,
+    timestamp: Date.now()
+  };
+  
+  db.ref(`typing/${currentGroup}/${currentUser.uid}`).set(typingData);
+  
+  // Auto-clear after timeout
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    db.ref(`typing/${currentGroup}/${currentUser.uid}`).remove();
+  }, TYPING_TIMEOUT_MS);
+}
+
+// Attach typing listener to input
+msgInput.addEventListener('input', () => {
+  if (msgInput.value.trim().length > 0) {
+    updateTypingStatus();
+  } else {
+    // Clear typing if input is empty
+    clearTimeout(typingTimeout);
+    if (currentUser) {
+      db.ref(`typing/${currentGroup}/${currentUser.uid}`).remove();
+    }
+  }
+});
+
+function sendMessage(){
+  const name = usernameInput.value.trim();
+  const text = msgInput.value.trim();
+  
+  if(!name) {
+    showFilterWarning('⚠️ Please enter your name!');
+    return;
+  }
+  
+  if(!text) return;
+  
+  if(text.length < 1 || text.length > 500) {
+    showFilterWarning('⚠️ Message must be between 1 and 500 characters!');
+    return;
+  }
+  
+  if(!checkRateLimit()) return;
+  
+  setCookie('username', name, 7);
+  
+  // Clear typing indicator immediately on send
+  clearTimeout(typingTimeout);
+  if (currentUser) {
+    db.ref(`typing/${currentGroup}/${currentUser.uid}`).remove();
+  }
+  
+  const now = new Date();
+  const time = now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  
+  let filteredText = text;
+  let wasFiltered = false;
+  
+  if(containsProfanity(text)) {
+    filteredText = filterMessage(text);
+    wasFiltered = true;
+    showFilterWarning('⚠️ Your message contained inappropriate language and was filtered.');
+  }
+  
+  db.ref(`messages/${currentGroup}`).push({
+    name,
+    text: filteredText,
+    time,
+    pfp: pfpBase64 || null,
+    uid: currentUser.uid,
+    filtered: wasFiltered
+  });
+  
+  msgInput.value = '';
+  charCount.textContent = '0/500';
+}
+
+function sendImage(){
+  const file = document.getElementById('imgUpload').files[0];
+  const name = usernameInput.value.trim();
+  
+  if(!name) {
+    showFilterWarning('⚠️ Please enter your name!');
+    return;
+  }
+  
+  if(!file) {
+    showFilterWarning('⚠️ Please choose an image!');
+    return;
+  }
+  
+  if(!checkRateLimit()) return;
+  
+  const reader = new FileReader();
+  reader.onload = e => {
+    const imgData = e.target.result;
+    const now = new Date();
+    const time = now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    db.ref(`messages/${currentGroup}`).push({
+      name,
+      time,
+      pfp: pfpBase64 || null,
+      uid: currentUser.uid,
+      image: imgData
+    });
+    document.getElementById('imgUpload').value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearChat(){
+  const pw = prompt("Admin password to clear?");
+  if(pw === '2121'){
+    db.ref(`messages/${currentGroup}`).remove();
+    chatBox.innerHTML = '';
+  } else {
+    alert("Incorrect password!");
+  }
+}
+
+function deleteMessage(msgKey){ 
+  db.ref(`messages/${currentGroup}/${msgKey}`).remove(); 
+}
+
+function uploadPFP(){
+  const file = pfpUploadInput.files[0];
+  if(!file) {
+    showFilterWarning('⚠️ Please choose a file first!');
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const size = 64;
+      canvas.width = size; 
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, size, size);
+      const resized = canvas.toDataURL('image/jpeg', 0.7);
+      pfpBase64 = resized;
+      currentPfpImg.src = resized;
+      setCookie('pfpBase64', resized, 7);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function openMessageEmojiPicker(event, msgKey){
+  emojiPicker.style.display = 'block';
+  pickerTargetMsgKey = msgKey;
+  const rect = event.target.getBoundingClientRect();
+  emojiPicker.style.top = `${rect.top + window.scrollY - 300}px`;
+  emojiPicker.style.left = `${rect.left}px`;
+}
+
+emojiPicker.addEventListener('emoji-click', event => {
+  const emoji = event.detail.unicode;
+  if(pickerTargetMsgKey){
+    toggleReaction(pickerTargetMsgKey, emoji);
+    emojiPicker.style.display = 'none';
+  } else {
+    msgInput.value += emoji;
+    emojiPicker.style.display = 'none';
+    msgInput.focus();
+  }
+});
+
+function setCookie(name, value, days){
+  const expires = new Date(Date.now() + days * 86400000).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)};expires=${expires};path=/`;
+}
+
+function getCookie(name){
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+window.addEventListener('load', () => {
+  if(!getCookie('rulesAccepted')){
+    const popup = document.getElementById('rulesPopup');
+    const overlay = document.getElementById('rulesOverlay');
+    const closeBtn = document.getElementById('closeRules');
+    popup.style.display = 'block'; 
+    overlay.style.display = 'block';
+    
+    let secondsLeft = 20;
+    const countdown = setInterval(() => {
+      secondsLeft--;
+      if(secondsLeft <= 0){
+        clearInterval(countdown);
+        closeBtn.disabled = false;
+        closeBtn.classList.add('enabled');
+        closeBtn.textContent = "I Understand";
+      } else {
+        closeBtn.textContent = `Read for ${secondsLeft} seconds...`;
+      }
+    }, 1000);
+    
+    closeBtn.addEventListener('click', () => {
+      if(secondsLeft <= 0){
+        popup.style.display = 'none';
+        overlay.style.display = 'none';
+        setCookie('rulesAccepted', 'true', 30);
+      }
+    });
+  }
+});
+</script>
+</body>
+</html>
