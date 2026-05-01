@@ -19,34 +19,14 @@ jobs:
         with:
           node-version: 18
 
-      - name: Generate games.json
-        run: |
-          node <<'EOF'
-          const fs = require("fs");
-
-          function getDirs(base) {
-            return fs.existsSync(base)
-              ? fs.readdirSync(base, { withFileTypes: true })
-                  .filter(d => d.isDirectory())
-                  .map(d => d.name)
-              : [];
-          }
-
-          const good = getDirs("good");
-          const nova = getDirs("nova");
-
-          const output = {
-            generated: new Date().toISOString(),
-            good,
-            nova
-          };
-
-          fs.writeFileSync("list.json", JSON.stringify(output, null, 2));
-          console.log("✅ list.json generated:", output);
-          EOF
+      - name: Run list.js
+        run: node auto/list.js
 
       - name: Run html.js
-        run: node html.js
+        run: node auto/scripts.js
+      
+      - name: Run title.js
+        run: node auto/title.js
 
       - name: Commit and push changes
         run: |

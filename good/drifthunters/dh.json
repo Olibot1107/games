@@ -1,9 +1,9 @@
 {
     "TOTAL_MEMORY": 1073741824,
-    "dataUrl": "https://help.voidium.uk/drfhunter-main/dh.data.hi",
-    "asmCodeUrl": "https://help.voidium.uk/drfhunter-main/dh.asm.code.hi",
-    "asmMemoryUrl": "https://help.voidium.uk/drfhunter-main/dh.asm.memory.hi",
-    "asmFrameworkUrl": "https://help.voidium.uk/drfhunter-main/dh.asm.framework.hi",
+    "dataUrl": "drfhunter-main/dh.data.hi",
+    "asmCodeUrl": "drfhunter-main/dh.asm.code.hi",
+    "asmMemoryUrl": "drfhunter-main/dh.asm.memory.hi",
+    "asmFrameworkUrl": "drfhunter-main/dh.asm.framework.hi",
     "backgroundUrl": "",
     "splashScreenStyle": "Dark",
     "backgroundColor": "#111111",

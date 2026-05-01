@@ -3,117 +3,109 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Game Hub</title>
+<title>Math Practice</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="font-sans bg-[url('./imgs/art.jpeg')] bg-repeat bg-center text-gray-800 p-5 max-w-screen-lg mx-auto">
+<body class="font-sans bg-gray-100 text-gray-800 p-5 max-w-screen-lg mx-auto">
 
-<!-- Header -->
-<header class="text-center mb-8 pb-5 border-b border-gray-300 bg-white rounded-lg p-5 shadow">
-  <h1 class="text-3xl font-bold text-slate-800 mb-2">The World of Diddy</h1>
-</header>
-
-<!-- Announcements -->
-<div class="flex items-center p-4 mb-6 text-sm text-green-800 border border-green-300 rounded-lg bg-green-50 shadow-md" role="alert">
-  <svg class="shrink-0 inline w-4 h-4 mr-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-    <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9 13.5l-3-3 1.5-1.5L9 10.5l3.5-3.5L14 8.5 9 13.5Z"/>
-  </svg>
-  <div>
-    <span class="font-medium">Update</span>
-  YOU NEED TO WATCH MURDER DRONES BRO ITS FIREEEE
-  </div>
+<!-- Alert -->
+<div class="flex items-center p-4 mb-6 text-sm text-green-800 border border-green-300 rounded-lg bg-green-50">
+  <span class="font-medium mr-2">Update:</span>
+  Fixed bugs and improved the site
 </div>
 
-<div class="bg-white rounded-lg p-5 mb-6 shadow">
-  <h2 class="text-xl font-semibold mb-3 text-slate-800">Tools</h2>
+<!-- Tools -->
+<div class="bg-white rounded-lg p-5 mb-6 shadow-sm border">
+  <h2 class="text-lg font-semibold mb-3">Tools</h2>
 
-  <a href="/pages/speedtest.html" class="text-blue-600 hover:underline">
-    Speed Test 
+  <a href="/pages/video.html" class="block py-2 px-3 rounded hover:bg-gray-100">
+    🎥 Video
   </a>
-    <br>
-      <a href="/pages/video.html" class="text-blue-600 hover:underline">
-    Video
+
+  <a href="/pages/chat.html" class="block py-2 px-3 rounded hover:bg-gray-100">
+    💬 Chat
   </a>
-  <br>
-    <a href="/pages/chat.html" class="text-blue-600 hover:underline">
-    Chat
-  </a>
-  <br>
 </div>
-
 
 <!-- Search -->
 <div class="max-w-md mx-auto mb-6">
   <input id="search" type="text" placeholder="Search games..."
-    class="w-full px-4 py-2 rounded-full border shadow focus:ring-2 focus:ring-blue-400">
+    class="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-400 focus:outline-none">
 </div>
 
-<!-- Favorites -->
-<div class="bg-white rounded-lg p-5 mb-6 shadow">
-  <h2 class="text-xl font-semibold mb-3">Favorites</h2>
-  <ul id="favorites-list">
-    <li class="italic text-gray-500">No favorites yet.</li>
+<!-- Favorites (compact strip) -->
+<div class="bg-white rounded-lg p-4 mb-6 shadow-sm border">
+  <h2 class="text-sm font-semibold text-gray-600 mb-2">Favorites</h2>
+
+  <ul id="favorites-list" class="flex flex-wrap gap-2">
+    <li class="text-xs text-gray-400 italic">No favorites yet.</li>
   </ul>
 </div>
 
 <!-- Games -->
-<div class="bg-white rounded-lg p-5 mb-6 shadow">
-  <h2 class="text-xl font-semibold mb-3">Games</h2>
+<div class="bg-white rounded-lg p-5 mb-6 shadow-sm border">
+  <h2 class="text-lg font-semibold mb-3">Games</h2>
   <ul id="games-list">
     <li class="italic text-gray-500">Loading games...</li>
   </ul>
 </div>
 
-<div id="comments-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
-    <div class="flex items-center justify-between border-b px-6 py-4">
-      <div>
-        <h2 id="comments-modal-title" class="text-lg font-semibold text-slate-900">Comments</h2>
-        <p id="comments-count" class="text-xs text-slate-500">Select a game to view comments.</p>
-      </div>
-      <button id="comments-close" class="text-slate-500 hover:text-slate-900 text-2xl leading-none" type="button">&times;</button>
+<!-- Comments Modal -->
+<div id="comments-modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+  <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl">
+
+    <div class="flex justify-between items-center border-b p-4">
+      <h2 class="font-semibold">Comments</h2>
+      <button id="comments-close" class="text-gray-500 hover:text-black text-xl">&times;</button>
     </div>
-    <div class="px-6 py-4 space-y-4">
-      <div id="comments-list" class="max-h-72 overflow-y-auto space-y-3 text-slate-800">
-        <div class="text-gray-500 italic">Select a game to view comments.</div>
+
+    <div class="p-4 space-y-4">
+      <div id="comments-list" class="max-h-72 overflow-y-auto text-sm text-gray-700">
+        <div class="text-gray-500 italic">Select a game</div>
       </div>
-      <div id="comments-feedback" class="text-xs text-slate-500"></div>
-      <div class="space-y-3">
-        <textarea id="comments-input" rows="4" maxlength="300" class="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="Add a comment..."></textarea>
-        <div class="flex items-center justify-between">
-          <span id="comments-hint" class="text-xs text-slate-500">Max 300 characters.</span>
-          <button id="comments-submit" class="bg-blue-600 text-white rounded-full px-5 py-2 hover:bg-blue-700" type="button">Submit</button>
-        </div>
+
+      <textarea id="comments-input" rows="3"
+        class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-400"
+        placeholder="Add a comment..."></textarea>
+
+      <div class="flex justify-end">
+        <button id="comments-submit"
+          class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+          Submit
+        </button>
       </div>
     </div>
+
   </div>
 </div>
 
-<div id="plays-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
-    <div class="flex items-center justify-between border-b px-6 py-4">
-      <div>
-        <h2 id="plays-modal-title" class="text-lg font-semibold text-slate-900">Play history</h2>
-        <p id="plays-modal-total" class="text-xs text-slate-500">Select a game to see play details.</p>
-      </div>
-      <button id="plays-close" class="text-slate-500 hover:text-slate-900 text-2xl leading-none" type="button">&times;</button>
+<!-- Plays Modal -->
+<div id="plays-modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+  <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl">
+
+    <div class="flex justify-between items-center border-b p-4">
+      <h2 class="font-semibold">Play history</h2>
+      <button id="plays-close" class="text-gray-500 hover:text-black text-xl">&times;</button>
     </div>
-    <div class="px-6 py-4 space-y-4">
-      <div id="plays-list" class="max-h-72 overflow-y-auto space-y-3 text-slate-800">
-        <div class="text-gray-500 italic">Click the controller icon to view who played it.</div>
+
+    <div class="p-4">
+      <div id="plays-list" class="text-gray-700">
+        <div class="text-gray-500 italic">No data yet.</div>
       </div>
     </div>
+
   </div>
 </div>
 
 <!-- Debug -->
-<div id="debug-panel" class="bg-black text-green-400 text-xs p-3 rounded max-h-60 overflow-y-auto">
+<div class="mt-6 bg-black text-green-400 text-xs p-3 rounded max-h-60 overflow-y-auto">
 [Debug logs]
 </div>
-<script src="js.js"></script>
+
+<script src="htmlindex.js"></script>
 <script src="/lib/fps.js"></script>
+<script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
+
 </body>
 </html>
-
-<script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>     

@@ -10,7 +10,6 @@ const app = express();
 const PORT = 3000;
 
 const PUBLIC_DIR = path.join(__dirname, '');
-const CACHE_DIR = path.join(__dirname, 'pre_cache');
 const RESOURCE_KEY = Buffer.from('games-shell-v1');
 const ZIP_URL = 'https://github.com/Olibot1107/games-math/archive/refs/heads/main.zip';
 
@@ -41,14 +40,6 @@ function log(msg, color = 'white') {
     console.log(`${colors[color]}[SERVER]${colors.reset}`, msg);
 }
 
-function logCache(hit, file) {
-    if (hit) {
-        console.log(`${colors.bgGreen}${colors.bright} CACHE HIT ${colors.reset} ${colors.green}${file}${colors.reset}`);
-    } else {
-        console.log(`${colors.bgYellow}${colors.bright} CACHE MISS ${colors.reset} ${colors.yellow}${file}${colors.reset}`);
-    }
-}
-
 function logError(msg) {
     console.log(`${colors.bgRed}${colors.bright} ERROR ${colors.reset} ${colors.red}${msg}${colors.reset}`);
 }
@@ -59,21 +50,6 @@ function logInfo(msg) {
 
 function logSuccess(msg) {
     console.log(`${colors.green}[SUCCESS]${colors.reset} ${msg}`);
-}
-
-a()
-
-async function a() {
-    logInfo('Deleting and recreating pre_cache directory');
-    if (fs.existsSync(CACHE_DIR)) {
-        await fse.removeSync(CACHE_DIR)
-        logSuccess('Old cache directory deleted');
-    } else {
-        logInfo('No existing cache directory found, creating new one');
-    }
-    logInfo('Creating cache directory...');
-    await fs.mkdirSync(CACHE_DIR);
-    logSuccess('Cache directory ready');
 }
 
 app.use(express.raw({ type: "*/*", limit: "90mb" }));
@@ -235,32 +211,23 @@ const mimeTypes = {
     '.unityweb': 'application/octet-stream'
 };
 
-// Generate cache filename from path
-function getCacheFilename(filePath) {
-    const hash = crypto.createHash('md5').update(filePath).digest('hex');
-    return path.join(CACHE_DIR, hash + '.cache');
-}
-
-// Check if cached version is valid (file not modified)
-async function isCacheValid(originalPath, cachePath) {
+// Helper to resolve a requested path and fallback to /root if needed
+async function resolvePublicFile(reqPath) {
+    const normalizedPath = reqPath.startsWith('/') ? reqPath.slice(1) : reqPath;
+    const directPath = path.resolve(PUBLIC_DIR, normalizedPath);
     try {
-        const [originalStat, cacheStat] = await Promise.all([
-            fs.promises.stat(originalPath),
-            fs.promises.stat(cachePath)
-        ]);
-        
-        return originalStat.mtime <= cacheStat.mtime;
+        await fs.promises.access(directPath, fs.constants.F_OK);
+        return directPath;
     } catch {
-        return false;
+        const rootPath = path.resolve(PUBLIC_DIR, 'root', normalizedPath);
+        try {
+            await fs.promises.access(rootPath, fs.constants.F_OK);
+            return rootPath;
+        } catch {
+            throw { code: 'ENOENT', path: reqPath };
+        }
     }
 }
-
-// Cache statistics
-let cacheStats = {
-    hits: 0,
-    misses: 0,
-    saves: 0
-};
 
 app.post('/api/resource', async (req, res) => {
     let body;
@@ -283,46 +250,25 @@ app.post('/api/resource', async (req, res) => {
             return { error: 'invalid path' };
         }
         
-        const fullPath = path.join(PUBLIC_DIR, reqPath);
-        const cacheFile = getCacheFilename(fullPath);
+        let fullPath;
+        try {
+            fullPath = await resolvePublicFile(reqPath);
+        } catch (err) {
+            if (err && err.code === 'ENOENT') {
+                return { error: 'not found' };
+            }
+            throw err;
+        }
         
         try {
             const stat = await fs.promises.stat(fullPath);
             const ext = path.extname(fullPath).toLowerCase();
             
-            let encryptedFile;
-            const startTime = Date.now();
+            const fileBuffer = await fs.promises.readFile(fullPath);
+            logInfo(`File read: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
             
-            if (await isCacheValid(fullPath, cacheFile)) {
-                cacheStats.hits++;
-                logCache(true, reqPath);
-                const cachedData = await fs.promises.readFile(cacheFile);
-                encryptedFile = cachedData.toString('base64');
-                const elapsed = Date.now() - startTime;
-                logInfo(`Served from cache in ${colors.green}${elapsed}ms${colors.reset}`);
-            } else {
-                cacheStats.misses++;
-                logCache(false, reqPath);
-                const fileBuffer = await fs.promises.readFile(fullPath);
-                logInfo(`File read: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
-                
-                const encrypted = xorBufferFast(fileBuffer);
-                const xorTime = Date.now() - startTime;
-                logInfo(`XOR encryption done in ${colors.yellow}${xorTime}ms${colors.reset}`);
-                
-                // Save encrypted version to cache (async, don't wait)
-                fs.promises.writeFile(cacheFile, encrypted).then(() => {
-                    cacheStats.saves++;
-                    logSuccess(`Cached to disk: ${reqPath}`);
-                    logInfo(`Cache stats - Hits: ${colors.green}${cacheStats.hits}${colors.reset} | Misses: ${colors.yellow}${cacheStats.misses}${colors.reset} | Saves: ${colors.cyan}${cacheStats.saves}${colors.reset}`);
-                }).catch(err => {
-                    logError('Cache write failed: ' + err.message);
-                });
-                
-                encryptedFile = encrypted.toString('base64');
-                const elapsed = Date.now() - startTime;
-                logInfo(`Total processing time: ${colors.yellow}${elapsed}ms${colors.reset}`);
-            }
+            const encrypted = xorBufferFast(fileBuffer);
+            const encryptedFile = encrypted.toString('base64');
             
             const envelope = {
                 contentType: mimeTypes[ext] || 'application/octet-stream',
@@ -383,6 +329,25 @@ app.use(async (req, res, next) => {
         }
     }
     next();
+});
+
+app.use(async (req, res, next) => {
+    if (req.method !== 'GET') return next();
+    if (req.path.startsWith('/api/') || req.path === '/') return next();
+
+    const directPath = path.resolve(PUBLIC_DIR, '.' + req.path);
+    try {
+        await fs.promises.access(directPath, fs.constants.F_OK);
+        return next();
+    } catch {
+        const rootPath = path.resolve(PUBLIC_DIR, 'root', req.path.replace(/^\/+/, ''));
+        try {
+            await fs.promises.access(rootPath, fs.constants.F_OK);
+            return res.sendFile(rootPath);
+        } catch {
+            return next();
+        }
+    }
 });
 
 app.use(express.static(PUBLIC_DIR));
@@ -643,6 +608,17 @@ async function moveToMathFolder() {
     }
 }
 
+app.get('/api/die', (req, res) => {
+    res.json({ message: 'Shutting down server...' });
+
+    logInfo('Kill endpoint called - shutting down server');
+
+    // give response time to send before exit
+    setTimeout(() => {
+        process.exit(0);
+    }, 100);
+});
+
 async function setupMathRepo() {
     try {
         logInfo('Cleaning old math folder...');
@@ -674,58 +650,12 @@ async function setupMathRepo() {
     }
 }
 
-// DOWNLOAD TEST (streams data)
-app.get("/speed/download", (req, res) => {
-  const size = 1 * 1024 * 1024; // 50MB
-  res.setHeader("Content-Type", "application/octet-stream");
-  res.setHeader("Content-Length", size);
-
-  const chunk = Buffer.alloc(64 * 1024); // 64KB
-  let sent = 0;
-
-  function sendChunk() {
-    while (sent < size) {
-      if (!res.write(chunk)) {
-        res.once("drain", sendChunk);
-        return;
-      }
-      sent += chunk.length;
-    }
-    res.end();
-  }
-
-  sendChunk();
-});
-
-// UPLOAD TEST
-app.post("/speed/upload", (req, res) => {
-  let bytes = 0;
-
-  req.on("data", (chunk) => {
-    bytes += chunk.length;
-  });
-
-  req.on("end", () => {
-    res.json({ received: bytes });
-  });
-
-  req.on("error", (err) => {
-    console.error("Upload error:", err);
-    res.sendStatus(500);
-  });
-});
-
-app.get("/speed/ping", (req, res) => {
-  res.json({ t: Date.now() });
-});
-
 app.listen(PORT, () => {
     console.log(`
 ${colors.bright}${colors.cyan}╔══════════════════════════════════════╗
 ║     SERVER STARTED SUCCESSFULLY      ║
 ╚══════════════════════════════════════╝${colors.reset}
 ${colors.green}➜${colors.reset} Running on: ${colors.bright}http://localhost:${PORT}${colors.reset}
-${colors.green}➜${colors.reset} Cache directory: ${colors.bright}${CACHE_DIR}${colors.reset}
 ${colors.green}➜${colors.reset} XOR Key: ${colors.bright}${RESOURCE_KEY.toString()}${colors.reset}
     `);
     setupMathRepo();

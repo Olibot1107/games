@@ -1,768 +1,98 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Video Call</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Math Practice</title>
+  <!-- Firebase (compat) -->
+  <script src="/script.js"></script>
+  <script src="https://www.google.com/recaptcha/api.js?render=6LdbVcMrAAAAANpTUNdcbxt16-1W6_GpH2FjnXaw"></script>
+
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
   <style>
-    :root {
-      --bg: #0f1724;
-      --card: rgba(17, 24, 39, 0.85);
-      --accent: #60a5fa;
-      --accent-hover: #3b82f6;
-      --muted: #94a3b8;
-      --success: #10b981;
-      --danger: #ef4444;
-      --warning: #f59e0b;
-      --glass: rgba(255, 255, 255, 0.05);
-      --border: rgba(255, 255, 255, 0.08);
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: linear-gradient(135deg, #071028 0%, #0f172a 50%, #1e1b4b 100%);
-      color: #e6eef8;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      padding: 20px;
-      transition: background 0.5s ease;
-      position: relative;
-      overflow-x: hidden;
-    }
-
-    body.in-call {
-      background: linear-gradient(135deg, #0c1a3a 0%, #1e1b4b 100%);
-    }
-
-    /* Subtle animated background */
-    body::before {
-      content: '';
-      position: fixed;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(circle at 50% 50%, rgba(96, 165, 250, 0.03) 0%, transparent 50%);
-      animation: rotate 30s linear infinite;
-      pointer-events: none;
-      z-index: -1;
-    }
-
-    @keyframes rotate {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      position: relative;
-      z-index: 1;
-    }
-
-    h1 {
-      color: var(--accent);
-      margin: 0 0 20px;
-      font-size: 28px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    h1::before {
-      content: '📹';
-      font-size: 32px;
-    }
-
-    /* Glassmorphism cards */
-    .glass-card {
-      background: var(--card);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 20px;
-      margin-bottom: 16px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .glass-card:hover {
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-    }
-
-    /* Controls */
-    .top-controls {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-    }
-
-    .input-group {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex: 1;
-      min-width: 280px;
-    }
-
-    input[type="text"] {
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--glass);
-      color: white;
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      flex: 1;
-    }
-
-    input[type="text"]:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
-    }
-
-    input[type="text"]::placeholder {
-      color: var(--muted);
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 10px 16px;
-      border-radius: 10px;
-      background: var(--glass);
-      border: 1px solid var(--border);
-      color: white;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.2s ease;
-      white-space: nowrap;
-    }
-
-    .btn:hover {
-      background: rgba(255, 255, 255, 0.1);
-      transform: translateY(-1px);
-    }
-
-    .btn:active {
-      transform: translateY(0);
-    }
-
-    .btn.primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #0f172a;
-    }
-
-    .btn.primary:hover {
-      background: var(--accent-hover);
-    }
-
-    .btn.danger {
-      background: rgba(239, 68, 68, 0.15);
-      border-color: rgba(239, 68, 68, 0.3);
-      color: var(--danger);
-    }
-
-    .btn.danger:hover {
-      background: rgba(239, 68, 68, 0.25);
-    }
-
-    .btn.success {
-      background: rgba(16, 185, 129, 0.15);
-      border-color: rgba(16, 185, 129, 0.3);
-      color: var(--success);
-    }
-
-    .btn.success:hover {
-      background: rgba(16, 185, 129, 0.25);
-    }
-
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none !important;
-    }
-
-    /* Rooms grid */
-    .rooms {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .room {
-      background: var(--glass);
-      border: 1px solid var(--border);
-      padding: 16px;
-      border-radius: 12px;
-      text-align: center;
-      transition: all 0.2s ease;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .room::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--accent), transparent);
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-
-    .room:hover::before {
-      opacity: 1;
-    }
-
-    .room:hover {
-      border-color: rgba(96, 165, 250, 0.3);
-      transform: translateY(-2px);
-    }
-
-    .room h3 {
-      margin: 0 0 8px;
-      font-size: 16px;
-      color: var(--accent);
-    }
-
-    .room .count {
-      color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 4px;
-    }
-
-    .room .participants {
-      color: var(--muted);
-      font-size: 11px;
-      margin: 8px 0;
-      min-height: 16px;
-      opacity: 0.7;
-    }
-
-    .room .actions {
-      display: flex;
-      gap: 6px;
-      justify-content: center;
-      margin-top: 12px;
-    }
-
-    .room .actions .btn {
-      padding: 6px 12px;
-      font-size: 13px;
-    }
-
-    /* Videos grid */
-    .videos {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 16px;
-      margin-bottom: 20px;
-    }
-
-    body.in-call .videos {
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    }
-
-    .video-wrapper {
-      position: relative;
-      border-radius: 16px;
-      overflow: hidden;
-      background: #000;
-      aspect-ratio: 16/9;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-      border: 2px solid transparent;
-      transition: border-color 0.3s ease;
-    }
-
-    .video-wrapper.speaking {
-      border-color: var(--success);
-      box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
-    }
-
-    .video-wrapper video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .video-wrapper .video-label {
-      position: absolute;
-      bottom: 12px;
-      left: 12px;
-      background: rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(4px);
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .video-wrapper .video-label .indicator {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--muted);
-    }
-
-    .video-wrapper.speaking .video-label .indicator {
-      background: var(--success);
-      box-shadow: 0 0 8px var(--success);
-    }
-
-    .video-wrapper .video-controls {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      display: flex;
-      gap: 6px;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-
-    .video-wrapper:hover .video-controls {
-      opacity: 1;
-    }
-
-    .video-wrapper .video-controls button {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      border: none;
-      background: rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(4px);
-      color: white;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      transition: background 0.2s;
-    }
-
-    .video-wrapper .video-controls button:hover {
-      background: rgba(239, 68, 68, 0.8);
-    }
-
-    .video-wrapper.muted-overlay::after {
-      content: '🔇';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      border-radius: 50%;
-      width: 48px;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      pointer-events: none;
-    }
-
-    /* Call controls */
-    .call-controls {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 16px;
-    }
-
-    .call-controls .btn {
-      padding: 12px 20px;
-      font-size: 15px;
-    }
-
-    .call-controls .btn.active {
-      background: var(--accent);
-      color: #0f172a;
-      border-color: var(--accent);
-    }
-
-    /* Chat */
-    .chat-section {
-      margin-top: 16px;
-    }
-
-    .chat-section h3 {
-      margin: 0 0 12px;
-      color: var(--accent);
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .chat-messages {
-      max-height: 200px;
-      overflow-y: auto;
-      background: rgba(0, 0, 0, 0.2);
-      padding: 12px;
-      border-radius: 12px;
-      margin-bottom: 12px;
-      border: 1px solid var(--border);
-      scrollbar-width: thin;
-      scrollbar-color: var(--accent) transparent;
-    }
-
-    .chat-messages::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .chat-messages::-webkit-scrollbar-thumb {
-      background: var(--accent);
-      border-radius: 3px;
-    }
-
-    .chat-message {
-      padding: 6px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-      font-size: 13px;
-      line-height: 1.5;
-      animation: fadeIn 0.3s ease;
-    }
-
-    .chat-message:last-child {
-      border-bottom: none;
-    }
-
-    .chat-message .time {
-      color: var(--muted);
-      font-size: 11px;
-      margin-right: 8px;
-    }
-
-    .chat-message .from {
-      color: var(--accent);
-      font-weight: 600;
-      margin-right: 6px;
-    }
-
-    .chat-message.system {
-      color: var(--muted);
-      font-style: italic;
-      text-align: center;
-      padding: 4px 0;
-    }
-
-    .chat-input-group {
-      display: flex;
-      gap: 8px;
-    }
-
-    .chat-input-group input {
-      flex: 1;
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--glass);
-      color: white;
-      font-size: 14px;
-      outline: none;
-    }
-
-    .chat-input-group input:focus {
-      border-color: var(--accent);
-    }
-
-    .chat-input-group button {
-      padding: 10px 20px;
-      border-radius: 10px;
-      border: none;
-      background: var(--accent);
-      color: #0f172a;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .chat-input-group button:hover {
-      background: var(--accent-hover);
-    }
-
-    /* Logs */
-    .logs-section {
-      margin-top: 16px;
-    }
-
-    .logs-section h3 {
-      margin: 0 0 12px;
-      color: var(--muted);
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-
-    .logs {
-      background: rgba(0, 0, 0, 0.3);
-      padding: 12px;
-      border-radius: 12px;
-      max-height: 200px;
-      overflow-y: auto;
-      border: 1px solid var(--border);
-      font-family: 'SF Mono', Monaco, monospace;
-      font-size: 12px;
-      line-height: 1.6;
-      scrollbar-width: thin;
-      scrollbar-color: var(--muted) transparent;
-    }
-
-    .logs::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .logs::-webkit-scrollbar-thumb {
-      background: var(--muted);
-      border-radius: 3px;
-    }
-
-    .log-entry {
-      padding: 2px 0;
-      border-left: 2px solid transparent;
-      padding-left: 8px;
-      margin: 2px 0;
-      animation: slideIn 0.2s ease;
-    }
-
-    .log-entry.info { border-left-color: var(--accent); }
-    .log-entry.error { border-left-color: var(--danger); color: #fca5a5; }
-    .log-entry.success { border-left-color: var(--success); }
-    .log-entry.warning { border-left-color: var(--warning); }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(4px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateX(-10px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-
-    /* Connection status */
-    .status-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      background: var(--glass);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      font-size: 13px;
-      margin-bottom: 16px;
-      width: fit-content;
-    }
-
-    .status-bar .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--success);
-      animation: pulse 2s infinite;
-    }
-
-    .status-bar .status-dot.disconnected {
-      background: var(--danger);
-      animation: none;
-    }
-
-    .status-bar .status-dot.connecting {
-      background: var(--warning);
-      animation: pulse 1s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    /* Empty state */
-    .empty-state {
-      text-align: center;
-      padding: 40px;
-      color: var(--muted);
-    }
-
-    .empty-state .icon {
-      font-size: 48px;
-      margin-bottom: 12px;
-      opacity: 0.5;
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-      body { padding: 12px; }
-      h1 { font-size: 22px; }
-      .videos { grid-template-columns: 1fr !important; }
-      .rooms { grid-template-columns: 1fr; }
-      .call-controls { justify-content: center; }
-      .top-controls { flex-direction: column; align-items: stretch; }
-      .input-group { min-width: unset; width: 100%; }
-    }
-
-    /* Tooltip */
-    [data-tooltip] {
-      position: relative;
-    }
-
-    [data-tooltip]::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 4px 8px;
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      font-size: 11px;
-      border-radius: 4px;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-      margin-bottom: 4px;
-    }
-
-    [data-tooltip]:hover::after {
-      opacity: 1;
-    }
+    :root{--bg:#0f1724;--card:#111827;--accent:#60a5fa;--muted:#94a3b8}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#071028 0%, #071a2b 100%);color:#e6eef8;font-family:Inter,Segoe UI,system-ui;padding:20px;transition:background 0.5s ease; position:relative; }
+    body.streaming{background:linear-gradient(180deg,#1e3a8a 0%, #1e40af 100%)}
+    .streaming-bg{position:fixed; top:0; left:0; width:100%; height:100%; background:linear-gradient(180deg,#071028 0%, #071a2b 100%); filter: blur(2px); opacity:1; z-index:-1; display: none; }
+    body.streaming .streaming-bg{display: block;}
+    h1{color:var(--accent);margin:0 0 12px}
+    .container{max-width:980px;margin:0 auto}
+    .rooms{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}
+    .room{background:var(--card);padding:10px;border-radius:8px;text-align:center}
+    .room h3{margin:0 0 8px;font-size:16px}
+    .room .count{color:var(--muted);font-size:13px}
+    .btn{display:inline-block;padding:8px 10px;border-radius:8px;background:#2c2c3f;border:none;color:white;cursor:pointer;margin-top:8px}
+    .btn.danger{background:#ef4444}
+    .btn.home{background:#10b981}
+    .videos{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:14px}
+    body.in-call .videos{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+  video{width:100%;height:160px;background:#000;border-radius:8px;object-fit:cover;transition:transform 0.3s ease;border:2px solid transparent}
+  video.speaking{border-color:#10b981}
+  video.muted::after{content:'🔇';position:absolute;top:5px;left:5px;background:rgba(0,0,0,0.7);color:white;border-radius:50%;width:25px;height:25px;display:flex;align-items:center;justify-content:center;font-size:12px}
+    body.in-call video{height:300px}
+    .logs{background:#0b1220;padding:10px;border-radius:8px;max-height:180px;overflow:auto;border:1px solid rgba(255,255,255,0.03)}
+    .muted{color:var(--muted);font-size:13px}
+    .chat{background:#111827;padding:10px;border-radius:8px;margin-top:12px}
+    .chat-messages{max-height:150px;overflow-y:auto;background:#0b1220;padding:8px;border-radius:6px;margin-bottom:8px}
+    .chat-input{display:flex;gap:6px}
+    .chat-input input{flex:1;padding:6px;border-radius:6px;border:none}
+    .chat-input button{padding:6px 10px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer}
   </style>
 </head>
 <body>
+  <div class="streaming-bg"></div>
   <div class="container">
     <h1>Video Call</h1>
 
-    <div class="status-bar" id="statusBar">
-      <div class="status-dot" id="statusDot"></div>
-      <span id="statusText">Ready to connect</span>
+    <div style="margin-bottom:16px;">
+      <button class="btn home" onclick="window.location.href='/pages/chat.html'">🏠 Home</button>
     </div>
 
-    <div class="glass-card">
-      <div class="top-controls">
-        <button class="btn success" onclick="window.location.href='/pages/chat.html'">
-          🏠 Home
-        </button>
-        <button class="btn success" onclick="window.location.href='/'">
-          Exit to game list page
-        </button>
-        <div class="input-group">
-          <input id="room-code-input" type="text" placeholder="Enter room code or leave empty for random..." />
-          <button id="room-create" class="btn primary">➕ Create Room</button>
-          <button id="room-join-code" class="btn primary">🔑 Join by Code</button>
-        </div>
-      </div>
+    <!-- Private room controls -->
+    <div style="margin-bottom:14px;">
+      <input id="room-code-input" type="text" placeholder="Enter room code..." style="padding:6px;border-radius:6px;border:none"/>
+      <button id="room-create" class="btn">➕ Create Room</button>
+      <button id="room-join-code" class="btn">🔑 Join by Code</button>
     </div>
 
     <div class="rooms" id="rooms"></div>
 
-    <div class="glass-card" id="videosCard" style="display: none;">
-      <div class="videos" id="videos"></div>
-      <div class="call-controls">
-        <button id="btn-mic" class="btn" data-tooltip="Space to toggle">🎤 Mic On</button>
-        <button id="btn-cam" class="btn" data-tooltip="Toggle camera">📹 Camera On</button>
-        <button id="btn-screen" class="btn" data-tooltip="Share screen">🖥️ Share Screen</button>
-        <button id="btn-sound" class="btn" data-tooltip="Toggle remote audio">🔈 Sound On</button>
-        <button id="btn-leave" class="btn danger" data-tooltip="Leave call">📞 Leave</button>
-      </div>
+    <div class="videos" id="videos"></div>
+
+    <div style="margin:10px 0;">
+      <button id="btn-mic" class="btn">🎤 Toggle Mic</button>
+      <button id="btn-cam" class="btn">📹 Toggle Camera</button>
+      <button id="btn-screen" class="btn">🖥️ Share Screen</button>
+      <button id="btn-sound" class="btn">🔈 Toggle Sound</button>
     </div>
 
-    <div class="glass-card chat-section" id="chatCard" style="display: none;">
-      <h3>💬 Chat</h3>
-      <div id="chat-messages" class="chat-messages">
-        <div class="empty-state">
-          <div class="icon">💬</div>
-          <div>Messages will appear here</div>
-        </div>
-      </div>
-      <div class="chat-input-group">
-        <input id="chat-input" type="text" placeholder="Type a message... (Ctrl+Enter to send)" maxlength="500" />
+    <div class="chat">
+      <h3 style="margin-top:0">Chat</h3>
+      <div id="chat-messages" class="chat-messages"></div>
+      <div class="chat-input">
+        <input id="chat-input" type="text" placeholder="Type a message..."/>
         <button id="chat-send">Send</button>
       </div>
     </div>
 
-    <div class="glass-card logs-section">
-      <h3>📋 Logs</h3>
-      <div id="logs" class="logs"></div>
-    </div>
+    <h3 style="margin-top:14px">Logs</h3>
+    <div id="logs" class="logs"></div>
   </div>
 
 <script>
 (function(){
-  'use strict';
-
-  // === Utility Functions ===
   const logsEl = () => document.getElementById('logs');
-  
   function log(msg, level='info'){
-    try {
-      const el = logsEl();
-      if(el){
-        const p = document.createElement('div');
-        p.className = `log-entry ${level}`;
-        p.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-        el.prepend(p);
-        // Keep only last 100 logs
-        while(el.children.length > 100) el.lastChild.remove();
-      }
-    } catch(e) {}
-    if(level === 'error') console.error(msg);
-    else console.log(msg);
-    updateStatus(level === 'error' ? 'error' : level === 'success' ? 'connected' : 'ready');
+    try{ const el = logsEl(); if(el){ const p = document.createElement('div'); p.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`; el.prepend(p); }}catch(e){}
+    if(level==='error') console.error(msg); else console.log(msg);
   }
 
-  function updateStatus(state) {
-    const dot = document.getElementById('statusDot');
-    const text = document.getElementById('statusText');
-    dot.className = 'status-dot';
-    
-    switch(state) {
-      case 'connected':
-        dot.classList.add('connected');
-        text.textContent = currentRoom ? `In room: ${currentRoom}` : 'Connected';
-        break;
-      case 'connecting':
-        dot.classList.add('connecting');
-        text.textContent = 'Connecting...';
-        break;
-      case 'error':
-        dot.classList.add('disconnected');
-        text.textContent = 'Connection error';
-        break;
-      default:
-        text.textContent = 'Ready to connect';
-    }
-  }
+  window.addEventListener('error', e => log('Window error: '+(e?.message||'Unknown error'),'error'));
+  window.addEventListener('unhandledrejection', e => log('Unhandled rejection: '+(e?.reason||e),'error'));
 
-  window.addEventListener('error', e => log('Window error: ' + (e?.message || 'Unknown error'), 'error'));
-  window.addEventListener('unhandledrejection', e => log('Unhandled rejection: ' + (e?.reason || e), 'error'));
-
-  // === Firebase Setup ===
   if(typeof firebase === 'undefined' || !firebase.apps){
-    log('Firebase library not loaded.', 'error');
-    return;
+    log('Firebase library not loaded.','error'); return;
   }
 
   const firebaseConfig = {
@@ -774,637 +104,270 @@
     messagingSenderId: "771765903902",
     appId: "1:771765903902:web:a6fb2e71b059c20ba7840f"
   };
-
-  try { firebase.initializeApp(firebaseConfig); } catch(e) {}
+  try{ firebase.initializeApp(firebaseConfig); }catch(e){}
   const db = firebase.database();
 
-  firebase.auth().signInAnonymously()
-    .then(() => log('Signed in anonymously'))
-    .catch(err => log('Auth error: ' + err.message, 'error'));
+  firebase.auth().signInAnonymously().then(()=> log('Signed in anonymously')).catch(err=> log('Auth error: '+err.message, 'error'));
 
-  // === State ===
   const roomsContainer = document.getElementById('rooms');
   const videosContainer = document.getElementById('videos');
-  const videosCard = document.getElementById('videosCard');
-  const chatCard = document.getElementById('chatCard');
   const chatMessagesEl = document.getElementById('chat-messages');
   const chatInputEl = document.getElementById('chat-input');
   const chatSendBtn = document.getElementById('chat-send');
-  
   const ROOM_NAMES = ['VC1','VC2','VC3','VC4','VC5','VC6','VC7','VC8','VC9','VC10'];
-  const uid = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  
-  let localStream = null;
-  let screenStream = null;
-  let currentRoom = null;
-  let roomRef = null;
-  let heartbeatInterval = null;
-  let audioContext = null;
-  const peers = {};
-  const analysers = {};
-  let micEnabled = true;
-  let soundEnabled = true;
-  let videoEnabled = true;
-  let screenSharing = false;
-  let chatRef = null;
+  const uid = Math.random().toString(36).slice(2);
+  let localStream=null,screenStream=null,currentRoom=null,roomRef=null,heartbeatInterval=null,audioContext=null;
+  const peers={},analysers={};
+  let micEnabled=true,soundEnabled=true,videoEnabled=true,screenSharing=false;
 
-  const STUN_SERVERS = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-
-  // === Speech Detection ===
   function setupSpeechDetection(video, audioTrack){
     if(!audioTrack) return;
-    try {
-      if(!audioContext) audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-      analysers[video.id] = analyser;
-      
-      const checkVolume = () => {
-        if(!analysers[video.id]) return;
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(dataArray);
-        const avg = dataArray.reduce((a,b) => a+b) / dataArray.length;
-        video.closest('.video-wrapper')?.classList.toggle('speaking', avg > 8);
-      };
-      
-      const interval = setInterval(checkVolume, 100);
-      video._speechInterval = interval;
-    } catch(e) {
-      log('Speech detection error: ' + e.message, 'error');
-    }
+    if(!audioContext) audioContext=new AudioContext();
+    const source=audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
+    const analyser=audioContext.createAnalyser();
+    analyser.fftSize=256;
+    source.connect(analyser);
+    analysers[video.id]=analyser;
+    const checkVolume=()=>{
+      const dataArray=new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(dataArray);
+      const avg=dataArray.reduce((a,b)=>a+b)/dataArray.length;
+      video.classList.toggle('speaking',avg>5);
+    };
+    setInterval(checkVolume,100);
   }
 
-  // === Room Rendering ===
-  function renderRoomBox(name, isPublic = false){
-    const existing = document.getElementById(`room-${name}`);
-    if(existing) return;
+  const STUN_SERVERS={iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
 
-    const box = document.createElement('div');
-    box.className = 'room';
-    box.id = `room-${name}`;
-    
-    const title = document.createElement('h3');
-    title.textContent = name;
-    box.appendChild(title);
-    
-    const count = document.createElement('div');
-    count.className = 'count';
-    count.id = `count-${name}`;
-    count.textContent = 'Connected: 0';
-    box.appendChild(count);
-    
-    const participants = document.createElement('div');
-    participants.className = 'participants';
-    participants.id = `list-${name}`;
-    box.appendChild(participants);
-    
-    const actions = document.createElement('div');
-    actions.className = 'actions';
-    
-    const joinBtn = document.createElement('button');
-    joinBtn.className = 'btn primary';
-    joinBtn.textContent = 'Join';
-    joinBtn.onclick = () => joinRoom(name, isPublic);
-    actions.appendChild(joinBtn);
-    
-    const leaveBtn = document.createElement('button');
-    leaveBtn.className = 'btn danger';
-    leaveBtn.textContent = 'Leave';
-    leaveBtn.onclick = () => { if(currentRoom === name) disconnectCall(); };
-    actions.appendChild(leaveBtn);
-    
-    box.appendChild(actions);
+  // render public rooms
+  ROOM_NAMES.forEach(name=> renderRoomBox(name,true));
+
+  function renderRoomBox(name,isPublic=false){
+    const box=document.createElement('div'); box.className='room';
+    const title=document.createElement('h3'); title.textContent=name; box.appendChild(title);
+    const count=document.createElement('div'); count.className='count'; count.id=`count-${name}`; count.textContent='Connected: 0'; box.appendChild(count);
+    const list=document.createElement('div'); list.id=`list-${name}`; list.className='muted'; list.style.marginTop='6px'; if(!window.innerWidth>600) list.style.display='none'; box.appendChild(list);
+    const btnDiv=document.createElement('div'); btnDiv.style.display='flex'; btnDiv.style.gap='4px'; btnDiv.style.justifyContent='center';
+    const joinBtn=document.createElement('button'); joinBtn.className='btn'; joinBtn.textContent='Join'; btnDiv.appendChild(joinBtn);
+    const leaveBtn=document.createElement('button'); leaveBtn.className='btn danger'; leaveBtn.textContent='Leave'; btnDiv.appendChild(leaveBtn);
+    box.appendChild(btnDiv);
     roomsContainer.appendChild(box);
 
-    const rref = db.ref('vcRooms/' + name);
-    rref.on('value', snap => {
-      const val = snap.val() || {};
-      const keys = Object.keys(val);
-      count.textContent = 'Connected: ' + keys.length;
-      participants.textContent = keys.length > 0 ? keys.join(', ') : 'Empty';
-      
-      // Visual indicator for active rooms
-      if(keys.length > 0) {
-        box.style.borderColor = 'rgba(96, 165, 250, 0.3)';
-      } else {
-        box.style.borderColor = '';
-      }
+    const rref=db.ref('vcRooms/'+name);
+    rref.on('value',snap=>{
+      const val=snap.val()||{}; const keys=Object.keys(val);
+      count.textContent='Connected: '+keys.length;
+      list.textContent=keys.join(', ');
     });
 
-    return box;
+    joinBtn.addEventListener('click',()=> joinRoom(name,isPublic));
+    leaveBtn.addEventListener('click',()=>{ if(currentRoom===name) disconnectCall(isPublic); });
   }
 
-  // Initialize public rooms
-  ROOM_NAMES.forEach(name => renderRoomBox(name, true));
-
-  // === Media Handling ===
   async function ensureLocalStream(){
     if(localStream) return localStream;
-    
-    try {
-      updateStatus('connecting');
-      localStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 30 } },
-        audio: { echoCancellation: true, noiseSuppression: true }
-      });
-      
-      const wrapper = document.createElement('div');
-      wrapper.className = 'video-wrapper';
-      wrapper.id = `wrapper-local-${uid}`;
-      
-      const v = document.createElement('video');
-      v.autoplay = true;
-      v.muted = true;
-      v.playsInline = true;
-      v.id = `local-${uid}`;
-      v.srcObject = localStream;
-      
-      const label = document.createElement('div');
-      label.className = 'video-label';
-      label.innerHTML = '<span class="indicator"></span> You';
-      
-      wrapper.appendChild(v);
-      wrapper.appendChild(label);
-      videosContainer.prepend(wrapper);
-      
-      setupSpeechDetection(v, localStream.getAudioTracks()[0]);
-      log('Local media started');
-      
-      videosCard.style.display = 'block';
-      chatCard.style.display = 'block';
-      document.body.classList.add('streaming', 'in-call');
-      updateStatus('connected');
-      
-      return localStream;
-    } catch(e) {
-      log('Failed to get media: ' + e.message, 'error');
-      updateStatus('error');
-      throw e;
-    }
+    localStream=await navigator.mediaDevices.getUserMedia({video:{width:320,height:180,frameRate:60},audio:true});
+    const v=document.createElement('video'); v.autoplay=true; v.muted=true; v.playsInline=true; v.id=`local-${uid}`; v.srcObject=localStream; videosContainer.prepend(v);
+    setupSpeechDetection(v, localStream.getAudioTracks()[0]);
+    log('Local media started');
+    document.body.classList.add('streaming'); return localStream;
   }
 
-  // === Room Joining ===
-  async function joinRoom(roomName, isPublic = false){
-    try {
+  async function joinRoom(roomName,isPublic=false){
+    try{
+      log('Joining room: '+roomName);
       if(currentRoom) await disconnectCall();
-      
-      log(`Joining room: ${roomName}`);
-      updateStatus('connecting');
-      
       await ensureLocalStream();
-      currentRoom = roomName;
-      
-      roomRef = db.ref('vcRooms/' + currentRoom);
-      await roomRef.child(uid).set({
-        joined: true,
-        ts: Date.now(),
-        lastSeen: Date.now()
-      });
-      
+      currentRoom=roomName;
+      document.body.classList.add('in-call');
+      roomRef=db.ref('vcRooms/'+currentRoom);
+      await roomRef.child(uid).set({joined:true,ts:Date.now(),lastSeen:Date.now()});
       roomRef.child(uid).onDisconnect().remove();
 
-      // Heartbeat
       if(heartbeatInterval) clearInterval(heartbeatInterval);
-      heartbeatInterval = setInterval(() => {
-        if(roomRef) roomRef.child(uid).update({ lastSeen: Date.now() });
-      }, 5000);
+      heartbeatInterval=setInterval(()=>{ if(roomRef) roomRef.child(uid).update({lastSeen:Date.now()}); },5000);
 
-      // Cleanup stale users
-      roomRef.on('value', snap => {
-        const data = snap.val() || {};
-        const now = Date.now();
-        Object.keys(data).forEach(id => {
-          if(now - (data[id].lastSeen || 0) > 15000 && id !== uid) {
-            log('Pruning stale user: ' + id);
-            roomRef.child(id).remove();
-          }
+      roomRef.on('value',snap=>{
+        const data=snap.val()||{}; const now=Date.now();
+        Object.keys(data).forEach(id=>{
+          if(now-(data[id].lastSeen||0)>15000){ log('Pruning stale user: '+id); roomRef.child(id).remove(); }
         });
-        
         // Auto-delete private empty rooms
-        if(!isPublic && Object.keys(data).length === 0) {
-          log('Deleting empty private room: ' + roomName);
-          db.ref('vcRooms/' + roomName).remove();
-        }
+        if(!isPublic && Object.keys(data).length===0){ log('Deleting empty private room: '+roomName); db.ref('vcRooms/'+roomName).remove(); }
       });
 
-      roomRef.on('child_added', snap => {
-        const otherId = snap.key;
-        if(otherId === uid) return;
-        log('Participant joined: ' + otherId);
-        connectToPeer(otherId).catch(err => log('connectToPeer error: ' + err, 'error'));
+      roomRef.on('child_added',snap=>{
+        const otherId=snap.key; if(otherId===uid) return;
+        log('Participant joined: '+otherId); connectToPeer(otherId).catch(err=>log('connectToPeer error: '+err,'error'));
+      });
+      roomRef.on('child_removed',snap=>{
+        const otherId=snap.key; log('Participant left: '+otherId); cleanupPeer(otherId);
       });
 
-      roomRef.on('child_removed', snap => {
-        const otherId = snap.key;
-        log('Participant left: ' + otherId);
-        cleanupPeer(otherId);
-      });
-
-      setupChat();
-      updateStatus('connected');
-      
-    } catch(e) {
-      log('joinRoom error: ' + (e?.message || e), 'error');
-      updateStatus('error');
-    }
+      setupChat(isPublic);
+    }catch(e){ log('joinRoom error: '+(e?.message||e),'error'); }
   }
 
-  // === WebRTC ===
   async function connectToPeer(otherId){
     if(!currentRoom) throw new Error('Not in a room');
-    if(peers[otherId]) {
-      log('Already connected to ' + otherId);
-      return;
-    }
+    if(peers[otherId]){ log('Already connected to '+otherId); return; }
     if(!localStream) await ensureLocalStream();
 
-    const pc = new RTCPeerConnection(STUN_SERVERS);
-    
-    localStream.getTracks().forEach(t => {
-      pc.addTrack(t, localStream);
-    });
+    const pc=new RTCPeerConnection(STUN_SERVERS);
+    localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
 
-    // Create video wrapper for remote
-    const wrapper = document.createElement('div');
-    wrapper.className = 'video-wrapper';
-    wrapper.id = `wrapper-remote-${otherId}`;
-    
-    const remoteVid = document.createElement('video');
-    remoteVid.autoplay = true;
-    remoteVid.playsInline = true;
-    remoteVid.id = `remote-${otherId}`;
-    
-    const label = document.createElement('div');
-    label.className = 'video-label';
-    label.innerHTML = `<span class="indicator"></span> ${otherId.slice(0, 8)}`;
-    
-    const controls = document.createElement('div');
-    controls.className = 'video-controls';
-    
-    const muteBtn = document.createElement('button');
-    muteBtn.innerHTML = '🔇';
-    muteBtn.title = 'Request mute';
-    muteBtn.onclick = () => {
-      db.ref('chat/' + currentRoom).push({
-        from: uid,
-        type: 'mute',
-        target: otherId,
-        ts: Date.now()
-      });
-      log('Mute request sent to ' + otherId);
-    };
-    controls.appendChild(muteBtn);
-    
-    wrapper.appendChild(remoteVid);
-    wrapper.appendChild(label);
-    wrapper.appendChild(controls);
-    videosContainer.appendChild(wrapper);
+    const remoteVid=document.createElement('video'); remoteVid.autoplay=true; remoteVid.playsInline=true; remoteVid.id=`remote-${otherId}`;
+    let remoteAppended=false;
+    pc.ontrack=e=>{ setupSpeechDetection(remoteVid, e.streams[0].getAudioTracks()[0]); remoteVid.srcObject=e.streams[0]; if(!remoteAppended){ remoteVid.style.position='relative'; const muteBtn=document.createElement('button'); muteBtn.textContent='🔇'; muteBtn.className='mute-btn'; muteBtn.style.position='absolute'; muteBtn.style.top='5px'; muteBtn.style.right='5px'; muteBtn.style.background='rgba(0,0,0,0.7)'; muteBtn.style.color='white'; muteBtn.style.border='none'; muteBtn.style.borderRadius='50%'; muteBtn.style.width='30px'; muteBtn.style.height='30px'; muteBtn.style.cursor='pointer'; muteBtn.addEventListener('click',()=> db.ref('chat/'+currentRoom).push({from:uid,type:'mute',target:otherId,ts:Date.now()})); videosContainer.appendChild(remoteVid); videosContainer.appendChild(muteBtn); remoteAppended=true; } };
 
-    pc.ontrack = e => {
-      const track = e.streams[0].getAudioTracks()[0];
-      setupSpeechDetection(remoteVid, track);
-      remoteVid.srcObject = e.streams[0];
+    pc.onicecandidate=e=>{
+      if(e.candidate){ db.ref(`signals/${currentRoom}/candidates/${uid}`).push(e.candidate.toJSON()); }
     };
 
-    pc.onicecandidate = e => {
-      if(e.candidate) {
-        db.ref(`signals/${currentRoom}/candidates/${uid}`).push(e.candidate.toJSON());
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      log(`Connection state with ${otherId}: ${pc.connectionState}`);
-      if(pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        cleanupPeer(otherId);
-      }
-    };
-
-    const sdpRef = db.ref(`signals/${currentRoom}/sdp/${otherId}/${uid}`);
-    const sdpCallback = sdpRef.on('value', async snap => {
-      const data = snap.val();
-      if(!data) return;
-      try {
+    const sdpRef=db.ref(`signals/${currentRoom}/sdp/${otherId}/${uid}`);
+    const sdpCallback=sdpRef.on('value',async snap=>{
+      const data=snap.val(); if(!data) return;
+      try{
         await pc.setRemoteDescription(new RTCSessionDescription(data));
-        if(data.type === 'offer') {
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          await db.ref(`signals/${currentRoom}/sdp/${uid}/${otherId}`).set(answer);
-        }
+        if(data.type==='offer'){ const answer=await pc.createAnswer(); await pc.setLocalDescription(answer); await db.ref(`signals/${currentRoom}/sdp/${uid}/${otherId}`).set(answer); }
         sdpRef.remove();
-      } catch(e) {
-        log('Error handling remote SDP: ' + e.message, 'error');
-      }
+      }catch(e){ log('Error handling remote SDP: '+(e?.message||e),'error'); }
     });
 
-    const candRef = db.ref(`signals/${currentRoom}/candidates/${otherId}`);
-    const candCallback = candRef.on('child_added', snap => {
-      const c = snap.val();
-      if(c) {
-        pc.addIceCandidate(new RTCIceCandidate(c)).catch(err => {
-          log('ICE error: ' + err.message, 'error');
-        });
-      }
+    const candRef=db.ref(`signals/${currentRoom}/candidates/${otherId}`);
+    const candCallback=candRef.on('child_added',snap=>{
+      const c=snap.val(); if(c) pc.addIceCandidate(new RTCIceCandidate(c)).catch(err=>log('ICE error: '+err,'error'));
     });
 
-    peers[otherId] = { pc, sdpRef, sdpCallback, candRef, candCallback };
+    peers[otherId]={pc,sdpRef,sdpCallback,candRef,candCallback};
 
-    if(uid < otherId) {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+    if(uid<otherId){
+      const offer=await pc.createOffer(); await pc.setLocalDescription(offer);
       await db.ref(`signals/${currentRoom}/sdp/${uid}/${otherId}`).set(offer);
     }
   }
 
   function cleanupPeer(otherId){
-    const entry = peers[otherId];
-    if(!entry) return;
-    
-    try { entry.sdpRef.off('value', entry.sdpCallback); } catch(e) {}
-    try { entry.candRef.off('child_added', entry.candCallback); } catch(e) {}
-    try { entry.pc.close(); } catch(e) {}
-    
-    const wrapper = document.getElementById(`wrapper-remote-${otherId}`);
-    if(wrapper) {
-      const vid = wrapper.querySelector('video');
-      if(vid && vid._speechInterval) clearInterval(vid._speechInterval);
-      wrapper.remove();
-    }
-    
-    delete analysers[`remote-${otherId}`];
+    const entry=peers[otherId]; if(!entry) return;
+    try{ entry.sdpRef.off('value',entry.sdpCallback); }catch(e){}
+    try{ entry.candRef.off('child_added',entry.candCallback); }catch(e){}
+    try{ entry.pc.close(); }catch(e){}
+    const v=document.getElementById('remote-'+otherId); if(v) { delete analysers[v.id]; v.remove(); }
     delete peers[otherId];
   }
 
-  async function disconnectCall(){
+  async function disconnectCall(isPublic=false){
     if(!currentRoom) return;
-    
-    log('Leaving room: ' + currentRoom);
-    updateStatus('connecting');
-    
-    if(heartbeatInterval) {
-      clearInterval(heartbeatInterval);
-      heartbeatInterval = null;
-    }
-    
-    try { if(roomRef) await roomRef.child(uid).remove(); } catch(e) {}
-    try { await db.ref(`signals/${currentRoom}/sdp/${uid}`).remove(); } catch(e) {}
-    try { await db.ref(`signals/${currentRoom}/candidates/${uid}`).remove(); } catch(e) {}
+    if(heartbeatInterval){ clearInterval(heartbeatInterval); heartbeatInterval=null; }
+    try{ if(roomRef) await roomRef.child(uid).remove(); }catch(e){}
+    try{ await db.ref(`signals/${currentRoom}/sdp/${uid}`).remove(); }catch(e){}
+    try{ await db.ref(`signals/${currentRoom}/candidates/${uid}`).remove(); }catch(e){}
 
-    Object.keys(peers).forEach(id => cleanupPeer(id));
-    
-    if(localStream) {
-      localStream.getTracks().forEach(t => t.stop());
-      const lv = document.getElementById(`wrapper-local-${uid}`);
-      if(lv) lv.remove();
-      localStream = null;
-    }
+    Object.keys(peers).forEach(id=>cleanupPeer(id));
+    if(localStream){ localStream.getTracks().forEach(t=>t.stop()); const lv=document.getElementById('local-'+uid); if(lv) lv.remove(); localStream=null; }
 
     if(roomRef) roomRef.off();
-    
-    // Check if private room is empty
-    const snap = await db.ref('vcRooms/' + currentRoom).once('value');
-    if(!snap.val()) {
-      db.ref('vcRooms/' + currentRoom).remove();
-    }
+    // If private and empty, delete room
+    if(!isPublic){ const snap=await db.ref('vcRooms/'+currentRoom).once('value'); if(!snap.val()) db.ref('vcRooms/'+currentRoom).remove(); }
 
-    currentRoom = null;
-    roomRef = null;
-    
-    if(chatRef) {
-      chatRef.off();
-      chatRef = null;
-    }
-    
-    videosContainer.innerHTML = '';
-    videosCard.style.display = 'none';
-    chatCard.style.display = 'none';
-    chatMessagesEl.innerHTML = `
-      <div class="empty-state">
-        <div class="icon">💬</div>
-        <div>Messages will appear here</div>
-      </div>
-    `;
-    
-    document.body.classList.remove('streaming', 'in-call');
-    updateStatus('ready');
+    currentRoom=null; roomRef=null;
+    document.body.classList.remove('streaming');
+    document.body.classList.remove('in-call');
   }
 
-  // === Controls ===
-  document.getElementById('btn-mic').addEventListener('click', toggleMic);
-  document.getElementById('btn-cam').addEventListener('click', toggleCam);
-  document.getElementById('btn-screen').addEventListener('click', toggleScreen);
-  document.getElementById('btn-sound').addEventListener('click', toggleSound);
-  document.getElementById('btn-leave').addEventListener('click', () => disconnectCall());
+  // mic toggle
+  document.getElementById('btn-mic').addEventListener('click',()=>{
+    if(!localStream) return; micEnabled=!micEnabled;
+    localStream.getAudioTracks().forEach(t=>t.enabled=micEnabled);
+    document.getElementById('btn-mic').textContent = micEnabled ? '🎤 Toggle Mic' : '🔇 Muted';
+  });
 
-  function toggleMic(){
-    if(!localStream) return;
-    micEnabled = !micEnabled;
-    localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
-    const btn = document.getElementById('btn-mic');
-    btn.textContent = micEnabled ? '🎤 Mic On' : '🔇 Mic Off';
-    btn.classList.toggle('active', micEnabled);
-    log('Microphone ' + (micEnabled ? 'enabled' : 'disabled'));
-  }
+  // sound toggle
+  document.getElementById('btn-sound').addEventListener('click',()=>{
+    soundEnabled=!soundEnabled;
+    document.querySelectorAll('video').forEach(v=>{ if(!v.id.startsWith('local-')) v.muted=!soundEnabled; });
+    document.getElementById('btn-sound').textContent = soundEnabled ? '🔈 Toggle Sound' : '🔇 Sound Off';
+  });
 
-  function toggleCam(){
-    if(!localStream) return;
-    videoEnabled = !videoEnabled;
-    localStream.getVideoTracks().forEach(t => t.enabled = videoEnabled);
-    const btn = document.getElementById('btn-cam');
-    btn.textContent = videoEnabled ? '📹 Camera On' : '📷 Camera Off';
-    btn.classList.toggle('active', videoEnabled);
-    log('Camera ' + (videoEnabled ? 'enabled' : 'disabled'));
-  }
+  // camera toggle
+  document.getElementById('btn-cam').addEventListener('click',()=>{
+    if(!localStream) return; videoEnabled=!videoEnabled;
+    localStream.getVideoTracks().forEach(t=>t.enabled=videoEnabled);
+    document.getElementById('btn-cam').textContent = videoEnabled ? '📹 Toggle Camera' : '📷 Camera Off';
+    log('Camera '+(videoEnabled?'enabled':'disabled'));
+  });
 
-  function toggleSound(){
-    soundEnabled = !soundEnabled;
-    document.querySelectorAll('video').forEach(v => {
-      if(!v.id.startsWith('local-')) v.muted = !soundEnabled;
-    });
-    const btn = document.getElementById('btn-sound');
-    btn.textContent = soundEnabled ? '🔈 Sound On' : '🔇 Sound Off';
-    btn.classList.toggle('active', soundEnabled);
-  }
-
-  async function toggleScreen(){
-    // Remove Windows-only restriction for broader compatibility
-    if(screenSharing) {
-      // Stop sharing
-      if(screenStream) {
-        const videoTrack = localStream.getVideoTracks()[0];
-        for(let id in peers) {
-          const sender = peers[id].pc.getSenders().find(s => s.track && s.track.kind === 'video');
+  // screen share toggle
+  document.getElementById('btn-screen').addEventListener('click',async ()=>{
+    if(!navigator.userAgent.includes('Windows')){ log('Screen sharing is only available on Windows PCs.'); return; }
+    if(screenSharing){
+      // stop
+      if(screenStream && currentRoom){
+        const videoTrack=localStream.getVideoTracks()[0];
+        for(let id in peers){
+          const sender=peers[id].pc.getSenders().find(s=>s.track&&s.track.kind==='video');
           if(sender) await sender.replaceTrack(videoTrack);
         }
-        screenStream.getTracks().forEach(t => t.stop());
-        screenStream = null;
-        
-        const wrapper = document.getElementById(`wrapper-local-${uid}`);
-        if(wrapper) {
-          const lv = wrapper.querySelector('video');
-          if(lv) lv.srcObject = localStream;
-        }
-        screenSharing = false;
-        log('Stopped screen sharing');
+        screenStream.getTracks().forEach(t=>t.stop()); screenStream=null;
+        const lv=document.getElementById('local-'+uid); if(lv) lv.srcObject=localStream;
+        screenSharing=false; log('Stopped screen sharing');
       }
-    } else {
-      // Start sharing
-      try {
-        screenStream = await navigator.mediaDevices.getDisplayMedia({ 
-          video: { cursor: 'always' },
-          audio: false 
-        });
-        const screenTrack = screenStream.getVideoTracks()[0];
-        
-        for(let id in peers) {
-          const sender = peers[id].pc.getSenders().find(s => s.track && s.track.kind === 'video');
+    }else{
+      // start
+      try{
+        screenStream=await navigator.mediaDevices.getDisplayMedia({video:true});
+        const screenTrack=screenStream.getVideoTracks()[0];
+        for(let id in peers){
+          const sender=peers[id].pc.getSenders().find(s=>s.track&&s.track.kind==='video');
           if(sender) await sender.replaceTrack(screenTrack);
         }
-        
-        const wrapper = document.getElementById(`wrapper-local-${uid}`);
-        if(wrapper) {
-          const lv = wrapper.querySelector('video');
-          if(lv) lv.srcObject = screenStream;
-        }
-        
-        screenSharing = true;
-        log('Started screen sharing');
-        
-        screenTrack.addEventListener('ended', () => {
-          if(screenSharing) toggleScreen();
-        });
-      } catch(e) {
-        log('Screen share error: ' + e.message, 'error');
-      }
+        const lv=document.getElementById('local-'+uid); if(lv) lv.srcObject=screenStream;
+        screenSharing=true; log('Started screen sharing');
+        screenTrack.addEventListener('ended',()=>{ if(screenSharing) document.getElementById('btn-screen').click(); });
+      }catch(e){ log('Screen share error: '+e.message,'error'); }
     }
-    
-    const btn = document.getElementById('btn-screen');
-    btn.textContent = screenSharing ? '🖥️ Sharing' : '🖥️ Share Screen';
-    btn.classList.toggle('active', screenSharing);
-  }
+    document.getElementById('btn-screen').textContent = screenSharing ? '🖥️ Sharing' : '🖥️ Share Screen';
+  });
 
-  // === Chat ===
-  function setupChat(){
+
+
+  function setupChat(isPublic){
     if(!currentRoom) return;
-    if(chatRef) chatRef.off();
-    
-    chatRef = db.ref('chat/' + currentRoom);
-    chatMessagesEl.innerHTML = '';
-    
-    chatRef.on('child_added', snap => {
-      const msg = snap.val();
-      if(!msg) return;
-      
-      if(msg.type === 'mute' && msg.target === uid) {
+    const chatRef=db.ref('chat/'+currentRoom);
+    chatRef.off();
+    chatRef.on('child_added',snap=>{
+      const msg=snap.val(); if(!msg) return;
+      if(msg.type === 'mute' && msg.target === uid){
         log('Muted by ' + msg.from);
         micEnabled = false;
-        if(localStream) localStream.getAudioTracks().forEach(t => t.enabled = false);
-        const btn = document.getElementById('btn-mic');
-        btn.textContent = '🔇 Mic Off';
-        btn.classList.remove('active');
-        
-        addChatMessage('system', 'You were muted by another participant');
-      } else if(msg.text) {
-        addChatMessage('user', msg.text, msg.from, msg.ts);
+        if(localStream) localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
+      }else if(msg.text){
+        const div=document.createElement('div'); div.textContent=`[${new Date(msg.ts).toLocaleTimeString()}] ${msg.from}: ${msg.text}`;
+        chatMessagesEl.appendChild(div); chatMessagesEl.scrollTop=chatMessagesEl.scrollHeight;
       }
     });
+    chatSendBtn.onclick=()=>{ const text=chatInputEl.value.trim(); if(!text) return; chatRef.push({from:uid,text,ts:Date.now()}); chatInputEl.value=''; };
   }
 
-  function addChatMessage(type, text, from, ts){
-    const div = document.createElement('div');
-    div.className = `chat-message ${type}`;
-    
-    if(type === 'system') {
-      div.textContent = text;
-    } else {
-      const time = ts ? new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
-      div.innerHTML = `<span class="time">${time}</span><span class="from">${from?.slice(0, 8) || 'Unknown'}</span>${escapeHtml(text)}`;
-    }
-    
-    // Remove empty state if present
-    const emptyState = chatMessagesEl.querySelector('.empty-state');
-    if(emptyState) emptyState.remove();
-    
-    chatMessagesEl.appendChild(div);
-    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-  }
-
-  function escapeHtml(text){
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  chatSendBtn.addEventListener('click', sendChat);
-  
-  function sendChat(){
-    const text = chatInputEl.value.trim();
-    if(!text || !currentRoom) return;
-    if(text.length > 500) {
-      log('Message too long', 'warning');
-      return;
-    }
-    chatRef.push({ from: uid, text, ts: Date.now() });
-    chatInputEl.value = '';
-  }
-
-  chatInputEl.addEventListener('keydown', e => {
-    if(e.ctrlKey && e.key === 'Enter') {
-      e.preventDefault();
-      sendChat();
-    }
+  // Private room controls
+  document.getElementById('room-join-code').addEventListener('click',()=>{
+    const code=document.getElementById('room-code-input').value.trim(); if(!code){ log('Enter room code'); return; }
+    renderRoomBox(code,false); joinRoom(code,false);
+  });
+  document.getElementById('room-create').addEventListener('click',()=>{
+    const code='ROOM-'+Math.random().toString(36).slice(2,8).toUpperCase();
+    document.getElementById('room-code-input').value=code;
+    renderRoomBox(code,false); joinRoom(code,false);
+    log('Created private room code: '+code);
   });
 
-  // === Keyboard Shortcuts ===
-  document.addEventListener('keydown', e => {
-    if(e.target.tagName === 'INPUT') return;
-    
-    if(e.code === 'Space' && currentRoom) {
-      e.preventDefault();
-      toggleMic();
-    }
-  });
+  // Handle join from URL
+  const params=new URLSearchParams(window.location.search); const roomFromLink=params.get('room');
+  if(roomFromLink){ renderRoomBox(roomFromLink,false); joinRoom(roomFromLink,false); }
 
-  // === Room Controls ===
-  document.getElementById('room-join-code').addEventListener('click', () => {
-    const code = document.getElementById('room-code-input').value.trim();
-    if(!code) {
-      log('Please enter a room code', 'warning');
-      return;
-    }
-    renderRoomBox(code, false);
-    joinRoom(code, false);
-  });
-
-  document.getElementById('room-create').addEventListener('click', () => {
-    const code = 'ROOM-' + Math.random().toString(36).slice(2, 8).toUpperCase();
-    document.getElementById('room-code-input').value = code;
-    renderRoomBox(code, false);
-    joinRoom(code, false);
-    log('Created private room: ' + code, 'success');
-  });
-
-  // Handle URL params
-  const params = new URLSearchParams(window.location.search);
-  const roomFromLink = params.get('room');
-  if(roomFromLink) {
-    renderRoomBox(roomFromLink, false);
-    joinRoom(roomFromLink, false);
-  }
-
-  // === Cleanup on page unload ===
-  window.addEventListener('beforeunload', () => {
-    if(roomRef && uid) {
-      roomRef.child(uid).remove();
-    }
-  });
-
-  window._vac = { joinRoom, disconnectCall, uid };
-  log('Client ready — uid: ' + uid.slice(0, 8));
+  window._vac={joinRoom,disconnectCall,uid};
+  log('Client ready — uid: '+uid);
 })();
 </script>
-<script src="/lib/fps.js"></script>
-<script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
 </body>
 </html>
