@@ -6,10 +6,14 @@ const crypto = require('crypto');
 const https = require('https');
 const unzipper = require('unzipper');
 const fse = require('fs-extra');
+const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
 const app = express();
 const PORT = 3000;
 
 const PUBLIC_DIR = path.join(__dirname, '');
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+const PHOTO_UPLOAD_DIR = path.join(UPLOADS_DIR, 'photos');
 const RESOURCE_KEY = Buffer.from('games-shell-v1');
 const ZIP_URL = 'https://github.com/Olibot1107/games-math/archive/refs/heads/main.zip';
 
@@ -52,7 +56,7 @@ function logSuccess(msg) {
     console.log(`${colors.green}[SUCCESS]${colors.reset} ${msg}`);
 }
 
-app.use(express.raw({ type: "*/*", limit: "90mb" }));
+app.use(express.raw({ type: ['application/json', 'application/vnd.api+json', 'text/plain'], limit: '90mb' }));
 app.use(cookieParser());
 
 app.use((req, res, next) => {
@@ -295,6 +299,69 @@ app.post('/api/resource', async (req, res) => {
     
     res.json({ files: results });
 });
+
+// Ensure uploads folder exists
+if (!fs.existsSync(PHOTO_UPLOAD_DIR)) fs.mkdirSync(PHOTO_UPLOAD_DIR, { recursive: true });
+
+const photoStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, PHOTO_UPLOAD_DIR),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `${uuidv4()}${ext}`);
+    }
+});
+
+const photoUpload = multer({
+    storage: photoStorage,
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('Only image uploads are allowed'), false);
+        }
+        cb(null, true);
+    },
+    limits: {
+        fileSize: 20 * 1024 * 1024,
+        files: 20
+    }
+});
+
+app.post('/api/photos/upload', photoUpload.array('photos', 20), (req, res) => {
+    const files = req.files || [];
+    if (!files.length) {
+        return res.status(400).json({ error: 'No photos uploaded' });
+    }
+
+    const uploaded = files.map(file => ({
+        originalName: file.originalname,
+        url: `/uploads/photos/${file.filename}`,
+        uploadedAt: Date.now()
+    }));
+
+    res.json({ success: true, photos: uploaded });
+});
+
+app.get('/api/photos', async (req, res) => {
+    try {
+        const names = await fs.promises.readdir(PHOTO_UPLOAD_DIR);
+        const photos = await Promise.all(names.map(async (filename) => {
+            const fullPath = path.join(PHOTO_UPLOAD_DIR, filename);
+            const stat = await fs.promises.stat(fullPath);
+            return {
+                originalName: filename,
+                url: `/uploads/photos/${filename}`,
+                uploadedAt: stat.mtimeMs
+            };
+        }));
+
+        photos.sort((a, b) => b.uploadedAt - a.uploadedAt);
+        res.json({ photos });
+    } catch (err) {
+        console.error('Failed to list photo uploads', err);
+        res.json({ photos: [] });
+    }
+});
+
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Cached HTML injection
 const htmlCache = new Map();

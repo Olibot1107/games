@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Photo Gallery</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+      color: #f8fafc;
+    }
+    .photo-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+  </style>
+</head>
+
+<body class="min-h-screen p-6">
+
+<div class="max-w-5xl mx-auto">
+
+  <header class="mb-6 rounded-3xl bg-slate-900/80 border border-slate-700 p-6">
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <h1 class="text-3xl font-bold">Photo Gallery</h1>
+
+      <label class="cursor-pointer rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white">
+        Upload Images
+        <input id="photo-input" type="file" accept="image/*" multiple class="sr-only" />
+      </label>
+    </div>
+
+    <p class="mt-3 text-sm text-slate-400">
+      <span id="photo-count">0</span> photos uploaded
+    </p>
+
+    <!-- Progress bar -->
+    <div class="mt-4 w-full bg-slate-700 rounded-full h-3 overflow-hidden">
+      <div id="progress-bar" class="bg-emerald-400 h-3 w-0 transition-all"></div>
+    </div>
+  </header>
+
+  <section id="gallery" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"></section>
+
+</div>
+
+<script>
+  const inputEl = document.getElementById('photo-input');
+  const galleryEl = document.getElementById('gallery');
+  const countEl = document.getElementById('photo-count');
+  const progressBar = document.getElementById('progress-bar');
+
+  function uploadPhotos(files) {
+    if (!files.length) return;
+
+    const formData = new FormData();
+
+    [...files].forEach(file => {
+      if (file.type.startsWith('image/')) {
+        formData.append('photos', file);
+      }
+    });
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/photos/upload');
+
+    // progress handler
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = (event.loaded / event.total) * 100;
+        progressBar.style.width = percent + '%';
+      }
+    };
+
+    xhr.onload = () => {
+      progressBar.style.width = '0%';
+      inputEl.value = '';
+      loadGallery();
+    };
+
+    xhr.send(formData);
+  }
+
+  async function loadGallery() {
+    const res = await fetch('/api/photos');
+    const data = await res.json();
+
+    const photos = data.photos || [];
+
+    galleryEl.innerHTML = '';
+    countEl.textContent = photos.length;
+
+    photos.forEach(photo => {
+      const card = document.createElement('div');
+      card.className = 'photo-card rounded-2xl overflow-hidden';
+
+      card.innerHTML = `
+        <img src="${photo.url}" class="h-64 w-full" />
+        <div class="p-3 text-sm truncate">
+          ${photo.originalName}
+        </div>
+      `;
+
+      galleryEl.appendChild(card);
+    });
+  }
+
+  inputEl.addEventListener('change', (e) => {
+    uploadPhotos(e.target.files);
+  });
+
+  loadGallery();
+</script>
+
+</body>
+</html>
