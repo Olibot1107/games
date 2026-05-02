@@ -26,6 +26,8 @@ const DEBUG = process.env.DEBUG === 'true'; // run with: DEBUG=true node server.
 const colors = {
     reset: '\x1b[0m',
     bright: '\x1b[1m',
+
+    // text colors
     red: '\x1b[31m',
     green: '\x1b[32m',
     yellow: '\x1b[33m',
@@ -33,27 +35,29 @@ const colors = {
     magenta: '\x1b[35m',
     cyan: '\x1b[36m',
     white: '\x1b[37m',
+    black: '\x1b[30m',
+
+    // background colors
+    bgBlack: '\x1b[40m',
     bgRed: '\x1b[41m',
     bgGreen: '\x1b[42m',
     bgYellow: '\x1b[43m',
-    bgBlue: '\x1b[44m'
+    bgBlue: '\x1b[44m',
+    bgMagenta: '\x1b[45m',
+    bgCyan: '\x1b[46m',
+    bgWhite: '\x1b[47m',
 };
 
-// Colored logging functions
-function log(msg, color = 'white') {
-    console.log(`${colors[color]}[SERVER]${colors.reset}`, msg);
-}
-
-function logError(msg) {
-    console.log(`${colors.bgRed}${colors.bright} ERROR ${colors.reset} ${colors.red}${msg}${colors.reset}`);
-}
-
 function logInfo(msg) {
-    console.log(`${colors.cyan}[INFO]${colors.reset} ${msg}`);
+    console.log(`${colors.bgCyan}${colors.black} INFO ${colors.reset} ${msg}`);
 }
 
 function logSuccess(msg) {
-    console.log(`${colors.green}[SUCCESS]${colors.reset} ${msg}`);
+    console.log(`${colors.bgGreen}${colors.black} SUCCESS ${colors.reset} ${msg}`);
+}
+
+function logError(msg) {
+    console.log(`${colors.bgRed}${colors.white} ERROR ${colors.reset} ${msg}`);
 }
 
 app.use(express.raw({ type: ['application/json', 'application/vnd.api+json', 'text/plain'], limit: '90mb' }));
@@ -718,12 +722,15 @@ async function setupMathRepo() {
 }
 
 app.listen(PORT, () => {
-    console.log(`
-${colors.bright}${colors.cyan}╔══════════════════════════════════════╗
-║     SERVER STARTED SUCCESSFULLY      ║
-╚══════════════════════════════════════╝${colors.reset}
-${colors.green}➜${colors.reset} Running on: ${colors.bright}http://localhost:${PORT}${colors.reset}
-${colors.green}➜${colors.reset} XOR Key: ${colors.bright}${RESOURCE_KEY.toString()}${colors.reset}
-    `);
+    console.log(`${colors.cyan}${colors.bright}
+╭────────────────────────────────────────╮
+│          SERVER STATUS PANEL           │
+├────────────────────────────────────────┤
+│  Status :  ONLINE                      │
+│  URL    :  http://localhost:${PORT}       │
+│  Key    :  ${RESOURCE_KEY.toString()}              │
+╰────────────────────────────────────────╯
+${colors.reset}`);
+
     setupMathRepo();
 });
