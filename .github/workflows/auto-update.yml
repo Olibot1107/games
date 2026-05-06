@@ -22,8 +22,8 @@ jobs:
       - name: Run list.js
         run: node auto/list.js
 
-      - name: Run html.js
-        run: node auto/scripts.js
+      - name: Run scripts.js
+        run: node auto/scripts.js ..
       
       - name: Run title.js
         run: node auto/title.js
