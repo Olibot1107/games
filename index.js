@@ -63,7 +63,7 @@ function logError(msg) {
 
 app.use(express.raw({ type: ['application/json', 'application/vnd.api+json', 'text/plain'], limit: '90mb' }));
 app.use(cookieParser());
-app.use(health.ping());
+app.use(health.ping('/api/ping'));
 
 app.use((req, res, next) => {
     if (!DEBUG) return next();
