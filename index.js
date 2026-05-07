@@ -1,4 +1,5 @@
 const express = require('express');
+const health = require('express-ping');
 const fs = require('fs');
 const path = require('path');
 const cookieParser = require('cookie-parser');
@@ -62,6 +63,7 @@ function logError(msg) {
 
 app.use(express.raw({ type: ['application/json', 'application/vnd.api+json', 'text/plain'], limit: '90mb' }));
 app.use(cookieParser());
+app.use(health.ping());
 
 app.use((req, res, next) => {
     if (!DEBUG) return next();
