@@ -28,6 +28,9 @@ jobs:
       - name: Run title.js
         run: node auto/title.js
 
+      - name: Run npm i
+        run: npm i
+
       - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
