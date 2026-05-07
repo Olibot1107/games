@@ -23,6 +23,26 @@ if(!localStorage.getItem('uid')){
 }
 const uid = localStorage.getItem('uid');
 const clientId = getClientId();
+
+// Check for reload from game
+if (performance.getEntriesByType('navigation')[0].type === 'reload' && document.referrer) {
+    try {
+        const url = new URL(document.referrer);
+        const match = url.pathname.match(/^\/good\/([^\/]+)\/index\.html$/);
+        if (match) {
+            const game = match[1];
+            fetch('/api/plays', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ game, clientId })
+            }).then(() => {
+                fetchPlayCounts();
+            }).catch(() => {});
+        }
+    } catch (e) {
+        // ignore
+    }
+}
 const RESOURCE_KEY = new TextEncoder().encode('games-shell-v1');
 
 function getCookie(name) {
@@ -245,7 +265,13 @@ function renderGames(){
     filtered.sort((a,b)=>{
         const aV = voteData[a.name] || {up:0,down:0};
         const bV = voteData[b.name] || {up:0,down:0};
-        return (bV.up - bV.down) - (aV.up - aV.down);
+        const aComments = commentData[a.name]?.count || 0;
+        const bComments = commentData[b.name]?.count || 0;
+        const aPlays = playData[a.name] || 0;
+        const bPlays = playData[b.name] || 0;
+        const aScore = (aV.up - aV.down) + aComments + Math.floor(aPlays / 30);
+        const bScore = (bV.up - bV.down) + bComments + Math.floor(bPlays / 30);
+        return bScore - aScore;
     });
 
     gamesList.innerHTML = '';
@@ -824,7 +850,7 @@ function createCommentElement(comment, replies = []) {
     return item;
 }
 
-function submitComment(parentId = null){
+function submitComment(parentId = null, retryCount = 0){
     const textInput = document.getElementById('comments-input');
     const feedback = document.getElementById('comments-feedback');
     const submitButton = document.getElementById('comments-submit');
@@ -887,10 +913,15 @@ function submitComment(parentId = null){
                 feedback.textContent = 'Comment posted successfully.';
                 feedback.className = 'text-xs text-green-600';
             } else {
-                feedback.textContent = result.error || 'Comment failed.';
-                feedback.className = 'text-xs text-red-500';
+                throw new Error(result.error || 'Comment failed.');
             }
         } catch (error) {
+            if (retryCount < 1) {
+                feedback.textContent = 'Posting failed, retrying...';
+                feedback.className = 'text-xs text-yellow-600';
+                setTimeout(() => submitComment(parentId, retryCount + 1), 2000);
+                return;
+            }
             feedback.textContent = 'Unable to post comment: ' + error.message;
             feedback.className = 'text-xs text-red-500';
             log('Comment submit error: ' + error.message);
@@ -906,26 +937,43 @@ function submitComment(parentId = null){
 function deleteComment(commentId){
     if (!currentCommentGame || !commentId) return;
 
-    fetch('/api/comments', {
-        method: 'DELETE',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-            game: currentCommentGame,
-            id: commentId,
-            uid
-        })
+    fetchEncryptedJson('comments.json')
+    .then(data => {
+        const comments = (data && data[currentCommentGame]) || [];
+        const toDelete = [commentId];
+        const findReplies = (parentId) => {
+            comments.forEach(c => {
+                if (c.parentId === parentId) {
+                    toDelete.push(c.id);
+                    findReplies(c.id);
+                }
+            });
+        };
+        findReplies(commentId);
+
+        const deletePromises = toDelete.map(id =>
+            fetch('/api/comments', {
+                method: 'DELETE',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    game: currentCommentGame,
+                    id,
+                    uid
+                })
+            }).then(r => r.json())
+        );
+        return Promise.all(deletePromises);
     })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
+    .then(results => {
+        if (results.every(r => r.success)) {
             fetchCommentCounts();
             loadComments(currentCommentGame);
-            log('Comment deleted');
+            log('Comment and replies deleted');
         } else {
-            log(result.error || 'Unable to delete comment');
+            log('Some deletes failed');
         }
     })
-    .catch(e => log('Delete comment error: ' + e.message));
+    .catch(e => log('Delete error: ' + e.message));
 }
 
 function voteComment(game, commentId, voter) {
