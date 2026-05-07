@@ -762,10 +762,10 @@ function createCommentElement(comment, replies = []) {
     item.className = 'p-3 border rounded-lg bg-slate-50 mb-3';
 
     const header = document.createElement('div');
-    header.className = 'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-slate-500 mb-2 min-w-0';
+    header.className = 'flex items-start justify-between gap-2 text-xs text-slate-500 mb-2';
 
     const authorTime = document.createElement('div');
-    authorTime.className = 'space-x-2 flex flex-wrap items-center min-w-0';
+    authorTime.className = 'space-x-2 flex items-center';
     const voteCount = comment.votes ? Object.values(comment.votes).filter(v => v === 'up').length : 0;
     authorTime.innerHTML = `
         <span class="font-semibold text-slate-700">${escapeHtml(isOwnComment ? 'You' : (comment.author || 'Guest'))}</span>
@@ -775,7 +775,7 @@ function createCommentElement(comment, replies = []) {
     `;
 
     const actions = document.createElement('div');
-    actions.className = 'flex flex-wrap gap-2';
+    actions.className = 'flex gap-2';
 
     // Upvote button
     const upvoteBtn = document.createElement('button');
@@ -812,7 +812,7 @@ function createCommentElement(comment, replies = []) {
     header.appendChild(actions);
 
     const textDiv = document.createElement('div');
-    textDiv.className = 'text-sm text-slate-800 mb-2 whitespace-pre-wrap break-words';
+    textDiv.className = 'text-sm text-slate-800 mb-2';
     textDiv.textContent = comment.text;
 
     // Add images if any
@@ -822,7 +822,7 @@ function createCommentElement(comment, replies = []) {
         comment.images.forEach(imageUrl => {
             const img = document.createElement('img');
             img.src = imageUrl;
-            img.className = 'max-w-full max-h-32 object-cover rounded border cursor-pointer';
+            img.className = 'max-w-32 max-h-32 object-cover rounded border cursor-pointer';
             img.onclick = () => window.open(imageUrl, '_blank');
             imagesDiv.appendChild(img);
         });
