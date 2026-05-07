@@ -309,8 +309,19 @@ app.post('/api/resource', async (req, res) => {
 // Ensure uploads folder exists
 if (!fs.existsSync(PHOTO_UPLOAD_DIR)) fs.mkdirSync(PHOTO_UPLOAD_DIR, { recursive: true });
 
+const COMMENTS_UPLOAD_DIR = path.join(UPLOADS_DIR, 'comments');
+if (!fs.existsSync(COMMENTS_UPLOAD_DIR)) fs.mkdirSync(COMMENTS_UPLOAD_DIR, { recursive: true });
+
 const photoStorage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, PHOTO_UPLOAD_DIR),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `${uuidv4()}${ext}`);
+    }
+});
+
+const commentStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, COMMENTS_UPLOAD_DIR),
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase();
         cb(null, `${uuidv4()}${ext}`);
@@ -331,6 +342,20 @@ const photoUpload = multer({
     }
 });
 
+const commentUpload = multer({
+    storage: commentStorage,
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('Only image uploads are allowed'), false);
+        }
+        cb(null, true);
+    },
+    limits: {
+        fileSize: 10 * 1024 * 1024,
+        files: 5
+    }
+});
+
 app.post('/api/photos/upload', photoUpload.array('photos', 20), (req, res) => {
     const files = req.files || [];
     if (!files.length) {
@@ -340,6 +365,21 @@ app.post('/api/photos/upload', photoUpload.array('photos', 20), (req, res) => {
     const uploaded = files.map(file => ({
         originalName: file.originalname,
         url: `/uploads/photos/${file.filename}`,
+        uploadedAt: Date.now()
+    }));
+
+    res.json({ success: true, photos: uploaded });
+});
+
+app.post('/api/comments/upload', commentUpload.array('photos', 5), (req, res) => {
+    const files = req.files || [];
+    if (!files.length) {
+        return res.status(400).json({ error: 'No images uploaded' });
+    }
+
+    const uploaded = files.map(file => ({
+        originalName: file.originalname,
+        url: `/uploads/comments/${file.filename}`,
         uploadedAt: Date.now()
     }));
 
@@ -571,8 +611,8 @@ app.post('/api/comments', (req, res) => {
     const data = parseJsonBody(req);
     if (!data) return res.status(400).json({ error: 'Invalid JSON' });
 
-    const { game, text, uid, author } = data;
-    if (!game || !text || !uid) {
+    const { game, text, uid, author, clientId, parentId, images } = data;
+    if (!game || !text || !uid || !clientId) {
         return res.status(400).json({ error: 'Invalid payload' });
     }
 
@@ -584,13 +624,76 @@ app.post('/api/comments', (req, res) => {
     const comments = readComments();
     if (!comments[game]) comments[game] = [];
 
-    comments[game].push({
-        id: crypto.randomBytes(8).toString('hex'),
+    // Check if trying to reply to a reply (only one level allowed)
+    if (parentId && typeof parentId === 'string') {
+        const parentComment = comments[game].find(c => c.id === parentId);
+        if (!parentComment) {
+            return res.status(400).json({ error: 'Parent comment not found' });
+        }
+        if (parentComment.parentId) {
+            return res.status(400).json({ error: 'Cannot reply to a reply' });
+        }
+    }
+
+    const ts = Date.now();
+    const id = `${clientId}_${ts}`;
+
+    const commentData = {
+        id,
         uid,
         author: author ? author.toString().slice(0, 32) : `User-${uid.slice(0, 6)}`,
         text: trimmedText,
-        ts: Date.now()
-    });
+        ts,
+        images: Array.isArray(images) ? images.slice(0, 5) : [], // Limit to 5 images
+        votes: {} // Track upvotes
+    };
+
+    // Only add parentId if it's a valid string (not null or undefined)
+    if (typeof parentId === 'string') {
+        commentData.parentId = parentId;
+    }
+
+    comments[game].push(commentData);
+
+    writeComments(comments);
+    res.json({ success: true, id });
+});
+
+app.put('/api/comments', (req, res) => {
+    const data = parseJsonBody(req);
+    if (!data) return res.status(400).json({ error: 'Invalid JSON' });
+
+    const { game, id, text, uid, images } = data;
+    if (!game || !id || !text || !uid) {
+        return res.status(400).json({ error: 'Invalid payload' });
+    }
+
+    const trimmedText = text.toString().trim();
+    if (trimmedText.length < 1 || trimmedText.length > 300) {
+        return res.status(400).json({ error: 'Comment must be 1-300 characters' });
+    }
+
+    const comments = readComments();
+    const gameComments = comments[game];
+    if (!Array.isArray(gameComments)) {
+        return res.status(404).json({ error: 'Comment not found' });
+    }
+
+    const comment = gameComments.find(c => c.id === id);
+    if (!comment) {
+        return res.status(404).json({ error: 'Comment not found' });
+    }
+    if (comment.uid !== uid) {
+        return res.status(403).json({ error: 'Not allowed' });
+    }
+
+    comment.text = trimmedText;
+    comment.edited = true;
+    comment.editedTs = Date.now();
+    if (Array.isArray(images)) {
+        comment.images = images.slice(0, 5);
+    }
+    // If images not provided, keep existing
 
     writeComments(comments);
     res.json({ success: true });
@@ -621,6 +724,42 @@ app.delete('/api/comments', (req, res) => {
 
     gameComments.splice(index, 1);
     comments[game] = gameComments;
+    writeComments(comments);
+    res.json({ success: true });
+});
+
+app.post('/api/comments/vote', (req, res) => {
+    const data = parseJsonBody(req);
+    if (!data) return res.status(400).json({ error: 'Invalid JSON' });
+
+    const { game, commentId, uid } = data;
+    if (!game || !commentId || !uid) {
+        return res.status(400).json({ error: 'Invalid payload' });
+    }
+
+    const comments = readComments();
+    const gameComments = comments[game];
+    if (!Array.isArray(gameComments)) {
+        return res.status(404).json({ error: 'Comment not found' });
+    }
+
+    const comment = gameComments.find(c => c.id === commentId);
+    if (!comment) {
+        return res.status(404).json({ error: 'Comment not found' });
+    }
+
+    // Initialize votes object if it doesn't exist
+    if (!comment.votes) {
+        comment.votes = {};
+    }
+
+    // Toggle vote: if user already voted 'up', remove it; otherwise set to 'up'
+    if (comment.votes[uid] === 'up') {
+        delete comment.votes[uid];
+    } else {
+        comment.votes[uid] = 'up';
+    }
+
     writeComments(comments);
     res.json({ success: true });
 });

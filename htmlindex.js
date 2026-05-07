@@ -14,6 +14,7 @@ let currentCommentGame = null;
 const COMMENT_MIN_LENGTH = 1;
 const COMMENT_MAX_LENGTH = 300;
 let isSubmittingComment = false;
+let selectedImages = [];
 const CLIENT_ID_COOKIE = 'clientID';
 
 // UID
@@ -413,6 +414,21 @@ function escapeHtml(text){
     return div.innerHTML;
 }
 
+function timeAgo(timestamp) {
+    const now = Date.now();
+    const diff = now - timestamp;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (seconds < 60) return seconds === 1 ? '1s ago' : `${seconds}s ago`;
+    if (minutes < 60) return minutes === 1 ? '1m ago' : `${minutes}m ago`;
+    if (hours < 24) return hours === 1 ? '1h ago' : `${hours}h ago`;
+    if (days < 7) return days === 1 ? '1d ago' : `${days}d ago`;
+    return new Date(timestamp).toLocaleDateString();
+}
+
 function openCommentPanel(game){
     currentCommentGame = game;
     const modal = document.getElementById('comments-modal');
@@ -427,6 +443,8 @@ function openCommentPanel(game){
     countLabel.textContent = 'Loading comments...';
     feedback.textContent = '';
     input.value = '';
+    selectedImages = [];
+    updateImagePreview();
     updateCommentInputHint(0);
     modal.classList.remove('hidden');
     loadComments(game);
@@ -436,6 +454,8 @@ function closeCommentPanel(){
     const modal = document.getElementById('comments-modal');
     if (!modal) return;
     modal.classList.add('hidden');
+    selectedImages = [];
+    updateImagePreview();
 }
 
 function loadComments(game){
@@ -457,25 +477,26 @@ function loadComments(game){
             return;
         }
 
-        comments.sort((a,b)=>b.ts - a.ts).forEach(c => {
-            const isOwnComment = c.uid === uid;
-            const item = document.createElement('div');
-            item.className = 'p-3 border rounded-lg bg-slate-50';
-            item.innerHTML = `
-                <div class="flex items-start justify-between gap-2 text-xs text-slate-500 mb-2">
-                    <div class="space-x-2">
-                        <span class="font-semibold text-slate-700">${escapeHtml(isOwnComment ? 'You' : (c.author || 'Guest'))}</span>
-                        <span>${new Date(c.ts).toLocaleString()}</span>
-                    </div>
-                    ${isOwnComment ? '<button data-comment-id="' + escapeHtml(c.id) + '" class="comments-delete text-red-500 text-xs hover:underline">Delete</button>' : ''}
-                </div>
-                <div class="text-sm text-slate-800">${escapeHtml(c.text)}</div>
-            `;
-            list.appendChild(item);
+        // Group comments by parentId
+        const topLevelComments = [];
+        const replies = {};
+
+        comments.forEach(c => {
+            const parentId = (c.parentId && typeof c.parentId === 'string') ? c.parentId : null;
+            if (parentId) {
+                if (!replies[parentId]) replies[parentId] = [];
+                replies[parentId].push(c);
+            } else {
+                topLevelComments.push(c);
+            }
         });
 
-        list.querySelectorAll('.comments-delete').forEach(btn => {
-            btn.addEventListener('click', () => deleteComment(btn.dataset.commentId));
+        // Sort top-level comments by timestamp (newest first)
+        topLevelComments.sort((a,b)=>b.ts - a.ts);
+
+        topLevelComments.forEach(c => {
+            const commentElement = createCommentElement(c, replies[c.id] || []);
+            list.appendChild(commentElement);
         });
     })
     .catch(e=>{
@@ -484,7 +505,326 @@ function loadComments(game){
     });
 }
 
-function submitComment(){
+function startEditComment(commentId, commentElement) {
+    const textDiv = commentElement.querySelector('.text-sm');
+    if (!textDiv) return;
+
+    const currentText = textDiv.textContent;
+    const input = document.createElement('textarea');
+    input.value = currentText;
+    input.rows = 3;
+    input.className = 'w-full rounded border border-slate-300 px-2 py-1 text-sm';
+    input.maxLength = COMMENT_MAX_LENGTH;
+
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'Save';
+    saveBtn.className = 'bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 mr-2';
+    saveBtn.onclick = () => saveEditComment(commentId, input.value.trim(), commentElement, textDiv, input, actionsDiv);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.className = 'bg-gray-500 text-white text-xs px-3 py-1 rounded hover:bg-gray-600';
+    cancelBtn.onclick = () => cancelEdit(textDiv, input, actionsDiv);
+
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'mt-2';
+    actionsDiv.appendChild(saveBtn);
+    actionsDiv.appendChild(cancelBtn);
+
+    textDiv.replaceWith(input);
+    input.focus();
+    input.parentNode.appendChild(actionsDiv);
+}
+
+function saveEditComment(commentId, newText, commentElement, originalTextDiv, input, actionsDiv) {
+    if (newText.length < COMMENT_MIN_LENGTH || newText.length > COMMENT_MAX_LENGTH) {
+        alert('Comment must be 1-300 characters');
+        return;
+    }
+
+    const body = {
+        game: currentCommentGame,
+        id: commentId,
+        text: newText,
+        uid
+    };
+
+    fetch('/api/comments', {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            originalTextDiv.textContent = newText;
+            cancelEdit(originalTextDiv, input, actionsDiv);
+            fetchCommentCounts();
+            loadComments(currentCommentGame);
+        } else {
+            alert(result.error || 'Failed to edit comment');
+        }
+    })
+    .catch(e => {
+        alert('Unable to edit comment');
+        log('Edit comment error: ' + e.message);
+    });
+}
+
+function cancelEdit(originalTextDiv, input, actionsDiv) {
+    input.replaceWith(originalTextDiv);
+    actionsDiv.remove();
+}
+
+function startReplyComment(parentId, commentElement) {
+    // Find the parent comment to display who we're replying to
+    let parentComment = null;
+    fetchEncryptedJson('comments.json')
+    .then(data => {
+        const comments = (data && data[currentCommentGame]) || [];
+        parentComment = comments.find(c => c.id === parentId);
+        
+        const replyInput = document.createElement('div');
+        replyInput.className = 'mt-3 ml-6 p-3 border-l-4 border-green-400 rounded bg-green-50';
+        
+        let parentPreview = '';
+        if (parentComment) {
+            const parentAuthor = parentComment.uid === uid ? 'You' : (parentComment.author || 'Guest');
+            const textPreview = parentComment.text.slice(0, 50) + (parentComment.text.length > 50 ? '...' : '');
+            parentPreview = `<div class="text-xs text-slate-600 mb-2 bg-white p-2 rounded border-l-2 border-green-400"><strong>Replying to ${escapeHtml(parentAuthor)}:</strong> ${escapeHtml(textPreview)}</div>`;
+        }
+        
+        replyInput.innerHTML = `
+            ${parentPreview}
+            <textarea rows="3" maxlength="300" class="w-full rounded border border-slate-300 px-2 py-1 text-sm mb-2 reply-textarea" placeholder="Write a reply..."></textarea>
+            <div class="mb-2">
+                <input type="file" accept="image/*" multiple class="w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-green-100 file:text-green-700 reply-images">
+                <div class="flex flex-wrap gap-2 mt-1 reply-preview"></div>
+            </div>
+            <div class="flex gap-2">
+                <button class="bg-green-600 text-white text-xs px-3 py-1 rounded hover:bg-green-700 reply-submit">Reply</button>
+                <button class="bg-gray-500 text-white text-xs px-3 py-1 rounded hover:bg-gray-600 reply-cancel">Cancel</button>
+            </div>
+        `;
+
+        const textarea = replyInput.querySelector('.reply-textarea');
+        const imageInput = replyInput.querySelector('.reply-images');
+        const submitBtn = replyInput.querySelector('.reply-submit');
+        const cancelBtn = replyInput.querySelector('.reply-cancel');
+        const preview = replyInput.querySelector('.reply-preview');
+        let replyImages = [];
+
+        imageInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            const maxSize = 5 * 1024 * 1024;
+            
+            const validFiles = files.filter(file => {
+                if (!file.type.startsWith('image/')) return false;
+                if (file.size > maxSize) return false;
+                return true;
+            });
+            
+            replyImages = validFiles;
+            updateReplyPreview(preview, replyImages);
+        });
+
+        submitBtn.onclick = async () => {
+            const text = textarea.value.trim();
+            if (text.length < COMMENT_MIN_LENGTH) {
+                alert('Type a reply before submitting.');
+                return;
+            }
+            if (text.length > COMMENT_MAX_LENGTH) {
+                alert(`Replies are limited to ${COMMENT_MAX_LENGTH} characters.`);
+                return;
+            }
+
+            submitReply(text, parentId, replyInput, replyImages);
+        };
+
+        cancelBtn.onclick = () => replyInput.remove();
+
+        commentElement.appendChild(replyInput);
+        textarea.focus();
+    })
+    .catch(e => {
+        log('Error loading parent comment: ' + e.message);
+    });
+}
+
+function updateReplyPreview(preview, images) {
+    preview.innerHTML = '';
+    images.forEach((file, index) => {
+        const item = document.createElement('div');
+        item.className = 'relative inline-block';
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.className = 'w-12 h-12 object-cover rounded border';
+        const btn = document.createElement('button');
+        btn.className = 'absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-4 h-4 text-xs';
+        btn.textContent = '×';
+        btn.onclick = (e) => {
+            e.preventDefault();
+            images.splice(index, 1);
+            updateReplyPreview(preview, images);
+        };
+        item.appendChild(img);
+        item.appendChild(btn);
+        preview.appendChild(item);
+    });
+}
+
+function submitReply(text, parentId, replyInput, replyImages) {
+    if (isSubmittingComment) return;
+    isSubmittingComment = true;
+
+    (async () => {
+        try {
+            let imageUrls = [];
+            if (replyImages && replyImages.length > 0) {
+                const formData = new FormData();
+                replyImages.forEach(file => formData.append('photos', file));
+                
+                const response = await fetch('/api/comments/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    imageUrls = result.photos.map(photo => photo.url);
+                } else {
+                    throw new Error(result.error || 'Image upload failed');
+                }
+            }
+
+            const response = await fetch('/api/comments', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    game: currentCommentGame,
+                    text,
+                    uid,
+                    author: `Guest-${uid.slice(0,6)}`,
+                    clientId,
+                    parentId,
+                    images: imageUrls
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                fetchCommentCounts();
+                loadComments(currentCommentGame);
+                replyInput.remove();
+            } else {
+                alert(result.error || 'Reply failed.');
+            }
+        } catch (error) {
+            alert('Unable to post reply: ' + error.message);
+            log('Reply submit error: ' + error.message);
+        } finally {
+            isSubmittingComment = false;
+        }
+    })();
+}
+
+function createCommentElement(comment, replies = []) {
+    const isOwnComment = comment.uid === uid;
+    const isReply = comment.parentId && typeof comment.parentId === 'string';
+    const item = document.createElement('div');
+    item.className = 'p-3 border rounded-lg bg-slate-50 mb-3';
+
+    const header = document.createElement('div');
+    header.className = 'flex items-start justify-between gap-2 text-xs text-slate-500 mb-2';
+
+    const authorTime = document.createElement('div');
+    authorTime.className = 'space-x-2 flex items-center';
+    const voteCount = comment.votes ? Object.values(comment.votes).filter(v => v === 'up').length : 0;
+    authorTime.innerHTML = `
+        <span class="font-semibold text-slate-700">${escapeHtml(isOwnComment ? 'You' : (comment.author || 'Guest'))}</span>
+        <span>${timeAgo(comment.ts)}</span>
+        ${comment.edited ? '<span class="text-slate-400">(edited)</span>' : ''}
+        <span class="text-slate-600">👍 ${voteCount}</span>
+    `;
+
+    const actions = document.createElement('div');
+    actions.className = 'flex gap-2';
+
+    // Upvote button
+    const upvoteBtn = document.createElement('button');
+    const userVote = comment.votes && comment.votes[uid];
+    upvoteBtn.textContent = userVote === 'up' ? '👍' : '🤍';
+    upvoteBtn.className = userVote === 'up' ? 'text-blue-500 text-xs hover:underline font-bold' : 'text-slate-400 text-xs hover:text-blue-500';
+    upvoteBtn.onclick = () => voteComment(currentCommentGame, comment.id, uid);
+    actions.appendChild(upvoteBtn);
+
+    if (isOwnComment) {
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.className = 'text-blue-500 text-xs hover:underline';
+        editBtn.onclick = () => startEditComment(comment.id, item);
+        actions.appendChild(editBtn);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.className = 'text-red-500 text-xs hover:underline';
+        deleteBtn.onclick = () => deleteComment(comment.id);
+        actions.appendChild(deleteBtn);
+    }
+
+    // Only add reply button if this is not already a reply
+    if (!isReply) {
+        const replyBtn = document.createElement('button');
+        replyBtn.textContent = 'Reply';
+        replyBtn.className = 'text-green-500 text-xs hover:underline';
+        replyBtn.onclick = () => startReplyComment(comment.id, item);
+        actions.appendChild(replyBtn);
+    }
+
+    header.appendChild(authorTime);
+    header.appendChild(actions);
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'text-sm text-slate-800 mb-2';
+    textDiv.textContent = comment.text;
+
+    // Add images if any
+    if (comment.images && comment.images.length > 0) {
+        const imagesDiv = document.createElement('div');
+        imagesDiv.className = 'flex flex-wrap gap-2 mb-2';
+        comment.images.forEach(imageUrl => {
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.className = 'max-w-32 max-h-32 object-cover rounded border cursor-pointer';
+            img.onclick = () => window.open(imageUrl, '_blank');
+            imagesDiv.appendChild(img);
+        });
+        textDiv.appendChild(imagesDiv);
+    }
+
+    item.appendChild(header);
+    item.appendChild(textDiv);
+
+    // Add replies
+    if (replies.length > 0) {
+        replies.sort((a,b)=>a.ts - b.ts); // Oldest first for replies
+        const repliesContainer = document.createElement('div');
+        repliesContainer.className = 'ml-6 mt-3 space-y-2 border-l-2 border-slate-200 pl-4';
+
+        replies.forEach(reply => {
+            const replyElement = createCommentElement(reply, []); // Replies don't have nested replies for now
+            replyElement.className = 'p-2 border rounded bg-slate-100';
+            repliesContainer.appendChild(replyElement);
+        });
+
+        item.appendChild(repliesContainer);
+    }
+
+    return item;
+}
+
+function submitComment(parentId = null){
     const textInput = document.getElementById('comments-input');
     const feedback = document.getElementById('comments-feedback');
     const submitButton = document.getElementById('comments-submit');
@@ -508,40 +848,58 @@ function submitComment(){
     submitButton.textContent = 'Posting...';
     feedback.textContent = '';
 
-    fetch('/api/comments', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-            game: currentCommentGame,
-            text,
-            uid,
-            author: `Guest-${uid.slice(0,6)}`
-        })
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            fetchCommentCounts();
-            loadComments(currentCommentGame);
-            textInput.value = '';
-            updateCommentInputHint(0);
-            feedback.textContent = 'Comment posted successfully.';
-            feedback.className = 'text-xs text-green-600';
-        } else {
-            feedback.textContent = result.error || 'Comment failed.';
+    (async () => {
+        try {
+            let imageUrls = [];
+            if (selectedImages.length > 0) {
+                try {
+                    feedback.textContent = 'Uploading images...';
+                    imageUrls = await uploadImages();
+                } catch (imgError) {
+                    feedback.textContent = 'Warning: Image upload failed, posting comment without images.';
+                    feedback.className = 'text-xs text-yellow-600';
+                    imageUrls = [];
+                }
+            }
+
+            const response = await fetch('/api/comments', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    game: currentCommentGame,
+                    text,
+                    uid,
+                    author: `Guest-${uid.slice(0,6)}`,
+                    clientId,
+                    parentId: parentId || null,
+                    images: imageUrls
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                fetchCommentCounts();
+                loadComments(currentCommentGame);
+                textInput.value = '';
+                selectedImages = [];
+                updateImagePreview();
+                updateCommentInputHint(0);
+                feedback.textContent = 'Comment posted successfully.';
+                feedback.className = 'text-xs text-green-600';
+            } else {
+                feedback.textContent = result.error || 'Comment failed.';
+                feedback.className = 'text-xs text-red-500';
+            }
+        } catch (error) {
+            feedback.textContent = 'Unable to post comment: ' + error.message;
             feedback.className = 'text-xs text-red-500';
+            log('Comment submit error: ' + error.message);
+        } finally {
+            isSubmittingComment = false;
+            submitButton.disabled = false;
+            submitButton.textContent = 'Submit';
         }
-    })
-    .catch(e => {
-        feedback.textContent = 'Unable to post comment.';
-        feedback.className = 'text-xs text-red-500';
-        log('Comment submit error: ' + e.message);
-    })
-    .finally(() => {
-        isSubmittingComment = false;
-        submitButton.disabled = false;
-        submitButton.textContent = 'Submit';
-    });
+    })();
 }
 
 // ================= VOTE =================
@@ -568,6 +926,27 @@ function deleteComment(commentId){
         }
     })
     .catch(e => log('Delete comment error: ' + e.message));
+}
+
+function voteComment(game, commentId, voter) {
+    fetch('/api/comments/vote', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+            game,
+            commentId,
+            uid: voter
+        })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            loadComments(game);
+        } else {
+            log(result.error || 'Unable to vote');
+        }
+    })
+    .catch(e => log('Vote error: ' + e.message));
 }
 
 function sendVote(game, vote){
@@ -657,11 +1036,93 @@ if (commentsInput) {
     });
 }
 
+const commentsImages = document.getElementById('comments-images');
+if (commentsImages) {
+    commentsImages.addEventListener('change', handleImageSelection);
+}
+
 function updateCommentInputHint(length) {
     if (!commentsHint) return;
     const remaining = COMMENT_MAX_LENGTH - length;
     commentsHint.textContent = `${remaining} characters remaining`;
     commentsHint.className = remaining < 0 ? 'text-xs text-red-500' : 'text-xs text-slate-500';
+}
+
+function handleImageSelection(event) {
+    const files = Array.from(event.target.files);
+    const maxImages = 5;
+    const maxSize = 5 * 1024 * 1024; // 5MB per image
+
+    if (selectedImages.length + files.length > maxImages) {
+        alert(`You can only upload up to ${maxImages} images per comment.`);
+        return;
+    }
+
+    const validFiles = files.filter(file => {
+        if (!file.type.startsWith('image/')) {
+            alert(`${file.name} is not an image file.`);
+            return false;
+        }
+        if (file.size > maxSize) {
+            alert(`${file.name} is too large. Maximum size is 5MB.`);
+            return false;
+        }
+        return true;
+    });
+
+    selectedImages.push(...validFiles);
+    updateImagePreview();
+}
+
+function updateImagePreview() {
+    const preview = document.getElementById('comments-image-preview');
+    if (!preview) return;
+
+    preview.innerHTML = '';
+    selectedImages.forEach((file, index) => {
+        const item = document.createElement('div');
+        item.className = 'relative inline-block';
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.className = 'w-16 h-16 object-cover rounded border';
+        img.alt = 'Preview';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs hover:bg-red-600';
+        removeBtn.textContent = '×';
+        removeBtn.onclick = () => removeImage(index);
+
+        item.appendChild(img);
+        item.appendChild(removeBtn);
+        preview.appendChild(item);
+    });
+}
+
+// Make removeImage global for onclick
+window.removeImage = removeImage;
+
+async function uploadImages() {
+    if (selectedImages.length === 0) return [];
+
+    const formData = new FormData();
+    selectedImages.forEach(file => formData.append('photos', file));
+
+    try {
+        const response = await fetch('/api/comments/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            return result.photos.map(photo => photo.url);
+        } else {
+            throw new Error(result.error || 'Upload failed');
+        }
+    } catch (error) {
+        console.error('Image upload error:', error);
+        throw error;
+    }
 }
 
 updateCommentInputHint(0);
