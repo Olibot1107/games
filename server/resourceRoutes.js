@@ -67,6 +67,9 @@ function createBatchProgressLogger(paths) {
     let rendered = false;
     let frameLines = 0;
     let singleRendered = false;
+    let renderQueued = false;
+    let renderTimer = null;
+    let lastSnapshot = '';
 
     const statusPills = {
         waiting: `${colors.bgYellow}${colors.black} waiting to read ${colors.reset}`,
@@ -108,76 +111,89 @@ function createBatchProgressLogger(paths) {
         return [header, ...rows];
     }
 
-    function renderSingle() {
-        const lines = buildLines();
+    function writeLines(lines) {
+        const snapshot = lines.join('\n');
+        if (snapshot === lastSnapshot) {
+            return;
+        }
+        lastSnapshot = snapshot;
 
         if (!isTty) {
             lines.forEach((line) => console.log(line));
             return;
         }
 
-        if (singleRendered) {
+        process.stdout.write(snapshot + '\n');
+        frameLines = lines.length;
+    }
+
+    function flushRender() {
+        renderQueued = false;
+        if (renderTimer) {
+            clearTimeout(renderTimer);
+            renderTimer = null;
+        }
+
+        if (isSingle && statuses[0] === 'waiting' && !details[0]) {
+            return;
+        }
+
+        const lines = buildLines();
+        if (!isSingle && !isTty) {
+            writeLines(lines);
+            return;
+        }
+
+        if (isSingle && singleRendered) {
             readline.moveCursor(process.stdout, 0, -2);
             readline.cursorTo(process.stdout, 0);
             readline.clearScreenDown(process.stdout);
-        }
-
-        process.stdout.write(lines.join('\n') + '\n');
-        singleRendered = true;
-    }
-
-    function renderFrame() {
-        if (isSingle) {
-            if (!singleRendered && statuses[0] === 'waiting' && !details[0]) {
-                return;
-            }
-            renderSingle();
-            return;
-        }
-
-        const lines = buildLines();
-
-        if (!isTty) {
-            lines.forEach((line) => console.log(line));
-            return;
-        }
-
-        if (rendered) {
+        } else if (!isSingle && rendered && frameLines > 0) {
             readline.moveCursor(process.stdout, 0, -frameLines);
             readline.cursorTo(process.stdout, 0);
             readline.clearScreenDown(process.stdout);
         }
 
-        process.stdout.write(lines.join('\n') + '\n');
+        writeLines(lines);
         rendered = true;
-        frameLines = lines.length;
+        if (isSingle) {
+            singleRendered = true;
+        }
+    }
+
+    function scheduleRender() {
+        if (renderQueued) {
+            return;
+        }
+        renderQueued = true;
+        renderTimer = setTimeout(flushRender, 25);
     }
 
     return {
         start() {
             if (!isSingle) {
-                renderFrame();
+                flushRender();
             }
         },
         waiting(index) {
             statuses[index] = 'waiting';
             details[index] = '';
-            renderFrame();
+            scheduleRender();
         },
         reading(index, detail) {
             statuses[index] = 'reading';
             details[index] = detail || '';
-            renderFrame();
+            scheduleRender();
         },
         done(index, detail) {
             statuses[index] = 'done';
             details[index] = detail || '';
-            renderFrame();
+            scheduleRender();
         },
         error(index, detail) {
             statuses[index] = 'error';
             details[index] = detail || '';
-            renderFrame();
+            scheduleRender();
         },
     };
 }
