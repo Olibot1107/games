@@ -33,11 +33,37 @@
     body.in-call video{height:300px}
     .logs{background:#0b1220;padding:10px;border-radius:8px;max-height:180px;overflow:auto;border:1px solid rgba(255,255,255,0.03)}
     .muted{color:var(--muted);font-size:13px}
-    .chat{background:#111827;padding:10px;border-radius:8px;margin-top:12px}
-    .chat-messages{max-height:150px;overflow-y:auto;background:#0b1220;padding:8px;border-radius:6px;margin-bottom:8px}
-    .chat-input{display:flex;gap:6px}
-    .chat-input input{flex:1;padding:6px;border-radius:6px;border:none}
-    .chat-input button{padding:6px 10px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer}
+    .chat{background:#2c2c3f;padding:15px;border-radius:10px;margin-top:12px;box-shadow:0 10px 30px rgba(0,0,0,0.16)}
+    .chat-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .chat-top h3{margin:0;color:#e6eef8;display:flex;align-items:center;gap:8px}
+    .chat-top h3::before{content:'💬';font-size:0.95em}
+    .chat-sub{margin-top:4px;color:#94a3b8;font-size:13px}
+    .chat-room-pill{padding:6px 10px;border-radius:999px;background:#202033;border:1px solid rgba(114,137,218,0.25);color:#c9d2ff;font-size:12px;white-space:nowrap}
+    .chat-messages{max-height:400px;overflow-y:auto;background:#2c2c3f;padding:15px;border-radius:10px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.04)}
+    .chat-empty{padding:18px;border-radius:10px;background:#202033;border:1px dashed rgba(114,137,218,0.22);color:#94a3b8;font-size:14px;line-height:1.5}
+    .chat-message{display:flex;gap:10px;margin-bottom:12px;background:#393955;padding:10px;border-radius:10px;position:relative;border:1px solid rgba(255,255,255,0.03)}
+    .chat-message.self{background:#313a5a;border-color:rgba(114,137,218,0.35);margin-left:18px;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02)}
+    .chat-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#7289da,#60a5fa);display:flex;align-items:center;justify-content:center;flex:0 0 40px;font-weight:700;color:#fff;letter-spacing:0.03em;font-size:13px}
+    .chat-message.self .chat-avatar{background:linear-gradient(135deg,#8b5cf6,#60a5fa)}
+    .chat-avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+    .chat-content{flex:1;min-width:0}
+    .chat-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .chat-name{font-weight:bold;color:#7289da}
+    .chat-message.self .chat-name{color:#9fb6ff}
+    .chat-time{font-size:12px;color:#94a3b8}
+    .chat-text{margin-top:5px;word-break:break-word;color:#e5eefc}
+    .chat-text{line-height:1.45}
+    .chat-location{margin-top:6px}
+    .chat-input{display:flex;gap:8px;align-items:center}
+    .chat-input input{flex:1;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:#202033;color:#e6eef8}
+    .chat-input input:focus{outline:none;border-color:#60a5fa;box-shadow:0 0 0 2px rgba(96,165,250,0.12)}
+    .chat-input button{padding:10px 12px;border:none;border-radius:8px;background:linear-gradient(135deg,#60a5fa,#7289da);color:#fff;cursor:pointer;font-weight:700}
+    .chat-input button:hover{filter:brightness(1.05)}
+    .chat-message .location-card{margin-top:6px;padding:10px;background:#202033;border-radius:10px;border:1px solid rgba(114, 137, 218, 0.35)}
+    .location-map{width:100%;height:180px;border:0;border-radius:10px;margin-top:8px}
+    .location-meta{font-size:12px;color:#c9d2ff;line-height:1.4}
+    .location-link{color:#8cb4ff;text-decoration:none}
+    .location-link:hover{text-decoration:underline}
   </style>
 </head>
 <body>
@@ -66,10 +92,17 @@
       <button id="btn-switch-cam" class="btn">🔄 Switch Camera</button>
       <button id="btn-screen" class="btn">🖥️ Share Screen</button>
       <button id="btn-sound" class="btn">🔈 Toggle Sound</button>
+      <button id="btn-send-location" class="btn">📨 Send Location</button>
     </div>
 
     <div class="chat">
-      <h3 style="margin-top:0">Chat</h3>
+      <div class="chat-top">
+        <div>
+          <h3>Chat</h3>
+          <div class="chat-sub">Room messages and location cards live here.</div>
+        </div>
+        <div id="chat-room-pill" class="chat-room-pill">No room joined</div>
+      </div>
       <div id="chat-messages" class="chat-messages"></div>
       <div class="chat-input">
         <input id="chat-input" type="text" placeholder="Type a message..."/>
@@ -113,9 +146,11 @@
   const roomsContainer = document.getElementById('rooms');
   const videosContainer = document.getElementById('videos');
   const chatMessagesEl = document.getElementById('chat-messages');
+  const chatRoomPillEl = document.getElementById('chat-room-pill');
   const chatInputEl = document.getElementById('chat-input');
   const chatSendBtn = document.getElementById('chat-send');
   const switchCamBtn = document.getElementById('btn-switch-cam');
+  const sendLocationButton = document.getElementById('btn-send-location');
   const ROOM_NAMES = ['VC1','VC2','VC3','VC4','VC5','VC6','VC7','VC8','VC9','VC10'];
   const uid = Math.random().toString(36).slice(2);
   let localStream=null,screenStream=null,currentRoom=null,roomRef=null,heartbeatInterval=null,audioContext=null;
@@ -145,6 +180,162 @@
     videoEnabled = true;
     facingMode = mode;
     return { stream, videoTrack };
+  }
+
+  function buildMapEmbedUrl(lat, lon){
+    const delta = 0.008;
+    const left = lon - delta;
+    const right = lon + delta;
+    const top = lat + delta;
+    const bottom = lat - delta;
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(left)},${encodeURIComponent(bottom)},${encodeURIComponent(right)},${encodeURIComponent(top)}&layer=mapnik&marker=${encodeURIComponent(lat)},${encodeURIComponent(lon)}`;
+  }
+
+  function buildLocationHtml(location){
+    const { lat, lon, place } = location;
+    const coords = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+    const placeHtml = place ? `<div class="location-meta"><strong>Place:</strong> ${place.replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]))}</div>` : '';
+    const mapUrl = buildMapEmbedUrl(lat, lon);
+    return `
+      <div class="location-card">
+        <div class="location-meta"><strong>Coords:</strong> ${coords}</div>
+        ${placeHtml}
+        <iframe class="location-map" loading="lazy" src="${mapUrl}" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        <div class="location-meta" style="margin-top:6px;">
+          <a class="location-link" href="https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lon)}#map=18/${encodeURIComponent(lat)}/${encodeURIComponent(lon)}" target="_blank" rel="noopener">Open full map</a>
+        </div>
+      </div>
+    `;
+  }
+
+  function escapeHTML(text){
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function getSenderName(msg){
+    if(msg.from === uid) return 'You';
+    if(msg.name) return msg.name;
+    if(msg.from) return `User ${String(msg.from).slice(0, 6)}`;
+    return 'Unknown';
+  }
+
+  function getSenderAvatar(msg){
+    const name = getSenderName(msg).trim();
+    if(!name) return '?';
+    const parts = name.split(/\s+/).filter(Boolean);
+    const initials = parts.slice(0, 2).map(part => part[0]).join('');
+    return initials.toUpperCase().slice(0, 2);
+  }
+
+  function buildChatMessage(msg){
+    const name = getSenderName(msg);
+    const time = msg.ts ? new Date(msg.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+    const avatar = getSenderAvatar(msg);
+    const isSelf = msg.from === uid;
+    let body = '';
+
+    if(msg.type === 'location' && msg.location){
+      body = `<div class="chat-location">${buildLocationHtml(msg.location)}</div>`;
+    } else if(msg.text){
+      body = `<div class="chat-text">${escapeHTML(msg.text)}</div>`;
+    } else {
+      body = `<div class="chat-text muted">Unsupported message</div>`;
+    }
+
+    return `
+      <div class="chat-message ${isSelf ? 'self' : ''}">
+        <div class="chat-avatar" aria-hidden="true">${escapeHTML(avatar)}</div>
+        <div class="chat-content">
+          <div class="chat-head">
+            <span class="chat-name">${escapeHTML(name)}</span>
+            <span class="chat-time">${escapeHTML(time)}</span>
+          </div>
+          ${body}
+        </div>
+      </div>
+    `;
+  }
+
+  function setChatRoomLabel(roomName){
+    if(!chatRoomPillEl) return;
+    chatRoomPillEl.textContent = roomName ? `Room: ${roomName}` : 'No room joined';
+  }
+
+  function showEmptyChatState(text){
+    if(!chatMessagesEl) return;
+    chatMessagesEl.innerHTML = `<div class="chat-empty">${escapeHTML(text)}</div>`;
+  }
+
+  function clearEmptyChatState(){
+    const empty = chatMessagesEl.querySelector('.chat-empty');
+    if(empty) empty.remove();
+  }
+
+  function scrollChatToBottom(){
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+  }
+
+  function isChatNearBottom(){
+    return chatMessagesEl.scrollHeight - chatMessagesEl.scrollTop - chatMessagesEl.clientHeight < 120;
+  }
+
+  function formatLocationLabel(lat, lon, place){
+    if(place) return place;
+    return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+  }
+
+  async function fetchReverseLocation(lat, lon){
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+    const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if(!response.ok) throw new Error(`Location lookup failed (${response.status})`);
+    const data = await response.json();
+    return data?.display_name || data?.name || '';
+  }
+
+  async function getPreciseLocation(){
+    if(!navigator.geolocation){
+      throw new Error('This browser does not support location.');
+    }
+
+    const position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      });
+    });
+
+    const lat = position.coords.latitude;
+    const lon = position.coords.longitude;
+    let place = '';
+    try{
+      place = await fetchReverseLocation(lat, lon);
+    }catch(err){
+      place = '';
+    }
+    return { lat, lon, place };
+  }
+
+  async function sendMyLocation(){
+    if(!currentRoom) {
+      log('Join a room first before sending location');
+      return;
+    }
+
+    try{
+      const location = await getPreciseLocation();
+      db.ref('chat/'+currentRoom).push({
+        from: uid,
+        type: 'location',
+        location,
+        ts: Date.now()
+      });
+      log('Sent location');
+    }catch(err){
+      log('Location permission denied');
+    }
   }
 
   function setupSpeechDetection(video, audioTrack){
@@ -225,6 +416,7 @@
       if(currentRoom) await disconnectCall();
       await ensureLocalStream();
       currentRoom=roomName;
+      setChatRoomLabel(roomName);
       document.body.classList.add('in-call');
       roomRef=db.ref('vcRooms/'+currentRoom);
       await roomRef.child(uid).set({joined:true,ts:Date.now(),lastSeen:Date.now()});
@@ -317,6 +509,7 @@
     if(!isPublic){ const snap=await db.ref('vcRooms/'+currentRoom).once('value'); if(!snap.val()) db.ref('vcRooms/'+currentRoom).remove(); }
 
     currentRoom=null; roomRef=null;
+    setChatRoomLabel(null);
     document.body.classList.remove('streaming');
     document.body.classList.remove('in-call');
   }
@@ -402,24 +595,47 @@
     document.getElementById('btn-screen').textContent = screenSharing ? '🖥️ Sharing' : '🖥️ Share Screen';
   });
 
-
-
   function setupChat(isPublic){
     if(!currentRoom) return;
     const chatRef=db.ref('chat/'+currentRoom);
     chatRef.off();
+    showEmptyChatState('No messages yet. Say hello, or send a location when you want to share where you are.');
     chatRef.on('child_added',snap=>{
       const msg=snap.val(); if(!msg) return;
+      clearEmptyChatState();
+      const shouldStick = isChatNearBottom();
       if(msg.type === 'mute' && msg.target === uid){
         log('Muted by ' + msg.from);
         micEnabled = false;
         if(localStream) localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
+      }else if(msg.type === 'location' && msg.location){
+        const div=document.createElement('div');
+        div.innerHTML = buildChatMessage(msg);
+        chatMessagesEl.appendChild(div.firstElementChild);
+        if(shouldStick) scrollChatToBottom();
       }else if(msg.text){
-        const div=document.createElement('div'); div.textContent=`[${new Date(msg.ts).toLocaleTimeString()}] ${msg.from}: ${msg.text}`;
-        chatMessagesEl.appendChild(div); chatMessagesEl.scrollTop=chatMessagesEl.scrollHeight;
+        const div=document.createElement('div');
+        div.innerHTML = buildChatMessage(msg);
+        chatMessagesEl.appendChild(div.firstElementChild);
+        if(shouldStick) scrollChatToBottom();
       }
     });
-    chatSendBtn.onclick=()=>{ const text=chatInputEl.value.trim(); if(!text) return; chatRef.push({from:uid,text,ts:Date.now()}); chatInputEl.value=''; };
+    const sendChatMessage = () => {
+      const text = chatInputEl.value.trim();
+      if(!text) return;
+      chatRef.push({from:uid,name:'You',text,ts:Date.now()});
+      chatInputEl.value='';
+      chatInputEl.focus();
+      scrollChatToBottom();
+    };
+
+    chatSendBtn.onclick = sendChatMessage;
+    chatInputEl.onkeydown = (event) => {
+      if(event.key === 'Enter'){
+        event.preventDefault();
+        sendChatMessage();
+      }
+    };
   }
 
   // Private room controls
@@ -440,6 +656,10 @@
 
   window._vac={joinRoom,disconnectCall,uid};
   log('Client ready — uid: '+uid);
+  setChatRoomLabel(currentRoom);
+  if(sendLocationButton){
+    sendLocationButton.addEventListener('click', sendMyLocation);
+  }
 })();
 </script>
 <script src="/lib/fps.js"></script>

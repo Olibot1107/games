@@ -43,6 +43,30 @@ emoji-picker { position: absolute; z-index: 999; }
 @keyframes slideIn { from { transform: translateX(400px); } to { transform: translateX(0); } }
 .char-count { font-size: 12px; color: #aaa; margin-left: 10px; }
 .char-count.warning { color: #ff5555; }
+.location-card {
+  margin-top: 6px;
+  padding: 10px;
+  background: #202033;
+  border-radius: 10px;
+  border: 1px solid rgba(114, 137, 218, 0.35);
+}
+.location-map {
+  width: 100%;
+  height: 180px;
+  border: 0;
+  border-radius: 10px;
+  margin-top: 8px;
+}
+.location-meta {
+  font-size: 12px;
+  color: #c9d2ff;
+  line-height: 1.4;
+}
+.location-link {
+  color: #8cb4ff;
+  text-decoration: none;
+}
+.location-link:hover { text-decoration: underline; }
 
 /* Typing Indicator Styles */
 #typingIndicator {
@@ -91,6 +115,7 @@ emoji-picker { position: absolute; z-index: 999; }
   <input type="file" id="pfpUpload" accept="image/*">
   <button onclick="uploadPFP()">Upload PFP</button>
   <img id="currentPfp" src="" alt="pfp">
+  <button onclick="sendMyLocation()">📨 Send Location</button>
 </div>
 
 <div id="chat"></div>
@@ -208,6 +233,90 @@ function showFilterWarning(message) {
   setTimeout(() => { warning.style.display = 'none'; }, 3000);
 }
 
+function buildMapEmbedUrl(lat, lon) {
+  const delta = 0.008;
+  const left = lon - delta;
+  const right = lon + delta;
+  const top = lat + delta;
+  const bottom = lat - delta;
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(left)},${encodeURIComponent(bottom)},${encodeURIComponent(right)},${encodeURIComponent(top)}&layer=mapnik&marker=${encodeURIComponent(lat)},${encodeURIComponent(lon)}`;
+}
+
+function buildLocationHtml(location) {
+  const { lat, lon, place } = location;
+  const mapUrl = buildMapEmbedUrl(lat, lon);
+  const coords = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  const placeHtml = place ? `<div class="location-meta"><strong>Place:</strong> ${escapeHTML(place)}</div>` : '';
+  return `
+    <div class="location-card">
+      <div class="location-meta"><strong>Coords:</strong> ${coords}</div>
+      ${placeHtml}
+      <iframe class="location-map" loading="lazy" src="${mapUrl}" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      <div class="location-meta" style="margin-top:6px;">
+        <a class="location-link" href="https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lon)}#map=18/${encodeURIComponent(lat)}/${encodeURIComponent(lon)}" target="_blank" rel="noopener">Open full map</a>
+      </div>
+    </div>
+  `;
+}
+
+function formatLocationLabel(lat, lon, place) {
+  if (place) return place;
+  return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+}
+
+async function fetchReverseLocation(lat, lon) {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+  const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  if (!response.ok) throw new Error(`Location lookup failed (${response.status})`);
+  const data = await response.json();
+  return data?.display_name || data?.name || '';
+}
+
+async function getPreciseLocation() {
+  if (!navigator.geolocation) {
+    throw new Error('This browser does not support location.');
+  }
+
+  const position = await new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    });
+  });
+
+  const lat = position.coords.latitude;
+  const lon = position.coords.longitude;
+  let place = '';
+  try {
+    place = await fetchReverseLocation(lat, lon);
+  } catch (err) {
+    place = '';
+  }
+  return { lat, lon, place };
+}
+
+async function sendMyLocation() {
+  if (!currentUser) {
+    showFilterWarning('⚠️ Please wait for chat to connect first.');
+    return;
+  }
+
+  try {
+    const location = await getPreciseLocation();
+    db.ref(`messages/${currentGroup}`).push({
+      name: usernameInput.value.trim() || 'Anonymous',
+      time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
+      pfp: pfpBase64 || null,
+      uid: currentUser.uid,
+      type: 'location',
+      location
+    });
+  } catch (err) {
+    showFilterWarning(`⚠️ ${err.message || 'Location permission was denied.'}`);
+  }
+}
+
 // Character counter
 const msgInput = document.getElementById('message');
 const charCount = document.getElementById('charCount');
@@ -272,7 +381,6 @@ const pfpUploadInput = document.getElementById('pfpUpload');
 const currentPfpImg = document.getElementById('currentPfp');
 const typingIndicator = document.getElementById('typingIndicator');
 const typingText = document.getElementById('typingText');
-
 let currentGroup = "Main";
 let currentUser = null;
 let currentRef = null;
@@ -356,6 +464,12 @@ function addMessage(msgKey, msg){
     }
   } else if(msg.image) {
     contentHTML=`<div class="text"><img src="${msg.image}" style="max-width:200px;border-radius:10px;"></div>`;
+  } else if(msg.type === 'location' && msg.location) {
+    contentHTML = `
+      <div class="text">
+        ${buildLocationHtml(msg.location)}
+      </div>
+    `;
   }
   
   div.innerHTML=`
