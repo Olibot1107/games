@@ -1146,9 +1146,6 @@ function updateImagePreview() {
     });
 }
 
-// Make removeImage global for onclick
-window.removeImage = removeImage;
-
 async function uploadImages() {
     if (selectedImages.length === 0) return [];
 

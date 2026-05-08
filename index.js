@@ -8,7 +8,7 @@ const https = require('https');
 const unzipper = require('unzipper');
 const fse = require('fs-extra');
 const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
+const archiver = require('archiver');
 const app = express();
 const PORT = 3000;
 
@@ -313,10 +313,18 @@ const COMMENTS_UPLOAD_DIR = path.join(UPLOADS_DIR, 'comments');
 if (!fs.existsSync(COMMENTS_UPLOAD_DIR)) fs.mkdirSync(COMMENTS_UPLOAD_DIR, { recursive: true });
 
 const photoStorage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, PHOTO_UPLOAD_DIR),
+    destination: (req, file, cb) => {
+        const uid = req.body.uid;
+        if (!uid) return cb(new Error('UID required'), null);
+        const userDir = path.join(PHOTO_UPLOAD_DIR, uid);
+        if (!fs.existsSync(userDir)) fs.mkdirSync(userDir, { recursive: true });
+        cb(null, userDir);
+    },
     filename: (req, file, cb) => {
+        if (!req.fileIndex) req.fileIndex = 0;
+        const hash = req.body.hashes[req.fileIndex++];
         const ext = path.extname(file.originalname).toLowerCase();
-        cb(null, `${uuidv4()}${ext}`);
+        cb(null, `${hash}${ext}`);
     }
 });
 
@@ -338,7 +346,7 @@ const photoUpload = multer({
     },
     limits: {
         fileSize: 20 * 1024 * 1024,
-        files: 20
+        files: 3
     }
 });
 
@@ -356,15 +364,20 @@ const commentUpload = multer({
     }
 });
 
-app.post('/api/photos/upload', photoUpload.array('photos', 20), (req, res) => {
+app.post('/api/photos/upload', photoUpload.array('photos', 3), (req, res) => {
     const files = req.files || [];
     if (!files.length) {
         return res.status(400).json({ error: 'No photos uploaded' });
     }
 
+    const uid = req.body.uid;
+    if (!uid) {
+        return res.status(400).json({ error: 'UID required' });
+    }
+
     const uploaded = files.map(file => ({
         originalName: file.originalname,
-        url: `/uploads/photos/${file.filename}`,
+        url: `/uploads/photos/${uid}/${file.filename}`,
         uploadedAt: Date.now()
     }));
 
@@ -388,13 +401,23 @@ app.post('/api/comments/upload', commentUpload.array('photos', 5), (req, res) =>
 
 app.get('/api/photos', async (req, res) => {
     try {
-        const names = await fs.promises.readdir(PHOTO_UPLOAD_DIR);
+        const uid = req.query.uid;
+        if (!uid) {
+            return res.json({ photos: [] });
+        }
+
+        const userDir = path.join(PHOTO_UPLOAD_DIR, uid);
+        if (!fs.existsSync(userDir)) {
+            return res.json({ photos: [] });
+        }
+
+        const names = await fs.promises.readdir(userDir);
         const photos = await Promise.all(names.map(async (filename) => {
-            const fullPath = path.join(PHOTO_UPLOAD_DIR, filename);
+            const fullPath = path.join(userDir, filename);
             const stat = await fs.promises.stat(fullPath);
             return {
                 originalName: filename,
-                url: `/uploads/photos/${filename}`,
+                url: `/uploads/photos/${uid}/${filename}`,
                 uploadedAt: stat.mtimeMs
             };
         }));
@@ -404,6 +427,46 @@ app.get('/api/photos', async (req, res) => {
     } catch (err) {
         console.error('Failed to list photo uploads', err);
         res.json({ photos: [] });
+    }
+});
+
+app.get('/api/photos/download', async (req, res) => {
+    try {
+        const uid = req.query.uid;
+        if (!uid) {
+            return res.status(400).json({ error: 'UID required' });
+        }
+
+        const userDir = path.join(PHOTO_UPLOAD_DIR, uid);
+        if (!fs.existsSync(userDir)) {
+            return res.status(404).json({ error: 'No photos found' });
+        }
+
+        const names = await fs.promises.readdir(userDir);
+        if (!names.length) {
+            return res.status(404).json({ error: 'No photos found' });
+        }
+
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="photos-${uid}.zip"`);
+
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        archive.on('error', (err) => {
+            throw err;
+        });
+
+        archive.pipe(res);
+
+        names.forEach(filename => {
+            const filePath = path.join(userDir, filename);
+            archive.file(filePath, { name: filename });
+        });
+
+        archive.finalize();
+    } catch (err) {
+        console.error('Failed to create zip', err);
+        res.status(500).json({ error: 'Failed to create download' });
     }
 });
 

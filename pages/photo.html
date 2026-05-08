@@ -26,10 +26,16 @@
     <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <h1 class="text-3xl font-bold">Photo Gallery</h1>
 
-      <label class="cursor-pointer rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white">
-        Upload Images
-        <input id="photo-input" type="file" accept="image/*" multiple class="sr-only" />
-      </label>
+      <div class="flex gap-3">
+        <label class="cursor-pointer rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white">
+          Upload Images
+          <input id="photo-input" type="file" accept="image/*" multiple class="sr-only" />
+        </label>
+
+        <button id="download-btn" class="rounded-full bg-blue-500 px-5 py-3 text-sm font-semibold text-white">
+          Download All
+        </button>
+      </div>
     </div>
 
     <p class="mt-3 text-sm text-slate-400">
@@ -52,39 +58,91 @@
   const countEl = document.getElementById('photo-count');
   const progressBar = document.getElementById('progress-bar');
 
-  function uploadPhotos(files) {
-    if (!files.length) return;
+  // Get uid from localStorage, generate if not exists
+  let uid = localStorage.getItem('uid');
+  if (!uid) {
+    uid = Math.random().toString(36).slice(2);
+    localStorage.setItem('uid', uid);
+  }
 
-    const formData = new FormData();
+  async function hashFile(file) {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
 
-    [...files].forEach(file => {
-      if (file.type.startsWith('image/')) {
+  async function uploadPhotos(files) {
+    const imageFiles = [...files].filter(file => file.type.startsWith('image/'));
+    if (!imageFiles.length) return;
+
+    // Compute hashes for all files
+    const filesWithHashes = await Promise.all(imageFiles.map(async (file) => ({
+      file,
+      hash: await hashFile(file)
+    })));
+
+    // Upload in batches of 3
+    const batchSize = 3;
+    let currentBatch = 0;
+    const totalBatches = Math.ceil(filesWithHashes.length / batchSize);
+
+    function uploadBatch(batch) {
+      const formData = new FormData();
+      formData.append('uid', uid);
+
+      // Append hashes first
+      batch.forEach(({ file, hash }) => {
+        formData.append('hashes', hash);
+      });
+
+      // Then append photos
+      batch.forEach(({ file, hash }) => {
         formData.append('photos', file);
-      }
-    });
+      });
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/photos/upload');
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/photos/upload');
 
-    // progress handler
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const percent = (event.loaded / event.total) * 100;
-        progressBar.style.width = percent + '%';
-      }
-    };
+      // progress handler
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const batchPercent = (event.loaded / event.total) * 100;
+          const overallPercent = ((currentBatch * 100) + batchPercent) / totalBatches;
+          progressBar.style.width = overallPercent + '%';
+        }
+      };
 
-    xhr.onload = () => {
-      progressBar.style.width = '0%';
-      inputEl.value = '';
-      loadGallery();
-    };
+      xhr.onload = () => {
+        currentBatch++;
+        if (currentBatch < totalBatches) {
+          // Upload next batch
+          const start = currentBatch * batchSize;
+          const nextBatch = filesWithHashes.slice(start, start + batchSize);
+          uploadBatch(nextBatch);
+        } else {
+          // All batches done
+          progressBar.style.width = '0%';
+          inputEl.value = '';
+          loadGallery();
+        }
+      };
 
-    xhr.send(formData);
+      xhr.onerror = () => {
+        progressBar.style.width = '0%';
+        alert('Upload failed');
+      };
+
+      xhr.send(formData);
+    }
+
+    // Start with first batch
+    const firstBatch = filesWithHashes.slice(0, batchSize);
+    uploadBatch(firstBatch);
   }
 
   async function loadGallery() {
-    const res = await fetch('/api/photos');
+    const res = await fetch(`/api/photos?uid=${uid}`);
     const data = await res.json();
 
     const photos = data.photos || [];
@@ -97,7 +155,7 @@
       card.className = 'photo-card rounded-2xl overflow-hidden';
 
       card.innerHTML = `
-        <img src="${photo.url}" class="h-64 w-full" />
+        <img src="${photo.url}" class="h-64 w-full" loading="lazy" />
         <div class="p-3 text-sm truncate">
           ${photo.originalName}
         </div>
@@ -109,6 +167,15 @@
 
   inputEl.addEventListener('change', (e) => {
     uploadPhotos(e.target.files);
+  });
+
+  document.getElementById('download-btn').addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.href = `/api/photos/download?uid=${uid}`;
+    link.download = `photos-${uid}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   });
 
   loadGallery();
