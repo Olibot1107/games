@@ -63,6 +63,7 @@
     <div style="margin:10px 0;">
       <button id="btn-mic" class="btn">🎤 Toggle Mic</button>
       <button id="btn-cam" class="btn">📹 Toggle Camera</button>
+      <button id="btn-switch-cam" class="btn">🔄 Switch Camera</button>
       <button id="btn-screen" class="btn">🖥️ Share Screen</button>
       <button id="btn-sound" class="btn">🔈 Toggle Sound</button>
     </div>
@@ -114,11 +115,37 @@
   const chatMessagesEl = document.getElementById('chat-messages');
   const chatInputEl = document.getElementById('chat-input');
   const chatSendBtn = document.getElementById('chat-send');
+  const switchCamBtn = document.getElementById('btn-switch-cam');
   const ROOM_NAMES = ['VC1','VC2','VC3','VC4','VC5','VC6','VC7','VC8','VC9','VC10'];
   const uid = Math.random().toString(36).slice(2);
   let localStream=null,screenStream=null,currentRoom=null,roomRef=null,heartbeatInterval=null,audioContext=null;
   const peers={},analysers={};
   let micEnabled=true,soundEnabled=true,videoEnabled=true,screenSharing=false;
+  let facingMode='environment';
+
+  function videoConstraints(mode){
+    const constraints = { width: 320, height: 180, frameRate: 60 };
+    if(mode) constraints.facingMode = { ideal: mode };
+    return constraints;
+  }
+
+  async function acquireCameraStream(mode = facingMode){
+    const videoStream = await navigator.mediaDevices.getUserMedia({
+      video: videoConstraints(mode),
+      audio: !localStream
+    });
+
+    const videoTrack = videoStream.getVideoTracks()[0];
+    const audioTracks = localStream ? localStream.getAudioTracks() : videoStream.getAudioTracks();
+    const stream = new MediaStream([
+      ...audioTracks,
+      ...(videoTrack ? [videoTrack] : [])
+    ]);
+
+    videoEnabled = true;
+    facingMode = mode;
+    return { stream, videoTrack };
+  }
 
   function setupSpeechDetection(video, audioTrack){
     if(!audioTrack) return;
@@ -166,11 +193,30 @@
 
   async function ensureLocalStream(){
     if(localStream) return localStream;
-    localStream=await navigator.mediaDevices.getUserMedia({video:{width:320,height:180,frameRate:60},audio:true});
+    try{
+      const { stream } = await acquireCameraStream(facingMode);
+      localStream = stream;
+    }catch(err){
+      log('Camera mode fallback: '+err.message);
+      const fallback = await navigator.mediaDevices.getUserMedia({video:{width:320,height:180,frameRate:60},audio:true});
+      localStream = fallback;
+    }
     const v=document.createElement('video'); v.autoplay=true; v.muted=true; v.playsInline=true; v.id=`local-${uid}`; v.srcObject=localStream; videosContainer.prepend(v);
     setupSpeechDetection(v, localStream.getAudioTracks()[0]);
+    if(switchCamBtn) switchCamBtn.textContent = facingMode === 'environment' ? '📷 Back Camera' : '🤳 Front Camera';
     log('Local media started');
     document.body.classList.add('streaming'); return localStream;
+  }
+
+  async function replaceVideoTrackEverywhere(newTrack){
+    for(const id in peers){
+      const sender=peers[id].pc.getSenders().find(s=>s.track&&s.track.kind==='video');
+      if(sender) await sender.replaceTrack(newTrack);
+    }
+    const localVideo=document.getElementById('local-'+uid);
+    if(localVideo){
+      localVideo.srcObject = localStream;
+    }
   }
 
   async function joinRoom(roomName,isPublic=false){
@@ -295,6 +341,33 @@
     localStream.getVideoTracks().forEach(t=>t.enabled=videoEnabled);
     document.getElementById('btn-cam').textContent = videoEnabled ? '📹 Toggle Camera' : '📷 Camera Off';
     log('Camera '+(videoEnabled?'enabled':'disabled'));
+  });
+
+  // switch front/back camera
+  document.getElementById('btn-switch-cam').addEventListener('click',async ()=>{
+    if(!localStream) return;
+    try{
+      const nextMode = facingMode === 'environment' ? 'user' : 'environment';
+      const oldAudioTracks = localStream.getAudioTracks();
+      const oldVideoTrack = localStream.getVideoTracks()[0];
+      const { videoTrack } = await acquireCameraStream(nextMode);
+      localStream = new MediaStream([
+        ...oldAudioTracks,
+        ...(videoTrack ? [videoTrack] : [])
+      ]);
+
+      if(oldVideoTrack) oldVideoTrack.stop();
+      await replaceVideoTrackEverywhere(videoTrack);
+
+      const localVideo=document.getElementById('local-'+uid);
+      if(localVideo) localVideo.srcObject = localStream;
+
+      document.getElementById('btn-cam').textContent = videoEnabled ? '📹 Toggle Camera' : '📷 Camera Off';
+      document.getElementById('btn-switch-cam').textContent = nextMode === 'environment' ? '📷 Back Camera' : '🤳 Front Camera';
+      log('Switched camera to '+nextMode);
+    }catch(e){
+      log('Switch camera error: '+e.message,'error');
+    }
   });
 
   // screen share toggle
