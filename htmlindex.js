@@ -13,9 +13,16 @@ let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
 let currentCommentGame = null;
 const COMMENT_MIN_LENGTH = 1;
 const COMMENT_MAX_LENGTH = 300;
+const MAX_COMMENT_IMAGES = 5;
+const MAX_COMMENT_IMAGE_SIZE = 5 * 1024 * 1024;
+const COMMENT_IMAGE_BASE = '/uploads';
 let isSubmittingComment = false;
 let selectedImages = [];
 const CLIENT_ID_COOKIE = 'clientID';
+const resourceJsonCache = new Map();
+const resourceJsonInflight = new Map();
+const plainJsonCache = new Map();
+const plainJsonInflight = new Map();
 
 // UID
 if(!localStorage.getItem('uid')){
@@ -98,8 +105,16 @@ function decodeEncryptedPayload(payload) {
     return new TextDecoder().decode(decryptedFile);
 }
 
-function fetchEncryptedJson(path) {
-    return fetch('/api/resource', {
+async function fetchEncryptedJson(path) {
+    if (resourceJsonCache.has(path)) {
+        return resourceJsonCache.get(path);
+    }
+
+    if (resourceJsonInflight.has(path)) {
+        return resourceJsonInflight.get(path);
+    }
+
+    const request = fetch('/api/resource', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ path })
@@ -113,7 +128,97 @@ function fetchEncryptedJson(path) {
             throw new Error('Invalid encrypted response');
         }
         const jsonText = decodeEncryptedPayload(data.files[0].payload);
-        return JSON.parse(jsonText);
+        const parsed = JSON.parse(jsonText);
+        resourceJsonCache.set(path, parsed);
+        return parsed;
+    })
+    .finally(() => {
+        resourceJsonInflight.delete(path);
+    });
+
+    resourceJsonInflight.set(path, request);
+    return request;
+}
+
+async function fetchEncryptedJsonBatch(paths) {
+    const uniquePaths = [...new Set(paths.filter(Boolean))];
+    const missingPaths = uniquePaths.filter(path => !resourceJsonCache.has(path) && !resourceJsonInflight.has(path));
+
+    if (missingPaths.length > 0) {
+        const request = fetch('/api/resource', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ paths: missingPaths })
+        })
+        .then(r => {
+            if (!r.ok) throw new Error('Failed to fetch encrypted resources');
+            return r.json();
+        })
+        .then(data => {
+            const files = Array.isArray(data.files) ? data.files : [];
+            files.forEach((file, index) => {
+                const path = missingPaths[index];
+                if (!file || !file.payload) {
+                    return;
+                }
+                const jsonText = decodeEncryptedPayload(file.payload);
+                resourceJsonCache.set(path, JSON.parse(jsonText));
+            });
+        })
+        .finally(() => {
+            missingPaths.forEach(path => resourceJsonInflight.delete(path));
+        });
+
+        missingPaths.forEach(path => resourceJsonInflight.set(path, request));
+        await request;
+    }
+
+    const result = {};
+    uniquePaths.forEach(path => {
+        if (resourceJsonCache.has(path)) {
+            result[path] = resourceJsonCache.get(path);
+        }
+    });
+    return result;
+}
+
+function invalidateResourceJsonCache(...paths) {
+    paths.flat().forEach((path) => {
+        resourceJsonCache.delete(path);
+        resourceJsonInflight.delete(path);
+    });
+}
+
+async function fetchPlainJson(path) {
+    if (plainJsonCache.has(path)) {
+        return plainJsonCache.get(path);
+    }
+
+    if (plainJsonInflight.has(path)) {
+        return plainJsonInflight.get(path);
+    }
+
+    const request = fetch(path)
+    .then(r => {
+        if (!r.ok) throw new Error(`Failed to fetch ${path}`);
+        return r.json();
+    })
+    .then(data => {
+        plainJsonCache.set(path, data);
+        return data;
+    })
+    .finally(() => {
+        plainJsonInflight.delete(path);
+    });
+
+    plainJsonInflight.set(path, request);
+    return request;
+}
+
+function invalidatePlainJsonCache(...paths) {
+    paths.flat().forEach((path) => {
+        plainJsonCache.delete(path);
+        plainJsonInflight.delete(path);
     });
 }
 
@@ -293,8 +398,7 @@ function renderGames(){
 
 // ================= VOTES =================
 function fetchVotes(){
-    fetch('/votes.json')
-    .then(r=>r.json())
+    fetchPlainJson('/votes.json')
     .then(data=>{
         voteData = {};
 
@@ -365,6 +469,7 @@ function incrementPlayAndNavigate(game, href){
         body: JSON.stringify({ game: game.name, clientId })
     })
     .then(() => {
+        invalidateResourceJsonCache('plays.json');
         fetchPlayCounts();
         window.location.href = href;
     })
@@ -455,6 +560,67 @@ function timeAgo(timestamp) {
     return new Date(timestamp).toLocaleDateString();
 }
 
+function normalizeCommentImageUrl(url) {
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url) || url.startsWith('data:') || url.startsWith('blob:')) {
+        return url;
+    }
+    if (url.startsWith('/math/uploads/')) {
+        return url.replace('/math/uploads/', '/uploads/');
+    }
+    if (url.startsWith('/uploads/')) {
+        return url;
+    }
+    if (url.startsWith('uploads/')) {
+        return `/${url}`;
+    }
+    return url.startsWith('/') ? url : `${COMMENT_IMAGE_BASE}/${url}`;
+}
+
+function revokePreviewObjectUrls(container) {
+    if (!container) return;
+    container.querySelectorAll('img').forEach((img) => {
+        if (typeof img.src === 'string' && img.src.startsWith('blob:')) {
+            URL.revokeObjectURL(img.src);
+        }
+    });
+}
+
+function createUploadProgressLabel(prefix, percent) {
+    return `${prefix} (${percent}%)`;
+}
+
+async function uploadCommentImages(files, onProgress) {
+    const imageFiles = Array.from(files || []);
+    if (!imageFiles.length) return [];
+
+    const formData = new FormData();
+    imageFiles.forEach(file => formData.append('photos', file));
+
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/comments/upload');
+        xhr.responseType = 'json';
+
+        xhr.upload.onprogress = (event) => {
+            if (!event.lengthComputable || typeof onProgress !== 'function') return;
+            onProgress(Math.round((event.loaded / event.total) * 100));
+        };
+
+        xhr.onload = () => {
+            const result = xhr.response || {};
+            if (xhr.status >= 200 && xhr.status < 300 && result.success) {
+                resolve((result.photos || []).map(photo => photo.url));
+                return;
+            }
+            reject(new Error(result.error || `Upload failed (${xhr.status})`));
+        };
+
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(formData);
+    });
+}
+
 function openCommentPanel(game){
     currentCommentGame = game;
     const modal = document.getElementById('comments-modal');
@@ -462,6 +628,7 @@ function openCommentPanel(game){
     const feedback = document.getElementById('comments-feedback');
     const countLabel = document.getElementById('comments-count');
     const input = document.getElementById('comments-input');
+    const imageInput = document.getElementById('comments-images');
 
     if (!modal || !title || !feedback || !countLabel || !input) return;
 
@@ -470,6 +637,7 @@ function openCommentPanel(game){
     feedback.textContent = '';
     input.value = '';
     selectedImages = [];
+    if (imageInput) imageInput.value = '';
     updateImagePreview();
     updateCommentInputHint(0);
     modal.classList.remove('hidden');
@@ -478,9 +646,11 @@ function openCommentPanel(game){
 
 function closeCommentPanel(){
     const modal = document.getElementById('comments-modal');
+    const imageInput = document.getElementById('comments-images');
     if (!modal) return;
     modal.classList.add('hidden');
     selectedImages = [];
+    if (imageInput) imageInput.value = '';
     updateImagePreview();
 }
 
@@ -585,6 +755,7 @@ function saveEditComment(commentId, newText, commentElement, originalTextDiv, in
         if (result.success) {
             originalTextDiv.textContent = newText;
             cancelEdit(originalTextDiv, input, actionsDiv);
+            invalidateResourceJsonCache('comments.json');
             fetchCommentCounts();
             loadComments(currentCommentGame);
         } else {
@@ -665,7 +836,7 @@ function startReplyComment(parentId, commentElement) {
                 return;
             }
 
-            submitReply(text, parentId, replyInput, replyImages);
+            submitReply(text, parentId, replyInput, replyImages, submitBtn);
         };
 
         cancelBtn.onclick = () => replyInput.remove();
@@ -679,6 +850,7 @@ function startReplyComment(parentId, commentElement) {
 }
 
 function updateReplyPreview(preview, images) {
+    revokePreviewObjectUrls(preview);
     preview.innerHTML = '';
     images.forEach((file, index) => {
         const item = document.createElement('div');
@@ -700,7 +872,7 @@ function updateReplyPreview(preview, images) {
     });
 }
 
-function submitReply(text, parentId, replyInput, replyImages) {
+function submitReply(text, parentId, replyInput, replyImages, submitBtn) {
     if (isSubmittingComment) return;
     isSubmittingComment = true;
 
@@ -708,22 +880,13 @@ function submitReply(text, parentId, replyInput, replyImages) {
         try {
             let imageUrls = [];
             if (replyImages && replyImages.length > 0) {
-                const formData = new FormData();
-                replyImages.forEach(file => formData.append('photos', file));
-                
-                const response = await fetch('/api/comments/upload', {
-                    method: 'POST',
-                    body: formData
+                if (submitBtn) submitBtn.textContent = 'Uploading...';
+                imageUrls = await uploadCommentImages(replyImages, (percent) => {
+                    if (submitBtn) submitBtn.textContent = createUploadProgressLabel('Uploading', percent);
                 });
-
-                const result = await response.json();
-                if (result.success) {
-                    imageUrls = result.photos.map(photo => photo.url);
-                } else {
-                    throw new Error(result.error || 'Image upload failed');
-                }
             }
 
+            if (submitBtn) submitBtn.textContent = 'Replying...';
             const response = await fetch('/api/comments', {
                 method: 'POST',
                 headers: {'Content-Type':'application/json'},
@@ -740,6 +903,7 @@ function submitReply(text, parentId, replyInput, replyImages) {
 
             const result = await response.json();
             if (result.success) {
+                invalidateResourceJsonCache('comments.json');
                 fetchCommentCounts();
                 loadComments(currentCommentGame);
                 replyInput.remove();
@@ -751,6 +915,7 @@ function submitReply(text, parentId, replyInput, replyImages) {
             log('Reply submit error: ' + error.message);
         } finally {
             isSubmittingComment = false;
+            if (submitBtn) submitBtn.textContent = 'Reply';
         }
     })();
 }
@@ -821,9 +986,20 @@ function createCommentElement(comment, replies = []) {
         imagesDiv.className = 'flex flex-wrap gap-2 mb-2';
         comment.images.forEach(imageUrl => {
             const img = document.createElement('img');
-            img.src = imageUrl;
+            const resolvedUrl = normalizeCommentImageUrl(imageUrl);
+            img.src = resolvedUrl;
+            img.loading = 'lazy';
+            img.decoding = 'async';
+            img.referrerPolicy = 'no-referrer';
             img.className = 'max-w-32 max-h-32 object-cover rounded border cursor-pointer';
-            img.onclick = () => window.open(imageUrl, '_blank');
+            img.alt = 'Comment image';
+            img.onerror = () => {
+                img.replaceWith(Object.assign(document.createElement('div'), {
+                    className: 'max-w-32 max-h-32 rounded border bg-slate-100 text-slate-500 text-[11px] flex items-center justify-center px-2 py-1',
+                    textContent: 'Image unavailable'
+                }));
+            };
+            img.onclick = () => window.open(resolvedUrl, '_blank', 'noopener,noreferrer');
             imagesDiv.appendChild(img);
         });
         textDiv.appendChild(imagesDiv);
@@ -850,7 +1026,7 @@ function createCommentElement(comment, replies = []) {
     return item;
 }
 
-function submitComment(parentId = null, retryCount = 0){
+function submitComment(parentId = null, retryCount = 0, pendingImageUrls = null){
     const textInput = document.getElementById('comments-input');
     const feedback = document.getElementById('comments-feedback');
     const submitButton = document.getElementById('comments-submit');
@@ -873,21 +1049,21 @@ function submitComment(parentId = null, retryCount = 0){
     submitButton.disabled = true;
     submitButton.textContent = 'Posting...';
     feedback.textContent = '';
+    let imageUrls = Array.isArray(pendingImageUrls) ? pendingImageUrls.slice() : [];
 
     (async () => {
         try {
-            let imageUrls = [];
-            if (selectedImages.length > 0) {
-                try {
-                    feedback.textContent = 'Uploading images...';
-                    imageUrls = await uploadImages();
-                } catch (imgError) {
-                    feedback.textContent = 'Warning: Image upload failed, posting comment without images.';
-                    feedback.className = 'text-xs text-yellow-600';
-                    imageUrls = [];
-                }
+            if (imageUrls.length === 0 && selectedImages.length > 0) {
+                submitButton.textContent = 'Uploading...';
+                feedback.textContent = 'Uploading images...';
+                feedback.className = 'text-xs text-slate-500';
+                imageUrls = await uploadCommentImages(selectedImages, (percent) => {
+                    feedback.textContent = createUploadProgressLabel('Uploading images', percent);
+                });
             }
 
+            submitButton.textContent = 'Posting...';
+            feedback.textContent = 'Posting comment...';
             const response = await fetch('/api/comments', {
                 method: 'POST',
                 headers: {'Content-Type':'application/json'},
@@ -904,6 +1080,7 @@ function submitComment(parentId = null, retryCount = 0){
 
             const result = await response.json();
             if (result.success) {
+                invalidateResourceJsonCache('comments.json');
                 fetchCommentCounts();
                 loadComments(currentCommentGame);
                 textInput.value = '';
@@ -916,10 +1093,16 @@ function submitComment(parentId = null, retryCount = 0){
                 throw new Error(result.error || 'Comment failed.');
             }
         } catch (error) {
+            if (/upload/i.test(error.message)) {
+                feedback.textContent = 'Image upload failed. Your comment was not posted.';
+                feedback.className = 'text-xs text-red-500';
+                log('Comment upload error: ' + error.message);
+                return;
+            }
             if (retryCount < 1) {
                 feedback.textContent = 'Posting failed, retrying...';
                 feedback.className = 'text-xs text-yellow-600';
-                setTimeout(() => submitComment(parentId, retryCount + 1), 2000);
+                setTimeout(() => submitComment(parentId, retryCount + 1, imageUrls), 2000);
                 return;
             }
             feedback.textContent = 'Unable to post comment: ' + error.message;
@@ -966,6 +1149,7 @@ function deleteComment(commentId){
     })
     .then(results => {
         if (results.every(r => r.success)) {
+            invalidateResourceJsonCache('comments.json');
             fetchCommentCounts();
             loadComments(currentCommentGame);
             log('Comment and replies deleted');
@@ -989,6 +1173,7 @@ function voteComment(game, commentId, voter) {
     .then(r => r.json())
     .then(result => {
         if (result.success) {
+            invalidateResourceJsonCache('comments.json');
             loadComments(game);
         } else {
             log(result.error || 'Unable to vote');
@@ -1025,12 +1210,13 @@ function sendVote(game, vote){
             uid,
             vote,
         })
+    }).then(() => {
+        invalidatePlainJsonCache('/votes.json');
     }).catch(e=>log(e.message));
 }
 
 // ================= INIT =================
-fetch('./list.json')
-.then(r=>r.json())
+fetchPlainJson('./list.json')
 .then(data=>{
     allGames = [
         ...(data.good||[]).map(n=>({name:n,category:'good'})),
@@ -1039,8 +1225,11 @@ fetch('./list.json')
 
     renderFavorites();
     fetchVotes();
-    fetchCommentCounts();
-    fetchPlayCounts();
+    fetchEncryptedJsonBatch(['comments.json', 'plays.json'])
+    .then(() => {
+        fetchCommentCounts();
+        fetchPlayCounts();
+    });
 });
 
 if(searchInput){
@@ -1050,22 +1239,13 @@ if(searchInput){
 const commentsModal = document.getElementById('comments-modal');
 const commentsClose = document.getElementById('comments-close');
 const commentsSubmit = document.getElementById('comments-submit');
-
-if (commentsClose) commentsClose.addEventListener('click', closeCommentPanel);
-if (commentsSubmit) commentsSubmit.addEventListener('click', submitComment);
-if (commentsModal) {
-    commentsModal.addEventListener('click', (event) => {
-        if (event.target === commentsModal) closeCommentPanel();
-    });
-}
-
 const commentsInput = document.getElementById('comments-input');
 const commentsHint = document.getElementById('comments-hint');
 const playsModal = document.getElementById('plays-modal');
 const playsClose = document.getElementById('plays-close');
 
 if (commentsClose) commentsClose.addEventListener('click', closeCommentPanel);
-if (commentsSubmit) commentsSubmit.addEventListener('click', submitComment);
+if (commentsSubmit) commentsSubmit.addEventListener('click', () => submitComment());
 if (commentsModal) {
     commentsModal.addEventListener('click', (event) => {
         if (event.target === commentsModal) closeCommentPanel();
@@ -1097,35 +1277,44 @@ function updateCommentInputHint(length) {
 }
 
 function handleImageSelection(event) {
-    const files = Array.from(event.target.files);
-    const maxImages = 5;
-    const maxSize = 5 * 1024 * 1024; // 5MB per image
+    const files = Array.from(event.target.files || []);
+    const accepted = [];
+    const rejected = [];
+    const remainingSlots = MAX_COMMENT_IMAGES - selectedImages.length;
 
-    if (selectedImages.length + files.length > maxImages) {
-        alert(`You can only upload up to ${maxImages} images per comment.`);
+    if (remainingSlots <= 0) {
+        alert(`You can only upload up to ${MAX_COMMENT_IMAGES} images per comment.`);
+        event.target.value = '';
         return;
     }
 
-    const validFiles = files.filter(file => {
+    for (const file of files) {
+        if (accepted.length >= remainingSlots) break;
         if (!file.type.startsWith('image/')) {
-            alert(`${file.name} is not an image file.`);
-            return false;
+            rejected.push(`${file.name} is not an image file.`);
+            continue;
         }
-        if (file.size > maxSize) {
-            alert(`${file.name} is too large. Maximum size is 5MB.`);
-            return false;
+        if (file.size > MAX_COMMENT_IMAGE_SIZE) {
+            rejected.push(`${file.name} is too large. Maximum size is 5MB.`);
+            continue;
         }
-        return true;
-    });
+        accepted.push(file);
+    }
 
-    selectedImages.push(...validFiles);
+    selectedImages.push(...accepted);
     updateImagePreview();
+    event.target.value = '';
+
+    if (rejected.length > 0) {
+        alert(rejected.join('\n'));
+    }
 }
 
 function updateImagePreview() {
     const preview = document.getElementById('comments-image-preview');
     if (!preview) return;
 
+    revokePreviewObjectUrls(preview);
     preview.innerHTML = '';
     selectedImages.forEach((file, index) => {
         const item = document.createElement('div');
@@ -1144,30 +1333,6 @@ function updateImagePreview() {
         item.appendChild(removeBtn);
         preview.appendChild(item);
     });
-}
-
-async function uploadImages() {
-    if (selectedImages.length === 0) return [];
-
-    const formData = new FormData();
-    selectedImages.forEach(file => formData.append('photos', file));
-
-    try {
-        const response = await fetch('/api/comments/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        const result = await response.json();
-        if (result.success) {
-            return result.photos.map(photo => photo.url);
-        } else {
-            throw new Error(result.error || 'Upload failed');
-        }
-    } catch (error) {
-        console.error('Image upload error:', error);
-        throw error;
-    }
 }
 
 updateCommentInputHint(0);
