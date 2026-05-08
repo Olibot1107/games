@@ -8,7 +8,33 @@ const https = require('https');
 const unzipper = require('unzipper');
 const fse = require('fs-extra');
 const multer = require('multer');
-const archiver = require('archiver');
+let archiver;
+async function loadArchiver() {
+    if (!archiver) {
+        const module = await import('archiver');
+        archiver = module.default ?? module;
+    }
+    return archiver;
+}
+
+function createArchive(type, options) {
+    if (typeof archiver === 'function') {
+        return archiver(type, options);
+    }
+
+    if (type === 'zip' && archiver?.ZipArchive) {
+        return new archiver.ZipArchive(options);
+    }
+    if (type === 'tar' && archiver?.TarArchive) {
+        return new archiver.TarArchive(options);
+    }
+    if (type === 'json' && archiver?.JsonArchive) {
+        return new archiver.JsonArchive(options);
+    }
+
+    throw new Error('Unsupported archiver export shape');
+}
+
 const app = express();
 const PORT = 3000;
 
@@ -450,7 +476,8 @@ app.get('/api/photos/download', async (req, res) => {
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="photos-${uid}.zip"`);
 
-        const archive = archiver('zip', { zlib: { level: 9 } });
+        await loadArchiver();
+        const archive = createArchive('zip', { zlib: { level: 9 } });
 
         archive.on('error', (err) => {
             throw err;
