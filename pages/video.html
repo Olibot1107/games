@@ -121,7 +121,7 @@
   let localStream=null,screenStream=null,currentRoom=null,roomRef=null,heartbeatInterval=null,audioContext=null;
   const peers={},analysers={};
   let micEnabled=true,soundEnabled=true,videoEnabled=true,screenSharing=false;
-  let facingMode='environment';
+  let facingMode='user';
 
   function videoConstraints(mode){
     const constraints = { width: 320, height: 180, frameRate: 60 };
