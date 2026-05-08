@@ -58,13 +58,6 @@
   const countEl = document.getElementById('photo-count');
   const progressBar = document.getElementById('progress-bar');
 
-  // Get uid from localStorage, generate if not exists
-  let uid = localStorage.getItem('uid');
-  if (!uid) {
-    uid = Math.random().toString(36).slice(2);
-    localStorage.setItem('uid', uid);
-  }
-
   async function hashFile(file) {
     const buffer = await file.arrayBuffer();
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
@@ -89,7 +82,6 @@
 
     function uploadBatch(batch) {
       const formData = new FormData();
-      formData.append('uid', uid);
 
       // Append hashes first
       batch.forEach(({ file, hash }) => {
@@ -142,7 +134,7 @@
   }
 
   async function loadGallery() {
-    const res = await fetch(`/api/photos?uid=${uid}`);
+    const res = await fetch('/api/photos');
     const data = await res.json();
 
     const photos = data.photos || [];
@@ -171,8 +163,8 @@
 
   document.getElementById('download-btn').addEventListener('click', () => {
     const link = document.createElement('a');
-    link.href = `/api/photos/download?uid=${uid}`;
-    link.download = `photos-${uid}.zip`;
+    link.href = '/api/photos/download';
+    link.download = 'photos.zip';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

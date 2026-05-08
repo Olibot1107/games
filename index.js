@@ -340,11 +340,8 @@ if (!fs.existsSync(COMMENTS_UPLOAD_DIR)) fs.mkdirSync(COMMENTS_UPLOAD_DIR, { rec
 
 const photoStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uid = req.body.uid;
-        if (!uid) return cb(new Error('UID required'), null);
-        const userDir = path.join(PHOTO_UPLOAD_DIR, uid);
-        if (!fs.existsSync(userDir)) fs.mkdirSync(userDir, { recursive: true });
-        cb(null, userDir);
+        if (!fs.existsSync(PHOTO_UPLOAD_DIR)) fs.mkdirSync(PHOTO_UPLOAD_DIR, { recursive: true });
+        cb(null, PHOTO_UPLOAD_DIR);
     },
     filename: (req, file, cb) => {
         if (!req.fileIndex) req.fileIndex = 0;
@@ -396,14 +393,9 @@ app.post('/api/photos/upload', photoUpload.array('photos', 3), (req, res) => {
         return res.status(400).json({ error: 'No photos uploaded' });
     }
 
-    const uid = req.body.uid;
-    if (!uid) {
-        return res.status(400).json({ error: 'UID required' });
-    }
-
     const uploaded = files.map(file => ({
         originalName: file.originalname,
-        url: `/uploads/photos/${uid}/${file.filename}`,
+        url: `/uploads/photos/${file.filename}`,
         uploadedAt: Date.now()
     }));
 
@@ -427,23 +419,17 @@ app.post('/api/comments/upload', commentUpload.array('photos', 5), (req, res) =>
 
 app.get('/api/photos', async (req, res) => {
     try {
-        const uid = req.query.uid;
-        if (!uid) {
+        if (!fs.existsSync(PHOTO_UPLOAD_DIR)) {
             return res.json({ photos: [] });
         }
 
-        const userDir = path.join(PHOTO_UPLOAD_DIR, uid);
-        if (!fs.existsSync(userDir)) {
-            return res.json({ photos: [] });
-        }
-
-        const names = await fs.promises.readdir(userDir);
+        const names = await fs.promises.readdir(PHOTO_UPLOAD_DIR);
         const photos = await Promise.all(names.map(async (filename) => {
-            const fullPath = path.join(userDir, filename);
+            const fullPath = path.join(PHOTO_UPLOAD_DIR, filename);
             const stat = await fs.promises.stat(fullPath);
             return {
                 originalName: filename,
-                url: `/uploads/photos/${uid}/${filename}`,
+                url: `/uploads/photos/${filename}`,
                 uploadedAt: stat.mtimeMs
             };
         }));
@@ -458,23 +444,17 @@ app.get('/api/photos', async (req, res) => {
 
 app.get('/api/photos/download', async (req, res) => {
     try {
-        const uid = req.query.uid;
-        if (!uid) {
-            return res.status(400).json({ error: 'UID required' });
-        }
-
-        const userDir = path.join(PHOTO_UPLOAD_DIR, uid);
-        if (!fs.existsSync(userDir)) {
+        if (!fs.existsSync(PHOTO_UPLOAD_DIR)) {
             return res.status(404).json({ error: 'No photos found' });
         }
 
-        const names = await fs.promises.readdir(userDir);
+        const names = await fs.promises.readdir(PHOTO_UPLOAD_DIR);
         if (!names.length) {
             return res.status(404).json({ error: 'No photos found' });
         }
 
         res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', `attachment; filename="photos-${uid}.zip"`);
+        res.setHeader('Content-Disposition', 'attachment; filename="photos.zip"');
 
         await loadArchiver();
         const archive = createArchive('zip', { zlib: { level: 9 } });
@@ -486,7 +466,7 @@ app.get('/api/photos/download', async (req, res) => {
         archive.pipe(res);
 
         names.forEach(filename => {
-            const filePath = path.join(userDir, filename);
+            const filePath = path.join(PHOTO_UPLOAD_DIR, filename);
             archive.file(filePath, { name: filename });
         });
 
