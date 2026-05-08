@@ -358,7 +358,7 @@ const commentStorage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, COMMENTS_UPLOAD_DIR),
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase();
-        cb(null, `${uuidv4()}${ext}`);
+        cb(null, `${Date.now()}-${file.originalname}`);
     }
 });
 
