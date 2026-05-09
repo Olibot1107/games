@@ -61,7 +61,7 @@ ${bodyPreview}
 });
 
 app.use((req, res, next) => {
-    if (req.path.startsWith('/api/') || req.path.startsWith('/wow') || req.path.startsWith('/math') || req.path.startsWith('/uploads')) return next();
+    if (req.path.startsWith('/api/') ||  req.path.startsWith('/math') || req.path.startsWith('/uploads')) return next();
     if (req.cookies?.ok === 'true') return next();
     return res.redirect('/math/index.html');
 });
@@ -69,8 +69,6 @@ app.use((req, res, next) => {
 registerResourceRoutes(app);
 registerMediaRoutes(app);
 registerSocialRoutes(app);
-
-const htmlCache = new Map();
 
 app.use(async (req, res, next) => {
     if (req.method !== 'GET') return next();
@@ -81,19 +79,11 @@ app.use(async (req, res, next) => {
             : path.join(PUBLIC_DIR, req.path);
 
         try {
-            let html;
-            if (htmlCache.has(filePath)) {
-                html = htmlCache.get(filePath);
-                logInfo(`HTML cache hit: ${req.path}`);
-            } else {
-                html = await fs.promises.readFile(filePath, 'utf8');
-                const inject = `<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>`;
-                html = html.includes('</head>')
-                    ? html.replace('</head>', inject + '</head>')
-                    : html + inject;
-                htmlCache.set(filePath, html);
-                logInfo(`HTML cached: ${req.path}`);
-            }
+            let html = await fs.promises.readFile(filePath, 'utf8');
+            const inject = `<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>`;
+            html = html.includes('</head>')
+                ? html.replace('</head>', inject + '</head>')
+                : html + inject;
 
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             return res.send(html);
