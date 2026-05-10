@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    	<meta name="robots" content="noindex,nofollow" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta http-equiv="pragma" content="no-cache"/>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name ="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta charset="utf-8"/>
+
+        <title>Toaster Dash</title>
+		<script src="poki-sdk.js"></script>
+		<script>
+		
+		</script>
+        <!-- Ad Check -->
+        <script>var adsAreDisabled = true;</script>
+        <script src="html5game/prebid/ads.js"></script>   
+		
+		<!-- Loading Bar -->
+		<script src="html5game/loading.js"></script>   
+        
+        <style>
+            html, body {
+                height: 100%;
+                width: 100%;
+            }
+                        
+            body {
+              background: #f2cf94;
+              color:#cccccc;
+			  
+              margin: 0px;
+              padding: 0px;
+              border: 0px;
+
+			  overflow:hidden;			  
+            }
+    
+            canvas, #canvas {
+	            -webkit-tap-highlight-color: transparent;
+				-webkit-interpolation-mode: nearest-neighbor;
+	            -webkit-touch-callout: none;
+				image-rendering: optimizeSpeed;
+	            
+				-khtml-user-select: none;
+	            -moz-user-select: none;
+	            -ms-user-select: none;
+	            -webkit-user-select: none;	 
+				-ms-touch-action: none;
+				
+	            user-select: none;						
+				
+				margin: 0px;
+				padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+				border: 0px;	
+            }        
+			
+            div.gm4html5_div_class {
+              margin: 0px;
+              padding: 0px;
+              border: 0px;
+            }
+						
+            
+            :-webkit-full-screen #canvas {
+                 width: 100%;
+                 height: 100%;
+            }
+			
+			#bar {
+				background:#5a3a32;
+				width:50%;
+				height: 40px;
+				border:1px solid #5a3a32;
+				
+				top: 60%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				
+				position:fixed;
+				z-index:-9999;
+
+				overflow:visible;
+			}
+			
+			#fill {
+				background-color:#ffffff;
+				position:relative;
+				width:0%;
+				height:100%;
+				margin:0px;
+			}
+			
+			
+			
+			#loading-image {
+				width:150px;
+				height:141px;				
+				
+				margin-top:-130px;
+				
+				position:absolute;				
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				
+				background-image: url('html5game/toaster.png');
+				background-repeat: no-repeat;
+				background-position: center center;
+			}
+        </style>
+    </head>
+
+    <body>
+        <div class="gm4html5_div_class" id="gm4html5_div_id">
+            <canvas id="canvas" width="1024" height="576">
+               <p>Your browser doesn't support HTML5 canvas.</p>
+            </canvas>
+			<script type="text/javascript" src="html5game/ToasterPoki.js"></script>
+			
+			<!-- Loading Bar -->
+			<div id="bar"><div id="loading-image"></div><div id="fill"></div></div>
+		</div>
+			
+		<script>
+		var sdk 		= PokiSDK;
+		var pokiDebug 	= false;
+        var canvas      = document.getElementById("canvas");
+		
+		
+		function poki_log(t) {
+			console.log(t);
+		}
+            
+        function poki_debug() {
+            return pokiDebug;
+        }
+		
+		function poki_loading(percents) {
+			sdk.gameLoadingProgress({percentageDone: percents});
+		}
+		
+		function rejection_handler( error ) {
+			console.error("Unhandled: " + error.message);
+			return false;
+		}		
+
+		window.onload = function() {
+			loading_start();
+			
+			sdk.init().then(() => {
+				//let _delay = adsAreDisabled ? 1 : 1;
+                //setTimeout(, _delay);
+				
+				GameMaker_Init();
+				
+                sdk.setDebug(pokiDebug);   
+				sdk.gameLoadingStart();	   
+
+			}).catch(e => {
+                console.log("ERROR:" + e.message);
+                GameMaker_Init();
+			});
+            
+            canvas.width  = window.innerWidth;
+            canvas.height = window.innerHeight;
+            canvas.addEventListener('click', function(){
+                window.focus();
+            });      
+            
+			canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock;
+			document.exitPointerLock = document.exitPointerLock || document.mozExitPointerLock;     
+		}
+		</script>			
+    </body>
+</html>

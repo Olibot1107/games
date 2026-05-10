@@ -1,0 +1,79 @@
+#button  {
+
+  transition-duration: 0.4s;
+  
+  
+  background-color: #04AA6D;
+  
+  opacity:0.6;
+  /*background-color: rgba(0, 0, 255, 0.3);*/
+  
+  border: none;
+  color: white;
+  /*font-size: 30px;*/
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  border-radius: 12px;
+  font-weight: bold;
+  /*padding: 15px 32px;*/
+}
+
+#button:hover {
+  background-color: #04AA6D;
+  opacity:1;
+  border: none;
+  color: white;
+}
+
+/*///////////////////////*/
+
+#button2  {
+
+  transition-duration: 0.4s;
+  
+  
+  background-color: #ff0000;
+  
+  opacity:0.6;
+  /*background-color: rgba(0, 0, 255, 0.3);*/
+  
+  border: none;
+  color: white;
+  /*font-size: 30px;*/
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  border-radius: 12px;
+  font-weight: bold;
+  /*padding: 15px 32px;*/
+}
+
+#button2:hover {
+  background-color: #ff0000;
+  opacity:1;
+  border: none;
+  color: white;
+}
+
+/*///////////////////////*/
+
+#ButtonHub  {
+  background-color: rgba(0, 0, 255, 0);
+  transition-duration: 0.4s;
+  border: none;
+  color: white;  
+  text-align: center;  
+  text-decoration: none;
+  display: inline-block;
+  border-radius: 12px;
+  font-weight: bold;
+
+}
+
+#ButtonHub:hover {
+  background-color: rgba(0, 255, 0, 0);
+  border: none;
+
+
+}

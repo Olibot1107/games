@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<data>
+	
+	<!--Add list of files you're including in your localization here
+	    The engine will NOT load any files that are not listed.	
+	-->
+	
+	<file id="data" value="data.tsv"/>
+	
+	<!-- <file id="fonts" value="fonts.xml"/> -->
+	
+	
+	<!--Add locale entries here. 
+	
+	The locale id is the ISO 639-1 country language code with 2-letter country suffix:
+	http://en.wikipedia.org/wiki/ISO_639-1
+	
+	1) Add the locale entry
+	2) Add a corresponding folder with localization content matching the id
+	3) Add a corresponding flag image in the _flags folder matching the id
+	4) Add any labels you want to display the language text in the menu
+	
+	-->
+	
+	<!--American English-->
+	<!-- <locale id="en-US" is_default="true" sort="0">	
+		<contributors value="DrDerico"/>
+    </locale>    
+	
+	<locale id="ru-RU" is_default="false" sort="1">	
+		<contributors value="DrDerico"/>
+    </locale>   
+	
+	<locale id="es-ES" is_default="false" sort="2">	
+		<contributors value="DrDerico"/>
+    </locale> 
+	
+	<locale id="pt-BR" is_default="false" sort="3">	
+		<contributors value="DrDerico"/>
+    </locale>    
+	
+	<locale id="fr-FR" is_default="false" sort="4">	
+		<contributors value="DrDerico"/>
+    </locale>  
+	
+	<locale id="it-IT" is_default="false" sort="5">	
+		<contributors value="DrDerico"/>
+    </locale> 	 -->
+	
+	<locale id="coolMathEnUS" is_default="true" sort="6">	
+		<contributors value="DrDerico"/>
+    </locale>    
+	
+	
+</data>

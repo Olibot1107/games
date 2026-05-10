@@ -1,0 +1,53 @@
+flag	content
+$STAGE	STAGE
+$SCORE	SCORE
+$TAP_TO_START	TAP TO START
+$TAP_TO_CONTINUE	TAP TO CONTINUE
+$CLICK_TO_START	CLICK TO START
+$CLICK_TO_CONTINUE	CLICK TO CONTINUE
+$YOU_FOUND	You found the
+$SHIELD_ITEM_NAME	Warlock's Shield<N>-----------------
+$MAGNET_ITEM_NAME	White Monk's Magnet<N>-----------------
+$TOMB_ITEM_NAME	Tomb<N>-----------------
+$SHIELD_ITEM_DESC	It protects you<N>from any harm
+$MAGNET_ITEM_DESC	It attracts to you<N>all nearby coins and gems
+$TOMB_ITEM_DESC	Someone were defeated here.<N>Maybe it was YOU!
+$WELCOME_MESS	Welcome to the Tower of Destiny!<N><N>Your goal is to climb up the tower<N>as high as possible and score<N>as many points as you can.<N><N>Open chests, pick up gems and<N>avoid dangerous obstacles.
+$TUTOR1	Tap on the screen to JUMP
+$TUTOR1_CLICK	Click to JUMP<N>(or press SPACE key)
+$TUTOR2	Excellent! Now pick up that gem
+$TUTOR3	And once more :)
+$TUTOR4	Good! Now open up that chest
+$TUTOR5	Awesome! Now jump on that ladder!
+$TUTOR_END	Congratulations!<N><N>You're doing great!<N>But from now you will go alone.<N><N>Here is a hint for you:<N><N>JUMP ON AN ENEMY TO DEFEAT IT!<N><N>Good luck!!!
+$PAUSE	PAUSE
+$QUIT_THE_TOWER	Leave the Tower?<N><N>Your progress<N>will be saved
+$QUIT_THE_GAME	Quit the game?
+$CREDITS	Author: DrDerico<N>drderico.com<N><N>(C) 2016
+$SHOP_TITLE	SHOP OF UPGRADES
+$LIVES_ITEM_NAME	Lives
+$SHOP_SHIELD_ITEM_NAME	Warlock's Shield
+$SHOP_MAGNET_ITEM_NAME	White Monk's Magnet
+$SHOP_ACTION_TIME	Duration:
+$SHOP_LIVES_AMOUNT	Amount:
+$SECONDS	seconds
+$PLUS_2_SECONDS	+2 secs
+$PLUS_1_LIFE	+1 life
+$BUY_MAGNET_CONFIRM	Upgrade the Magent<N>for <X> coins?
+$BUY_SHIELD_CONFIRM	Upgrade the Shield<N>for <X> coins?
+$BUY_HEALTH_CONFIRM	Buy the Life<N>for <X> gems?
+$NOT_ENOUGH_MONEY_TO_BUY	You haven't enough<N>coins
+$NOT_ENOUGH_GEMS_TO_BUY	You haven't enough<N>gems
+$ARTEFACT_ITEM_NAME	Kitty<N>-----------
+$ARTEFACT_ITEM_DESC	Save the kitty to make<N>the world a little bit better<N>and to get additional score points
+$MEOW	Meow
+$SHOP_BTN_TUTORIAL	You can buy something<N>valuable in the<N>Shop of Upgrades
+$NEW_HIGH_SCORE	NEW HIGH SCORE
+$GOOGLE_SAVE_LOADED	Saved game state from<N>Google Play<N>successfully loaded
+$BATCH_OFFER_UNLOCKED	Congrats!<N>You've unlocked 5 lives,<N>100 gems and 150 coins<N>thanks to <X>!
+$CONTINUE_SAVED_GAME	Continue the game<N>from  <X>  stage?
+$SHOP_SKINS_TITLE	WARDROBE
+$SHOP_SKIN_BTN_TUTORIAL	You can change<N>Hero's look<N>in the Wardrobe
+$SHOP_SKIN_BUY_CONFIRM	Want to buy<N>this costume<N>for  <X>  coins?
+$GET_FREE_COINS	Get <X> coins<N>FOR FREE
+$YOU_GOT_FREE_COINS	Congrats!<N>You've got<N><X> coins!

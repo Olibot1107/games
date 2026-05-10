@@ -1,0 +1,192 @@
+<!--
+Supernova
+
+@author Kasper Mol <awsumthx@gmail.com>
+-->
+<!doctype HTML>
+<html lang="en">
+
+<head>
+    <meta name="robots" content="noindex">
+    <meta charset="utf-8" />
+    <meta name=viewport
+        content="width=device-width, initial-scale=1.0, maximum-scale=1, shrink-to-fit=no, user-scalable=no, minimal-ui" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+
+    <title>Supernova</title>
+
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:600,900&display=block" rel="stylesheet">
+    <link rel="stylesheet" href="style.css" />
+
+    <link rel="preload" href="ship.obj" type="text/plain" as="script" />
+    <link rel="preload" href="ship-2.obj" type="text/plain" as="script" />
+    <link rel="preload" href="ship-3.obj" type="text/plain" as="script" />
+    <link rel="preload" href="ship-4.obj" type="text/plain" as="script" />
+    <link rel="preload" href="ship-5.obj" type="text/plain" as="script" />
+</head>
+
+<body>
+    <div id="loading-screen">
+        <div class="inner">
+            SUPERNOVA
+            <div id="load-text">loading...</div>
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+            style="margin: 0 auto;background: none; display: block; shape-rendering: auto;" viewBox="0 0 300 300"
+            preserveAspectRatio="xMidYMid">
+            <circle id="c1" cx="150" cy="150" r="4.09394" fill="none" stroke="#ffffff" stroke-width="1"></circle>
+            <circle id="c2" cx="150" cy="150" r="11.1541" fill="none" stroke="#46dff0" stroke-width="1"></circle>
+        </svg>
+    </div>
+    <section id="ingame" data-states="ingame dying paused end-screen">
+        <div id="flash"></div>
+        <div id="level-transition">LEVEL X</div>
+        <!-- <div id="touch-indicator">
+			<div id="touch-indicator-inner"></div>
+		</div> -->
+        <div id="controls">
+            <div class="row">
+                <div class="key" id="key-up"></div>
+            </div>
+            <div class="row">
+                <div class="key" id="key-left"></div>
+                <div class="key" id="key-down"></div>
+                <div class="key" id="key-right"></div>
+            </div>
+        </div>
+        <div id="pause-button" class="button" skip-focus="true">II</div>
+        <div id="progress">
+            <div id="level"></div>
+            <div id="next-level"></div>
+            <div class="inner">
+                <div id="progress-bar" style="transform:scale3d(0, 1, 1)"></div>
+            </div>
+        </div>
+        <div id="world-bars">
+            <div class="world-ship">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                    <path
+                        d="M8.566 17.842c-.945 2.462-3.678 4.012-6.563 4.161.139-2.772 1.684-5.608 4.209-6.563l.51.521c-1.534 1.523-2.061 2.765-2.144 3.461.704-.085 2.006-.608 3.483-2.096l.505.516zm-1.136-11.342c-1.778-.01-4.062.911-5.766 2.614-.65.649-1.222 1.408-1.664 2.258 1.538-1.163 3.228-1.485 5.147-.408.566-1.494 1.32-3.014 2.283-4.464zm5.204 17.5c.852-.44 1.61-1.013 2.261-1.664 1.708-1.706 2.622-4.001 2.604-5.782-1.575 1.03-3.125 1.772-4.466 2.296 1.077 1.92.764 3.614-.399 5.15zm11.312-23.956c-.428-.03-.848-.044-1.261-.044-9.338 0-14.465 7.426-16.101 13.009l4.428 4.428c5.78-1.855 12.988-6.777 12.988-15.993v-.059c-.002-.437-.019-.884-.054-1.341zm-5.946 7.956c-1.105 0-2-.895-2-2s.895-2 2-2 2 .895 2 2-.895 2-2 2z" />
+                </svg>
+            </div>
+        </div>
+        <div id="skip-button-ingame" class="skip-button button" default-active="false" skip-focus="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="19 19 32 32">
+                <path fill-rule="evenodd" stroke="none" fill="none"
+                    d="M32,2 C32,0.895 31.105,0 30,0 L2,0 C0.895,0 0,0.895 0,2 L0,30 C0,31.105 0.895,32 2,32 L30,32 C31.105,32 32,31.105 32,30 L32,2 Z M6,30 L2,30 L2,26 L6,26 L6,30 Z M6,24 L2,24 L2,20 L6,20 L6,24 Z M6,18 L2,18 L2,14 L6,14 L6,18 Z M6,12 L2,12 L2,8 L6,8 L6,12 Z M6,6 L2,6 L2,2 L6,2 L6,6 Z M14,22 L14,10 L20,16 L14,22 Z M30,30 L26,30 L26,26 L30,26 L30,30 Z M30,24 L26,24 L26,20 L30,20 L30,24 Z M30,18 L26,18 L26,14 L30,14 L30,18 Z M30,12 L26,12 L26,8 L30,8 L30,12 Z M30,6 L26,6 L26,2 L30,2 L30,6 Z"
+                    transform="translate(19 19)"></path>
+            </svg>
+            <span>SKIP</span>
+        </div>
+        <div id="speed">
+            <span id="speed-etc">SPEED</span>
+            <span id="speed-number"></span>
+            <span id="speed-best">BEST: 0</span>
+        </div>
+        <div id="streak">
+            <span id="streak-etc">STREAK</span>
+            <span id="streak-number">0</span>
+            <span id="streak-best">BEST: 0</span>
+        </div>
+    </section>
+
+    <section id="paused" data-states="paused">
+        <div id="ingame-display"></div>
+        <h2>PAUSED</h2>
+        <div class="buttons">
+            <div id="exit-button" class="button" default-active="false">
+                EXIT
+            </div>
+            <div id="skip-button-pause" class="skip-button button" default-active="false" disabled="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="19 19 32 32">
+                    <path fill-rule="evenodd" stroke="none" fill="none"
+                        d="M32,2 C32,0.895 31.105,0 30,0 L2,0 C0.895,0 0,0.895 0,2 L0,30 C0,31.105 0.895,32 2,32 L30,32 C31.105,32 32,31.105 32,30 L32,2 Z M6,30 L2,30 L2,26 L6,26 L6,30 Z M6,24 L2,24 L2,20 L6,20 L6,24 Z M6,18 L2,18 L2,14 L6,14 L6,18 Z M6,12 L2,12 L2,8 L6,8 L6,12 Z M6,6 L2,6 L2,2 L6,2 L6,6 Z M14,22 L14,10 L20,16 L14,22 Z M30,30 L26,30 L26,26 L30,26 L30,30 Z M30,24 L26,24 L26,20 L30,20 L30,24 Z M30,18 L26,18 L26,14 L30,14 L30,18 Z M30,12 L26,12 L26,8 L30,8 L30,12 Z M30,6 L26,6 L26,2 L30,2 L30,6 Z"
+                        transform="translate(19 19)"></path>
+                </svg>
+                <span>SKIP</span>
+            </div>
+            <div id="resume-button" class="button big" default-active="true">
+                PLAY
+            </div>
+        </div>
+    </section>
+
+    <section id="unlock" data-states="unlock">
+        <div class="inner">
+            <h2>NEW SHIP</h2>
+            <div class="buttons">
+                <div id="resume-button-unlock" class="button big" default-active="true">
+                    SELECT
+                </div>
+
+                <div id="continue-button-unlock" class="button" default-active="false">
+                    CONTINUE
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="control-panel" data-states="control-panel">
+        <div id="back-button" class="button" skip-focus="true">X</div>
+        <h2>Ships</h2>
+        <div class="buttons">
+            <div id="prev-ship" class="button navigation" skip-focus="true">&lsaquo;</div>
+            <div id="select-ship-button" class="button big" default-active="true">
+                SELECT
+            </div>
+            <div id="next-ship" class="button navigation" skip-focus="true">&rsaquo;</div>
+        </div>
+    </section>
+
+    <section id="main-menu" data-states="main-menu">
+        <div id="settings-button" class="button" skip-focus="true">
+            <svg height="48" viewBox="0 0 48 48" width="48" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 0h48v48H0z" fill="none" />
+                <path
+                    d="M38.86 25.95c.08-.64.14-1.29.14-1.95s-.06-1.31-.14-1.95l4.23-3.31c.38-.3.49-.84.24-1.28l-4-6.93c-.25-.43-.77-.61-1.22-.43l-4.98 2.01c-1.03-.79-2.16-1.46-3.38-1.97L29 4.84c-.09-.47-.5-.84-1-.84h-8c-.5 0-.91.37-.99.84l-.75 5.3c-1.22.51-2.35 1.17-3.38 1.97L9.9 10.1c-.45-.17-.97 0-1.22.43l-4 6.93c-.25.43-.14.97.24 1.28l4.22 3.31C9.06 22.69 9 23.34 9 24s.06 1.31.14 1.95l-4.22 3.31c-.38.3-.49.84-.24 1.28l4 6.93c.25.43.77.61 1.22.43l4.98-2.01c1.03.79 2.16 1.46 3.38 1.97l.75 5.3c.08.47.49.84.99.84h8c.5 0 .91-.37.99-.84l.75-5.3c1.22-.51 2.35-1.17 3.38-1.97l4.98 2.01c.45.17.97 0 1.22-.43l4-6.93c.25-.43.14-.97-.24-1.28l-4.22-3.31zM24 31c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
+            </svg>
+        </div>
+        <div id="continue-button" class="button big" default-active="true" active="true">
+            Play
+            <div id="play-level-button" class="button-sub"></div>
+        </div>
+        <div id="ships-button" class="ships-button button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                <path
+                    d="M8.566 17.842c-.945 2.462-3.678 4.012-6.563 4.161.139-2.772 1.684-5.608 4.209-6.563l.51.521c-1.534 1.523-2.061 2.765-2.144 3.461.704-.085 2.006-.608 3.483-2.096l.505.516zm-1.136-11.342c-1.778-.01-4.062.911-5.766 2.614-.65.649-1.222 1.408-1.664 2.258 1.538-1.163 3.228-1.485 5.147-.408.566-1.494 1.32-3.014 2.283-4.464zm5.204 17.5c.852-.44 1.61-1.013 2.261-1.664 1.708-1.706 2.622-4.001 2.604-5.782-1.575 1.03-3.125 1.772-4.466 2.296 1.077 1.92.764 3.614-.399 5.15zm11.312-23.956c-.428-.03-.848-.044-1.261-.044-9.338 0-14.465 7.426-16.101 13.009l4.428 4.428c5.78-1.855 12.988-6.777 12.988-15.993v-.059c-.002-.437-.019-.884-.054-1.341zm-5.946 7.956c-1.105 0-2-.895-2-2s.895-2 2-2 2 .895 2 2-.895 2-2 2z" />
+            </svg>
+        </div>
+    </section>
+
+    <section id="settings" data-states="settings">
+        <h2>SETTINGS</h2>
+        <div id="back-button-settings" class="button" skip-focus="true">X</div>
+        <div class="buttons">
+            <h3>Resolution</h3>
+            <div id="resolution-low" class="button">LOW</div>
+            <div id="resolution-default" class="button">DEFAULT</div>
+            <div id="resolution-ultra" class="button">ULTRA</div>
+        </div>
+        <div id="credits">
+            <strong><span>SUPERNOVA was created with ♡</span>&nbsp;<span>by Kasper Mol</span></strong>
+            Visit me on <a href="https://kokos.games">kokos.games</a>
+        </div>
+    </section>
+
+    <script>
+        window.dataLayer = window.dataLayer || [];
+		function gtag(){}
+    </script>
+
+    <script async src="scripts/bootstrap.min.js"></script>
+    <script async src="poki-sdk.js"></script>
+   <!--  <script defer
+        src="https://static.cloudflareinsights.com/beacon.min.js/v84a3a4012de94ce1a686ba8c167c359c1696973893317"
+        integrity="sha512-euoFGowhlaLqXsPWQ48qSkBSCFs3DPRyiwVu3FjR96cMPx+Fr+gpWRhIafcHwqwCqWS42RZhIudOvEI+Ckf6MA=="
+        data-cf-beacon='{"rayId":"835c4fd339c77167","version":"2023.10.0","token":"08a46637120a404a963395dd86986b4f"}'
+        crossorigin="anonymous"></script>
+
+         -->
+</body>
+
+</html>
