@@ -1,13 +1,16 @@
 const {
     COMMENTS_FILE,
     PLAYS_FILE,
+    DATA_FILE,
     VOTES_FILE,
     ensureBaseDirs,
     parseJsonBody,
     readComments,
     readPlays,
+    readData,
     readVotes,
     writeComments,
+    writeData,
     writePlays,
     writeVotes,
 } = require('./data');
@@ -18,6 +21,13 @@ function registerSocialRoutes(app) {
     if (!require('fs').existsSync(VOTES_FILE)) require('fs').writeFileSync(VOTES_FILE, '{}', 'utf8');
     if (!require('fs').existsSync(COMMENTS_FILE)) require('fs').writeFileSync(COMMENTS_FILE, '{}', 'utf8');
     if (!require('fs').existsSync(PLAYS_FILE)) require('fs').writeFileSync(PLAYS_FILE, '{}', 'utf8');
+    if (!require('fs').existsSync(DATA_FILE)) require('fs').writeFileSync(DATA_FILE, '{"totalBytes":0,"totalRequests":0}', 'utf8');
+
+    app.get('/api/data', (req, res) => {
+        const data = readData();
+        const gb = (data.totalBytes / (1024 * 1024 * 1024)).toFixed(2);
+        res.json({ totalGB: gb, totalRequests: data.totalRequests });
+    });
 
     app.post('/api/vote', (req, res) => {
         const data = parseJsonBody(req);

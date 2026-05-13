@@ -10,3 +10,5 @@ plays.json
 uploads
 photo_uploads.json
 package-lock.json
+requests.json
+data.json

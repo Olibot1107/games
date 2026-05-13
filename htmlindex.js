@@ -1337,4 +1337,34 @@ function updateImagePreview() {
 
 updateCommentInputHint(0);
 
+// Fetch and display data sent
+function fetchDataCount() {
+    fetch('/api/data')
+        .then(r => r.json())
+        .then(data => {
+            const gbElement = document.getElementById('data-count');
+            const reqElement = document.getElementById('requests-count');
+            if (gbElement) {
+                gbElement.textContent = data.totalGB + ' GB';
+            }
+            if (reqElement) {
+                reqElement.textContent = 'Resources Loaded: ' + data.totalRequests.toLocaleString();
+            }
+        })
+        .catch(e => {
+            const gbElement = document.getElementById('data-count');
+            const reqElement = document.getElementById('requests-count');
+            if (gbElement) {
+                gbElement.textContent = 'Error';
+            }
+            if (reqElement) {
+                reqElement.textContent = 'Resources Loaded: Error';
+            }
+            log('Data count error: ' + e.message);
+        });
+}
+
+// Fetch data count on load
+fetchDataCount();
+
 });

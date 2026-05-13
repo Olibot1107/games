@@ -323,6 +323,7 @@ function registerResourceRoutes(app) {
             }
         }));
 
+        res.set('X-Resource-Count', results.length);
         res.json({ files: results });
     });
 

@@ -11,6 +11,7 @@ const COMMENTS_UPLOAD_DIR = path.join(UPLOADS_DIR, 'comments');
 const VOTES_FILE = path.join(ROOT_DIR, 'votes.json');
 const COMMENTS_FILE = path.join(ROOT_DIR, 'comments.json');
 const PLAYS_FILE = path.join(ROOT_DIR, 'plays.json');
+const DATA_FILE = path.join(ROOT_DIR, 'data.json');
 
 const RESOURCE_KEY = Buffer.from('games-shell-v1');
 
@@ -121,6 +122,14 @@ function writePlays(plays) {
     writeJsonFile(PLAYS_FILE, plays);
 }
 
+function readData() {
+    return readJsonFile(DATA_FILE, { totalBytes: 0 });
+}
+
+function writeData(data) {
+    writeJsonFile(DATA_FILE, data);
+}
+
 function xorBufferFast(buffer) {
     const keyLen = RESOURCE_KEY.length;
     const bufLen = buffer.length;
@@ -205,6 +214,7 @@ module.exports = {
     PHOTO_UPLOAD_DIR,
     PLAYS_FILE,
     PUBLIC_DIR,
+    DATA_FILE,
     RESOURCE_KEY,
     UPLOADS_DIR,
     VOTES_FILE,
@@ -218,11 +228,13 @@ module.exports = {
     mimeTypes,
     parseJsonBody,
     readComments,
+    readData,
     readJsonFile,
     readPlays,
     readVotes,
     resolvePublicFile,
     writeComments,
+    writeData,
     writeJsonFile,
     writePlays,
     writeVotes,

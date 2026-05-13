@@ -6,11 +6,14 @@ const cookieParser = require('cookie-parser');
 
 const {
     PUBLIC_DIR,
+    DATA_FILE,
     RESOURCE_KEY,
     colors,
     logError,
     logInfo,
     logSuccess,
+    readData,
+    writeData,
 } = require('./server/data');
 const { registerMediaRoutes } = require('./server/mediaRoutes');
 const { registerResourceRoutes, setupMathRepo } = require('./server/resourceRoutes');
@@ -57,6 +60,24 @@ ${bodyPreview}
         logError('Debug logging failed: ' + err.message);
     }
 
+    next();
+});
+
+app.use((req, res, next) => {
+    res.on('finish', () => {
+        try {
+            const data = readData();
+            const length = parseInt(res.get('Content-Length')) || 0;
+            if (length > 0) {
+                data.totalBytes += length;
+            }
+            const resourceCount = parseInt(res.get('X-Resource-Count')) || 1;
+            data.totalRequests += resourceCount;
+            writeData(data);
+        } catch (e) {
+            // ignore
+        }
+    });
     next();
 });
 
