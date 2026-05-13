@@ -51,20 +51,26 @@
      Stable Release
    </span>
  </div>
+<div class="w-full bg-white border border-slate-200 rounded-xl px-6 py-5 shadow-sm mb-6 space-y-4">
 
- <div class="w-full bg-white border border-slate-200 rounded-xl px-6 py-4 shadow-sm mb-6">
-   <div class="flex items-center justify-between">
-     <div class="flex items-center gap-3">
-       <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-       <span class="text-sm text-slate-500 uppercase tracking-wide">Data Sent</span>
-     </div>
-     <span class="text-sm text-slate-400">Since Launch</span>
-   </div>
-   <div class="mt-2">
-     <h2 id="data-count" class="text-lg font-semibold text-slate-800">Loading...</h2>
-     <p id="requests-count" class="text-sm text-slate-600">Resources Loaded: Loading...</p>
-   </div>
- </div>
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <h2 class="text-sm font-medium text-slate-600 uppercase tracking-wide">
+      How much data has the website handled since launch?
+    </h2>
+  </div>
+
+  <!-- Stats -->
+  <div class="flex flex-col gap-2">
+    <h2 id="data-count" class="text-2xl font-bold text-blue-600">
+      Loading...
+    </h2>
+
+    <h2 id="requests-count" class="text-2xl font-bold text-green-600">
+      Loading...
+    </h2>
+  </div>
+</div>
 
 <div class="bg-white rounded-lg p-5 mb-6 shadow">
   <h2 class="text-xl font-semibold mb-3 text-slate-800">Tools</h2>

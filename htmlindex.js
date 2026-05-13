@@ -1345,10 +1345,10 @@ function fetchDataCount() {
             const gbElement = document.getElementById('data-count');
             const reqElement = document.getElementById('requests-count');
             if (gbElement) {
-                gbElement.textContent = data.totalGB + ' GB';
+                gbElement.textContent = data.totalGB + ' GB Worth of network data';
             }
             if (reqElement) {
-                reqElement.textContent = 'Resources Loaded: ' + data.totalRequests.toLocaleString();
+                reqElement.textContent = 'Files Loaded: ' + data.totalRequests.toLocaleString();
             }
         })
         .catch(e => {
