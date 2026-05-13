@@ -31,13 +31,25 @@ if(!localStorage.getItem('uid')){
 const uid = localStorage.getItem('uid');
 const clientId = getClientId();
 
-// Check for reload from game
+let userPlayTime = {};
+try { userPlayTime = JSON.parse(getCookie('playTime') || '{}'); } catch(e){}
+
+// Check for reload from game (tracks play duration)
 if (performance.getEntriesByType('navigation')[0].type === 'reload' && document.referrer) {
     try {
         const url = new URL(document.referrer);
-        const match = url.pathname.match(/^\/good\/([^\/]+)\/index\.html$/);
+        const match = url.pathname.match(/^\/(good|nova)\/([^\/]+)\/index\.html$/);
         if (match) {
-            const game = match[1];
+            const game = match[2];
+            const startTime = parseInt(getCookie('playStart_' + game) || '0', 10);
+            const duration = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+            if (duration > 0) {
+                if (!userPlayTime[game]) userPlayTime[game] = 0;
+                userPlayTime[game] += duration;
+                setCookie('playTime', JSON.stringify(userPlayTime));
+            }
+            setCookie('playStart_' + game, '', -1);
+            
             fetch('/api/plays', {
                 method: 'POST',
                 headers: {'Content-Type':'application/json'},
@@ -345,13 +357,22 @@ function createGameItem(game, votes){
     playCountBtn.title = `Played ${playData[game.name] || 0} time${(playData[game.name] || 0) === 1 ? '' : 's'}`;
     playCountBtn.onclick = () => openPlayModal(game.name);
 
+    const userTimeBtn = document.createElement('button');
+    userTimeBtn.type = 'button';
+    userTimeBtn.className = 'bg-purple-100 px-2 rounded text-purple-700';
+    const userSecs = userPlayTime[game.name] || 0;
+    const userMins = Math.floor(userSecs / 60);
+    const userHrs = Math.floor(userMins / 60);
+    userTimeBtn.textContent = userHrs > 0 ? `⏱ ${userHrs}h ${userMins % 60}m ${userSecs % 60}s` : userMins > 0 ? `⏱ ${userMins}m ${userSecs % 60}s` : `⏱ ${userSecs}s`;
+    userTimeBtn.title = `Your total play time: ${userHrs}h ${userMins % 60}m ${userSecs % 60}s`;
+
     const count = document.createElement('div');
     count.innerHTML = `
         <span class="text-green-600">${votes.up}</span> 👍 
         <span class="text-red-600">${votes.down}</span> 👎
     `;
 
-    right.append(up, down, neutralBtn, commentBtn, count, playCountBtn);
+    right.append(up, down, neutralBtn, commentBtn, count, playCountBtn, userTimeBtn);
     li.append(left, right);
 
     return li;
@@ -374,8 +395,10 @@ function renderGames(){
         const bComments = commentData[b.name]?.count || 0;
         const aPlays = playData[a.name] || 0;
         const bPlays = playData[b.name] || 0;
-        const aScore = (aV.up - aV.down) + aComments + Math.floor(aPlays / 30);
-        const bScore = (bV.up - bV.down) + bComments + Math.floor(bPlays / 30);
+        const aUserTime = userPlayTime[a.name] || 0;
+        const bUserTime = userPlayTime[b.name] || 0;
+        const aScore = (aV.up - aV.down) + aComments + Math.floor(aPlays / 30) + Math.floor(aUserTime / 60);
+        const bScore = (bV.up - bV.down) + bComments + Math.floor(bPlays / 30) + Math.floor(bUserTime / 60);
         return bScore - aScore;
     });
 
@@ -463,6 +486,7 @@ function fetchPlayCounts(){
 }
 
 function incrementPlayAndNavigate(game, href){
+    setCookie('playStart_' + game.name, Date.now());
     fetch('/api/plays', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
@@ -558,6 +582,16 @@ function timeAgo(timestamp) {
     if (hours < 24) return hours === 1 ? '1h ago' : `${hours}h ago`;
     if (days < 7) return days === 1 ? '1d ago' : `${days}d ago`;
     return new Date(timestamp).toLocaleDateString();
+}
+
+function initPlayTimeTracking(gameName){
+    const cookieName = 'playStart_' + gameName;
+    if(!document.cookie.split(';').some(c => c.trim().startsWith(cookieName + '='))){
+        document.cookie = cookieName + '=' + Date.now() + '; path=/';
+    }
+    window.addEventListener('beforeunload', function(){
+        document.cookie = cookieName + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+    });
 }
 
 function normalizeCommentImageUrl(url) {
