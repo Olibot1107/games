@@ -257,16 +257,6 @@ function saveFavorites(){
     renderFavorites();
 }
 
-function toggleFavorite(game){
-    if(favorites.includes(game)){
-        favorites = favorites.filter(f => f !== game);
-    } else {
-        favorites.push(game);
-    }
-    saveFavorites();
-    renderGames();
-}
-
 function renderFavorites(){
     if(!favoritesList) return;
 
@@ -281,9 +271,15 @@ function renderFavorites(){
         const li = document.createElement('li');
         li.className = "flex justify-between";
 
+        // Find the actual game object
+        const gameData = allGames.find(g => g.name === f);
+
+        // Fallback to good if somehow missing
+        const category = gameData ? gameData.category : 'good';
+
         const a = document.createElement('a');
         a.textContent = f;
-        a.href = `/good/${f}/index.html`;
+        a.href = `/${category}/${f}/index.html`;
         a.className = "text-blue-500 hover:underline";
 
         const btn = document.createElement('button');
