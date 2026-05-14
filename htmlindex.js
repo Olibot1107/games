@@ -257,6 +257,16 @@ function saveFavorites(){
     renderFavorites();
 }
 
+function toggleFavorite(game){
+    if(favorites.includes(game)){
+        favorites = favorites.filter(f => f !== game);
+    } else {
+        favorites.push(game);
+    }
+    saveFavorites();
+    renderGames();
+}
+    
 function renderFavorites(){
     if(!favoritesList) return;
 
