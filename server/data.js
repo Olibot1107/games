@@ -7,11 +7,13 @@ const PUBLIC_DIR = ROOT_DIR;
 const UPLOADS_DIR = path.join(ROOT_DIR, 'uploads');
 const PHOTO_UPLOAD_DIR = path.join(UPLOADS_DIR, 'photos');
 const COMMENTS_UPLOAD_DIR = path.join(UPLOADS_DIR, 'comments');
+const MEDIA_CACHE_DIR = path.join(ROOT_DIR, 'media-cache');
 
 const VOTES_FILE = path.join(ROOT_DIR, 'votes.json');
 const COMMENTS_FILE = path.join(ROOT_DIR, 'comments.json');
 const PLAYS_FILE = path.join(ROOT_DIR, 'plays.json');
 const DATA_FILE = path.join(ROOT_DIR, 'data.json');
+const SOUNDS_FILE = path.join(ROOT_DIR, 'sounds.json');
 
 const RESOURCE_KEY = Buffer.from('games-shell-v1');
 
@@ -61,6 +63,7 @@ function ensureBaseDirs() {
     ensureDir(UPLOADS_DIR);
     ensureDir(PHOTO_UPLOAD_DIR);
     ensureDir(COMMENTS_UPLOAD_DIR);
+    ensureDir(MEDIA_CACHE_DIR);
 }
 
 function logInfo(msg) {
@@ -216,7 +219,9 @@ module.exports = {
     PUBLIC_DIR,
     DATA_FILE,
     RESOURCE_KEY,
+    SOUNDS_FILE,
     UPLOADS_DIR,
+    MEDIA_CACHE_DIR,
     VOTES_FILE,
     colors,
     createCommentUploadFilename,

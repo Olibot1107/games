@@ -271,6 +271,7 @@ self.addEventListener('fetch', event => {
   if (url.pathname.startsWith('/math/')) return;
   if (url.pathname.includes('/client_status')) return;
   if (url.pathname.startsWith('/auth/postback/')) return;
+  if (url.pathname.startsWith('/media/')) return;
   if (url.pathname === '/') return;
   
   event.respondWith((async () => {
