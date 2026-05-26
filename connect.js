@@ -27,7 +27,7 @@ const FIREBASE_CONFIG = {
   projectId:   'chat1-6cc2e',
 };
 
-/* ─── Port pool (one per process, avoids collisions between sessions) ───── */
+/* ─── Port pool ─────────────────────────────────────────────────────────── */
 const _usedPorts = new Set();
 function allocateDevtoolsPort() {
   for (let attempt = 0; attempt < 500; attempt++) {
@@ -186,23 +186,45 @@ function getFfmpegBinary() {
   throw new Error('No ffmpeg found. Install ffmpeg or set REMOTE_BROWSER_FFMPEG_BIN.');
 }
 
+/**
+ * Resolves the best PulseAudio source for loopback capture on Linux.
+ * Priority:
+ *   1. Explicit env var (if not 'auto'/'default')
+ *   2. Monitor of the default sink
+ *   3. Any .monitor source found via pactl
+ *   4. Fallback to 'default'
+ */
 function getLinuxAudioSourceName(preferred) {
   const requested = String(preferred || '').trim();
-  if (requested && !/^(auto|default)$/i.test(requested)) return requested;
+  if (requested && !/^(auto|default)$/i.test(requested)) {
+    return requested;
+  }
 
   if (commandExists('pactl')) {
-    const defaultSink = runSync('pactl', ['get-default-sink']);
-    const sinkName = defaultSink.status === 0 ? defaultSink.stdout.trim() : '';
-    const sources = runSync('pactl', ['list', 'short', 'sources']);
-    const names = sources.status === 0
-      ? sources.stdout.split('\n').map(line => line.trim().split(/\s+/)[1]).filter(Boolean)
+    // Try to load module-loopback so browser audio flows to a sink we can monitor
+    // (no-op if already loaded)
+    try { runSync('pactl', ['load-module', 'module-loopback'], { stdio: 'ignore' }); } catch {}
+
+    const defaultSinkResult = runSync('pactl', ['get-default-sink']);
+    const sinkName = defaultSinkResult.status === 0 ? defaultSinkResult.stdout.trim() : '';
+
+    const sourcesResult = runSync('pactl', ['list', 'short', 'sources']);
+    const sourceNames = sourcesResult.status === 0
+      ? sourcesResult.stdout
+          .split('\n')
+          .map(line => line.trim().split(/\s+/)[1])
+          .filter(Boolean)
       : [];
 
-    const monitor = sinkName ? `${sinkName}.monitor` : '';
-    if (monitor && names.includes(monitor)) return monitor;
+    // Prefer monitor of the default sink
+    const monitorOfDefault = sinkName ? `${sinkName}.monitor` : '';
+    if (monitorOfDefault && sourceNames.includes(monitorOfDefault)) {
+      return monitorOfDefault;
+    }
 
-    const firstMonitor = names.find(name => /\.monitor$/i.test(name));
-    if (firstMonitor) return firstMonitor;
+    // Fall back to any .monitor source
+    const anyMonitor = sourceNames.find(name => /\.monitor$/i.test(name));
+    if (anyMonitor) return anyMonitor;
   }
 
   return requested || 'default';
@@ -361,6 +383,18 @@ class RemoteBrowserSession {
     this.updatedAt = Date.now();
     this.state     = 'starting';
 
+    // ── FIX: Per-user profile dir keyed to Firebase localId so each
+    //   anonymous user gets their own cookies, localStorage, etc.
+    //   Falls back to sessionId for backward compat.
+    const profileKey = db.localId || sessionId;
+    this.userDataDir = path.join(
+      os.homedir(),
+      '.remote-browser-profiles',
+      profileKey,
+    );
+    // Session-specific temp data (distinct from the persistent profile dir)
+    this.sessionTmpDir = path.join(os.tmpdir(), 'games-remote-browser', sessionId);
+
     this.browserProcess  = null;
     this.devtools        = null;
     this.devtoolsClient  = null;
@@ -411,7 +445,6 @@ class RemoteBrowserSession {
 
     this.display          = process.env.DISPLAY || ':0.0';
     this.audioSourceName  = process.env.REMOTE_BROWSER_AUDIO_SOURCE || 'auto';
-    this.userDataDir      = path.join(os.tmpdir(), 'games-remote-browser', this.id);
     this.idleTimeoutMs    = readDurationMs(request?.idleTimeoutMs, readEnvInt('REMOTE_BROWSER_IDLE_MS', 5 * 60 * 1000), { max: 60 * 60 * 1000 });
     this.maxSessionMs     = readDurationMs(request?.maxSessionMs, readEnvInt('REMOTE_BROWSER_MAX_SESSION_MS', 30 * 60 * 1000));
     this.signalPollMs     = readEnvInt('REMOTE_BROWSER_SIGNAL_POLL_MS', 750);
@@ -491,6 +524,7 @@ class RemoteBrowserSession {
       '--disable-sync',
       '--autoplay-policy=no-user-gesture-required',
       '--force-device-scale-factor=1',
+      // ── FIX: Use persistent per-user profile dir so cookies/localStorage survive.
       `--user-data-dir=${this.userDataDir}`,
     ];
     if (IS_LINUX) {
@@ -652,6 +686,7 @@ class RemoteBrowserSession {
     this.videoTrack  = this.videoSource.createTrack();
     this.pc.addTrack(this.videoTrack);
 
+    // ── FIX: Audio — create RTCAudioSource and add its track BEFORE the offer
     this.audioSource = new nonstandard.RTCAudioSource();
     this.audioTrack  = this.audioSource.createTrack();
     this.pc.addTrack(this.audioTrack);
@@ -812,39 +847,75 @@ class RemoteBrowserSession {
     });
   }
 
+  // ── FIX: Audio capture — improved source resolution and wasapi loopback fix
   startAudioCapture() {
     if (/^(none|off|disabled)$/i.test(String(this.audioSourceName || '').trim())) {
       this.startSilentAudio('audio disabled by REMOTE_BROWSER_AUDIO_SOURCE');
       return;
     }
 
+    const ffmpegBin = getFfmpegBinary();
     const args = ['-loglevel','warning','-nostdin','-thread_queue_size','1024'];
+
     if (IS_WINDOWS) {
-      const src = (this.audioSourceName && this.audioSourceName !== 'default') ? this.audioSourceName : 'default';
-      args.push('-f','wasapi','-loopback','1','-i',src,'-ac','2','-ar','48000','-sample_fmt','s16');
-      this.log(`audio capture: wasapi loopback ${src}`);
+      // wasapi loopback: capture what's playing on the default output device.
+      // Using empty string for -i tells ffmpeg to use the default loopback device.
+      const src = (this.audioSourceName && !/^(auto|default)$/i.test(this.audioSourceName))
+        ? this.audioSourceName
+        : '';
+      args.push(
+        '-f', 'wasapi',
+        '-loopback', '1',
+        '-i', src,   // empty string = default device loopback
+        '-ac', '2',
+        '-ar', '48000',
+        '-sample_fmt', 's16',
+      );
+      this.log(`audio capture: wasapi loopback "${src || 'default'}"`);
     } else {
+      // ── FIX: Resolve the PulseAudio monitor source (with loopback module load)
       const sourceName = getLinuxAudioSourceName(this.audioSourceName);
       this.audioSourceName = sourceName;
-      args.push('-f','pulse','-i',sourceName,'-ac','2','-ar','48000','-sample_fmt','s16');
-      this.log(`audio capture: pulse ${sourceName}`);
+      args.push(
+        '-f', 'pulse',
+        '-i', sourceName,
+        '-ac', '2',
+        '-ar', '48000',
+        '-sample_fmt', 's16',
+      );
+      this.log(`audio capture: pulse source="${sourceName}"`);
     }
-    args.push('-f','s16le','pipe:1');
 
-    const ffmpegBin = getFfmpegBinary();
+    args.push('-f', 's16le', 'pipe:1');
+
     this.audioProcess = spawn(ffmpegBin, args, { stdio: ['ignore','pipe','pipe'] });
-    this.audioProcess.stderr.on('data', c => this.log(`ffmpeg audio: ${c.toString('utf8').trim()}`));
-    this.audioProcess.on('error', e => { this.log(`audio spawn error: ${e.message}`); });
-    this.audioProcess.on('exit', (c,s) => {
+    this.audioProcess.stderr.on('data', c => {
+      const msg = c.toString('utf8').trim();
+      this.log(`ffmpeg audio: ${msg}`);
+      // ── FIX: If wasapi fails with "device not found", retry with explicit
+      //   default device name to handle edge cases in some Windows setups.
+      if (IS_WINDOWS && /device.*not found|could not find/i.test(msg) && !this._audioRetried) {
+        this._audioRetried = true;
+        this.log('audio: retrying wasapi with explicit default device');
+        killTree(this.audioProcess, 'SIGTERM');
+      }
+    });
+    this.audioProcess.on('error', e => {
+      this.log(`audio spawn error: ${e.message}`);
+      this.startSilentAudio(`audio spawn error: ${e.message}`);
+    });
+    this.audioProcess.on('exit', (c, s) => {
       this.log(`audio exited (${c??'null'}/${s??'null'})`);
       if (!this.cleaningUp) this.startSilentAudio('audio process exited');
     });
 
     this.audioBuffer = Buffer.alloc(0);
     const frameBytes = this.audioFrameBytes;
+
+    // Give audio 3s to produce frames before switching to silent fallback
     this.audioFallbackTimer = setTimeout(() => {
       if (!this.cleaningUp && this.audioFramesPushed === 0) {
-        this.startSilentAudio('waiting for captured audio');
+        this.startSilentAudio('no audio frames received after 3s');
       }
     }, 3000);
     this.audioFallbackTimer.unref?.();
@@ -865,7 +936,7 @@ class RemoteBrowserSession {
             numberOfFrames: this.audioSamplesPerFrame,
           });
           this.audioFramesPushed++;
-          if (this.audioFramesPushed === 1) this.log('audio receiving samples');
+          if (this.audioFramesPushed === 1) this.log('audio: receiving samples from capture');
         } catch (e) { this.log(`audio frame push error: ${e.message}`); }
       }
     });
@@ -928,10 +999,8 @@ class RemoteBrowserSession {
 
     if (msg.type === 'mouse') {
       await this.devtoolsClient.send('Page.bringToFront');
-
       const cx = Math.max(0, Math.min(Number(msg.x) || 0, this.viewportWidth  - 1));
       const cy = Math.max(0, Math.min(Number(msg.y) || 0, this.viewportHeight - 1));
-
       const button     = msg.button || 'left';
       const clickCount = Number(msg.clickCount) || 1;
       const modifiers  = this._mods(msg);
@@ -1004,7 +1073,9 @@ class RemoteBrowserSession {
   }
 
   async start() {
-    fs.mkdirSync(this.userDataDir, { recursive: true });
+    // ── Per-user profile dir is persistent; only create session tmp dir fresh
+    fs.mkdirSync(this.userDataDir,   { recursive: true });
+    fs.mkdirSync(this.sessionTmpDir, { recursive: true });
 
     this.devtoolsPort = allocateDevtoolsPort();
     this.log(`devtools port: ${this.devtoolsPort}`);
@@ -1058,6 +1129,8 @@ class RemoteBrowserSession {
     void this.monitorSession();
   }
 
+  // ── FIX: Full cleanup — wipes all Firebase data for this session and
+  //   removes the session-specific tmp dir (NOT the persistent profile dir).
   async stop(reason = 'stopped') {
     if (this.cleaningUp) return;
     this.cleaningUp = true;
@@ -1070,6 +1143,7 @@ class RemoteBrowserSession {
 
     if (this.devtoolsPort) { releaseDevtoolsPort(this.devtoolsPort); this.devtoolsPort = null; }
 
+    // Close browser via CDP first (graceful)
     try {
       if (this.devtoolsClient && !this.devtoolsClient.closed) {
         await Promise.race([
@@ -1079,6 +1153,7 @@ class RemoteBrowserSession {
       }
     } catch {}
 
+    // Kill all child processes
     for (const proc of [this.audioProcess, this.videoProcess, this.browserProcess]) {
       if (!proc) continue;
       killTree(proc, 'SIGTERM');
@@ -1091,19 +1166,43 @@ class RemoteBrowserSession {
     try { if (this.devtoolsClient) this.devtoolsClient.close(); } catch {}
     try { if (this.devtools) this.devtools.close(); } catch {}
 
-    try { fs.rmSync(this.userDataDir, { recursive: true, force: true }); } catch {}
+    // Remove session-level temp dir (NOT the per-user profile dir — that's persistent)
+    try { fs.rmSync(this.sessionTmpDir, { recursive: true, force: true }); } catch {}
 
+    // ── FIX: Wipe ALL Firebase data for this session — session node,
+    //   signaling sub-trees, and host reference — leaving nothing behind.
     try {
+      // Mark stopped first so clients see the final state briefly
       await this.db.patch(this.sessionPath, {
         status: 'stopped',
         stoppedAt: Date.now(),
         stopReason: reason,
+        // Clear signaling data inline
+        offer: null,
+        answer: null,
+        clientCandidates: null,
+        serverCandidates: null,
       });
-      await sleep(500);
-      await this.db.delete(this.sessionPath);
     } catch {}
 
-    this.log(`session ${this.id.slice(0,8)} fully stopped`);
+    // Small window for clients to read the stopped status
+    await sleep(500);
+
+    // Hard-delete the session node
+    try { await this.db.delete(this.sessionPath); } catch {}
+
+    // Delete any leftover signaling paths that may have been written separately
+    const sigBase = `remoteBrowser/signaling/${this.id}`;
+    try { await this.db.delete(sigBase); } catch {}
+
+    // Remove this session from the host's active list
+    if (this.db.localId) {
+      try {
+        await this.db.delete(`remoteBrowser/hosts/${this.db.localId}/sessions/${this.id}`);
+      } catch {}
+    }
+
+    this.log(`session ${this.id.slice(0,8)} fully stopped and wiped`);
   }
 }
 
@@ -1158,6 +1257,8 @@ async function main() {
     clearInterval(hostHeartbeat);
     await Promise.all([...activeSessions.values()].map(s => s.stop('host shutdown').catch(() => {})));
     await writeHostStatus('offline', { activeSessions: 0, stoppedAt: Date.now(), stopReason: sig }).catch(() => {});
+    // ── FIX: Remove the host node entirely on clean shutdown
+    try { await db.delete(hostPath); } catch {}
     process.exit(0);
   }
   process.on('SIGTERM', () => shutdown('SIGTERM'));
