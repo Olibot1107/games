@@ -1,0 +1,1111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Remote Browser</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <style>
+    :root{
+      --bg:#0d0d0d;
+      --bg-elevated:#141414;
+      --bg-surface:#1a1a1a;
+      --border:rgba(255,255,255,0.08);
+      --border-hover:rgba(255,255,255,0.14);
+      --text:#e8e8e8;
+      --text-muted:#888;
+      --accent:#4a9eff;
+      --accent-hover:#6ab2ff;
+      --good:#3ddc84;
+      --bad:#ff4d4d;
+      --warn:#ffaa00;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;overflow:hidden}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+
+    /* Browser Chrome */
+    .browser-chrome{
+      display:flex;flex-direction:column;
+      height:100vh;
+    }
+
+    /* Tab Bar */
+    .tab-bar{
+      display:flex;align-items:flex-end;
+      background:var(--bg);
+      border-bottom:1px solid var(--border);
+      padding:0 8px;gap:2px;
+      min-height:36px;
+      overflow-x:auto;overflow-y:hidden;
+      scrollbar-width:none;
+    }
+    .tab-bar::-webkit-scrollbar{display:none}
+
+    .tab{
+      display:flex;align-items:center;gap:8px;
+      padding:7px 12px 7px 14px;
+      border-radius:10px 10px 0 0;
+      font-size:12.5px;
+      color:var(--text-muted);
+      cursor:pointer;
+      white-space:nowrap;
+      max-width:220px;min-width:120px;
+      border:1px solid transparent;
+      border-bottom:none;
+      position:relative;
+      transition:background .15s,color .15s;
+      user-select:none;
+    }
+    .tab:hover{background:var(--bg-surface);color:var(--text)}
+    .tab.active{
+      background:var(--bg-elevated);
+      color:var(--text);
+      border-color:var(--border);
+      border-bottom:1px solid var(--bg-elevated);
+      margin-bottom:-1px;
+      z-index:1;
+    }
+    .tab .favicon{
+      width:14px;height:14px;border-radius:3px;
+      background:var(--accent);
+      display:flex;align-items:center;justify-content:center;
+      font-size:8px;font-weight:bold;color:#fff;
+      flex-shrink:0;
+    }
+    .tab .tab-title{overflow:hidden;text-overflow:ellipsis;flex:1}
+    .tab .tab-close{
+      width:16px;height:16px;border-radius:50%;
+      border:none;background:transparent;
+      color:var(--text-muted);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      font-size:14px;line-height:1;
+      opacity:0;transition:opacity .15s,background .15s;
+      flex-shrink:0;
+    }
+    .tab:hover .tab-close{opacity:1}
+    .tab .tab-close:hover{background:rgba(255,255,255,0.1);color:var(--bad)}
+    .tab.active .tab-close{opacity:1}
+
+    .new-tab-btn{
+      width:28px;height:28px;border-radius:8px;
+      border:none;background:transparent;
+      color:var(--text-muted);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      font-size:18px;margin-bottom:4px;flex-shrink:0;
+      transition:background .15s,color .15s;
+    }
+    .new-tab-btn:hover{background:var(--bg-surface);color:var(--text)}
+
+    /* Address Bar */
+    .address-bar{
+      display:flex;align-items:center;gap:8px;
+      padding:6px 12px;
+      background:var(--bg-elevated);
+      border-bottom:1px solid var(--border);
+    }
+    .nav-btns{display:flex;gap:2px}
+    .nav-btn{
+      width:28px;height:28px;border-radius:8px;
+      border:none;background:transparent;
+      color:var(--text-muted);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      font-size:14px;transition:background .15s,color .15s;
+    }
+    .nav-btn:hover:not(:disabled){background:var(--bg-surface);color:var(--text)}
+    .nav-btn:disabled{opacity:0.3;cursor:not-allowed}
+
+    .url-box{
+      flex:1;display:flex;align-items:center;gap:8px;
+      background:var(--bg-surface);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:0 12px;
+      height:32px;
+      transition:border-color .15s;
+    }
+    .url-box:focus-within{border-color:var(--accent)}
+    .url-box .lock-icon{color:var(--good);font-size:11px;flex-shrink:0}
+    .url-box input{
+      flex:1;background:transparent;border:none;
+      color:var(--text);font-size:13px;outline:none;
+      font-family:inherit;
+    }
+    .url-box input::placeholder{color:var(--text-muted)}
+
+    .url-actions{display:flex;gap:2px}
+    .url-action{
+      width:28px;height:28px;border-radius:8px;
+      border:none;background:transparent;
+      color:var(--text-muted);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      font-size:13px;transition:background .15s,color .15s;
+    }
+    .url-action:hover{background:var(--bg-surface);color:var(--text)}
+
+    /* Status Bar */
+    .status-bar{
+      display:flex;align-items:center;gap:12px;
+      padding:3px 12px;
+      background:var(--bg);
+      border-top:1px solid var(--border);
+      font-size:11px;color:var(--text-muted);
+      min-height:22px;
+    }
+    .status-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);flex-shrink:0}
+    .status-dot.good{background:var(--good)}
+    .status-dot.bad{background:var(--bad)}
+    .status-dot.warn{background:var(--warn)}
+    .status-bar .status-text{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .status-bar .status-right{display:flex;gap:12px;align-items:center}
+    .status-pill{
+      display:flex;align-items:center;gap:4px;
+      padding:1px 6px;border-radius:4px;
+      background:var(--bg-surface);
+      font-size:10px;
+    }
+
+    /* Viewport */
+    .viewport{
+      flex:1;position:relative;
+      background:#000;
+      overflow:hidden;
+    }
+    video{
+      width:100%;height:100%;
+      display:block;object-fit:contain;
+      outline:none;cursor:crosshair;
+      touch-action:none;user-select:none;
+    }
+    .viewport-overlay{
+      position:absolute;inset:0;
+      display:flex;align-items:center;justify-content:center;
+      pointer-events:none;
+      opacity:0;transition:opacity .2s;
+    }
+    .viewport-overlay.show{opacity:1}
+    .overlay-content{
+      text-align:center;
+      padding:32px;
+      border-radius:16px;
+      background:rgba(0,0,0,0.7);
+      backdrop-filter:blur(12px);
+      border:1px solid var(--border);
+    }
+    .overlay-content h2{font-size:18px;font-weight:600;margin-bottom:8px}
+    .overlay-content p{font-size:13px;color:var(--text-muted);margin-bottom:16px}
+    .overlay-content .big-btn{
+      padding:10px 24px;border-radius:10px;
+      border:none;background:var(--accent);color:#fff;
+      font-size:14px;font-weight:600;cursor:pointer;
+      transition:background .15s;
+    }
+    .overlay-content .big-btn:hover{background:var(--accent-hover)}
+
+    /* Log Panel (slide-up) */
+    .log-panel{
+      position:absolute;bottom:0;left:0;right:0;
+      background:var(--bg-elevated);
+      border-top:1px solid var(--border);
+      max-height:0;overflow:hidden;
+      transition:max-height .25s ease;
+      z-index:10;
+    }
+    .log-panel.open{max-height:200px}
+    .log-header{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:6px 12px;border-bottom:1px solid var(--border);
+      font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;
+      color:var(--text-muted);
+    }
+    .log-header button{
+      background:transparent;border:none;color:var(--text-muted);
+      cursor:pointer;font-size:11px;
+    }
+    .log-header button:hover{color:var(--text)}
+    .log-body{
+      padding:8px 12px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      font-size:11px;line-height:1.6;
+      color:#b0b0b0;
+      max-height:160px;overflow:auto;
+      white-space:pre-wrap;word-break:break-word;
+    }
+    .log-body .log-entry{margin-bottom:2px}
+    .log-body .log-time{color:var(--text-muted);margin-right:6px}
+    .log-body .log-good{color:var(--good)}
+    .log-body .log-bad{color:var(--bad)}
+    .log-body .log-warn{color:var(--warn)}
+
+    /* Toast */
+    .toast-container{
+      position:fixed;top:12px;right:12px;
+      display:flex;flex-direction:column;gap:6px;
+      z-index:100;pointer-events:none;
+    }
+    .toast{
+      padding:10px 16px;border-radius:10px;
+      background:var(--bg-elevated);
+      border:1px solid var(--border);
+      font-size:13px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.4);
+      animation:toastIn .3s ease,toastOut .3s ease 2.7s forwards;
+      pointer-events:auto;
+      max-width:320px;
+    }
+    .toast.success{border-color:rgba(61,220,132,0.3);color:var(--good)}
+    .toast.error{border-color:rgba(255,77,77,0.3);color:var(--bad)}
+    .toast.info{border-color:rgba(74,158,255,0.3);color:var(--accent)}
+    @keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+    @keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(20px)}}
+
+    /* Empty state */
+    .empty-state{
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      height:100%;gap:16px;
+    }
+    .empty-state .empty-icon{
+      width:64px;height:64px;border-radius:16px;
+      background:var(--bg-surface);
+      display:flex;align-items:center;justify-content:center;
+      font-size:28px;color:var(--text-muted);
+    }
+    .empty-state h3{font-size:16px;font-weight:600;color:var(--text)}
+    .empty-state p{font-size:13px;color:var(--text-muted);text-align:center;max-width:300px;line-height:1.5}
+    .empty-state .quick-sites{
+      display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px;
+    }
+    .quick-site{
+      padding:6px 14px;border-radius:8px;
+      background:var(--bg-surface);
+      border:1px solid var(--border);
+      color:var(--text);font-size:12px;
+      cursor:pointer;transition:all .15s;
+    }
+    .quick-site:hover{border-color:var(--accent);color:var(--accent)}
+
+    /* Loading spinner */
+    .spinner{
+      width:20px;height:20px;border-radius:50%;
+      border:2px solid var(--border);
+      border-top-color:var(--accent);
+      animation:spin 1s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Tooltip on video */
+    .video-hint{
+      position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
+      padding:6px 14px;border-radius:8px;
+      background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);
+      border:1px solid var(--border);
+      font-size:11px;color:var(--text-muted);
+      opacity:0;transition:opacity .3s;
+      pointer-events:none;white-space:nowrap;
+    }
+    .viewport:hover .video-hint{opacity:1}
+  </style>
+</head>
+<body>
+<div class="browser-chrome">
+  <!-- Tab Bar -->
+  <div class="tab-bar" id="tab-bar">
+    <button class="new-tab-btn" id="new-tab-btn" title="New tab">+</button>
+  </div>
+
+  <!-- Address Bar -->
+  <div class="address-bar">
+    <div class="nav-btns">
+      <button class="nav-btn" id="nav-back" disabled title="Back">&#9664;</button>
+      <button class="nav-btn" id="nav-forward" disabled title="Forward">&#9654;</button>
+      <button class="nav-btn" id="nav-reload" disabled title="Reload">&#8635;</button>
+    </div>
+    <div class="url-box">
+      <span class="lock-icon" id="lock-icon">&#128274;</span>
+      <input id="url-input" type="text" placeholder="Enter URL or search..." spellcheck="false" autocomplete="off" />
+    </div>
+    <div class="url-actions">
+      <button class="url-action" id="btn-focus" title="Focus remote browser" disabled>&#127919;</button>
+      <button class="url-action" id="btn-logs" title="Toggle logs">&#128203;</button>
+    </div>
+  </div>
+
+  <!-- Viewport -->
+  <div class="viewport" id="viewport">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">&#127760;</div>
+      <h3>Remote Browser</h3>
+      <p>by the makers of voidium</p>
+      <div class="quick-sites">
+        <button class="quick-site" data-url="https://www.tiktok.com/">TikTok</button>
+        <button class="quick-site" data-url="https://www.youtube.com/">YouTube</button>
+        <button class="quick-site" data-url="https://www.google.com/">Google</button>
+        <button class="quick-site" data-url="https://www.reddit.com/">Reddit</button>
+      </div>
+    </div>
+
+    <video id="remote-video" autoplay playsinline tabindex="0" style="display:none"></video>
+
+    <div class="viewport-overlay" id="overlay">
+      <div class="overlay-content">
+        <div class="spinner" style="margin:0 auto 12px"></div>
+        <h2 id="overlay-title">Connecting...</h2>
+        <p id="overlay-msg">Setting up remote browser session</p>
+      </div>
+    </div>
+
+    <div class="video-hint">
+      Click to focus &bull; Scroll &bull; Type &bull; Esc to unfocus
+    </div>
+
+    <!-- Log Panel -->
+    <div class="log-panel" id="log-panel">
+      <div class="log-header">
+        <span>Session Log</span>
+        <button id="clear-logs">Clear</button>
+      </div>
+      <div class="log-body" id="log-body"></div>
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span class="status-dot" id="status-dot"></span>
+    <span class="status-text" id="status-text">Ready</span>
+    <div class="status-right">
+      <span class="status-pill" id="pill-video">Video: &mdash;</span>
+      <span class="status-pill" id="pill-audio">Audio: &mdash;</span>
+      <span class="status-pill" id="pill-control">Control: &mdash;</span>
+      <span class="status-pill" id="pill-ice">ICE: &mdash;</span>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+(() => {
+  if (!window.firebase) { alert('Firebase failed to load.'); return; }
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyA4BYjOa__uKZjOBvS5p_uMxmJ6AMsKcpg",
+    authDomain: "chat1-6cc2e.firebaseapp.com",
+    databaseURL: "https://chat1-6cc2e-default-rtdb.firebaseio.com",
+    projectId: "chat1-6cc2e",
+    storageBucket: "chat1-6cc2e.firebasestorage.app",
+    messagingSenderId: "771765903902",
+    appId: "1:771765903902:web:a6fb2e71b059c20ba7840f",
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db   = firebase.database();
+  const auth = firebase.auth();
+  const SESSION_ROOT  = 'remoteBrowser/sessions';
+  const DEFAULT_URL   = 'https://www.tiktok.com/';
+  const DEFAULT_CAPTURE = { width: 1920, height: 1080, fps: 30, viewportWidth: 1920, viewportHeight: 1080 };
+
+  const els = {
+    tabBar:      document.getElementById('tab-bar'),
+    newTabBtn:   document.getElementById('new-tab-btn'),
+    urlInput:    document.getElementById('url-input'),
+    navBack:     document.getElementById('nav-back'),
+    navForward:  document.getElementById('nav-forward'),
+    navReload:   document.getElementById('nav-reload'),
+    btnFocus:    document.getElementById('btn-focus'),
+    btnLogs:     document.getElementById('btn-logs'),
+    lockIcon:    document.getElementById('lock-icon'),
+    viewport:    document.getElementById('viewport'),
+    emptyState:  document.getElementById('empty-state'),
+    remoteVideo: document.getElementById('remote-video'),
+    overlay:     document.getElementById('overlay'),
+    overlayTitle:document.getElementById('overlay-title'),
+    overlayMsg:  document.getElementById('overlay-msg'),
+    logPanel:    document.getElementById('log-panel'),
+    logBody:     document.getElementById('log-body'),
+    clearLogs:   document.getElementById('clear-logs'),
+    statusDot:   document.getElementById('status-dot'),
+    statusText:  document.getElementById('status-text'),
+    pillVideo:   document.getElementById('pill-video'),
+    pillAudio:   document.getElementById('pill-audio'),
+    pillControl: document.getElementById('pill-control'),
+    pillIce:     document.getElementById('pill-ice'),
+    toastContainer: document.getElementById('toast-container'),
+  };
+
+  const state = { user: null, sessions: new Map(), activeSessionId: null, authReady: null, logsOpen: false };
+
+  function now()   { return new Date().toLocaleTimeString(); }
+  function shortId(id) { return id ? id.slice(0,8) : '\u2014'; }
+  function isActive(s)  { const id = typeof s === 'string' ? s : s?.id; return Boolean(id && state.activeSessionId === id); }
+  function getSession(id = state.activeSessionId) { return id ? (state.sessions.get(id) || null) : null; }
+
+  function toast(msg, type='info') {
+    const t = document.createElement('div');
+    t.className = 'toast ' + type;
+    t.textContent = msg;
+    els.toastContainer.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  }
+
+  function log(m, tone) {
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    const time = document.createElement('span');
+    time.className = 'log-time';
+    time.textContent = '[' + now() + ']';
+    const text = document.createElement('span');
+    if (tone) text.className = 'log-' + tone;
+    text.textContent = ' ' + m;
+    entry.appendChild(time);
+    entry.appendChild(text);
+    els.logBody.prepend(entry);
+    while (els.logBody.children.length > 100) els.logBody.lastChild.remove();
+    console.log(m);
+  }
+  function slog(s, m, tone) { log('[' + shortId(s.id) + '] ' + m, tone); }
+
+  function createSessionRecord(id, url) {
+    return {
+      id, url, label:'', title:'',
+      sessionRef: null, sessionListener: null,
+      pc: null, controlChannel: null, remoteStream: null,
+      remoteDescSet: false, negotiating: false, answerSent: false,
+      seenServerCandidates: new Set(),
+      pendingServerCandidates: [],
+      capture: { ...DEFAULT_CAPTURE },
+      lastHostLogTs: 0,
+      connectionState: 'disconnected',
+      audioState: 'waiting',
+      controlState: 'not-connected',
+      iceState: 'idle',
+    };
+  }
+
+  function sessionLabel(s) {
+    if (s.title) return s.title;
+    try {
+      const h = new URL(s.url).hostname.replace(/^www\./i,'');
+      if (h.includes('tiktok')) return 'TikTok';
+      if (h.includes('youtube')) return 'YouTube';
+      if (h.includes('google')) return 'Google';
+      return h || shortId(s.id);
+    } catch { return shortId(s.id); }
+  }
+
+  function sessionFavicon(s) {
+    try {
+      const h = new URL(s.url).hostname.replace(/^www\./i,'');
+      if (h.includes('tiktok')) return 'TT';
+      if (h.includes('youtube')) return 'YT';
+      if (h.includes('google')) return 'G';
+      if (h.includes('reddit')) return 'R';
+      return (h[0] || '?').toUpperCase();
+    } catch { return '?'; }
+  }
+
+  function updateStatusBar() {
+    const s = getSession();
+    if (!s) {
+      els.statusDot.className = 'status-dot';
+      els.statusText.textContent = 'Ready \u2014 No active session';
+      els.pillVideo.textContent = 'Video: \u2014';
+      els.pillAudio.textContent = 'Audio: \u2014';
+      els.pillControl.textContent = 'Control: \u2014';
+      els.pillIce.textContent = 'ICE: \u2014';
+      els.lockIcon.textContent = '\uD83D\uDD12';
+      els.lockIcon.style.color = 'var(--good)';
+      return;
+    }
+
+    const conn = s.connectionState;
+    els.statusDot.className = 'status-dot';
+    if (conn === 'connected') els.statusDot.classList.add('good');
+    else if (conn === 'failed' || conn === 'closed') els.statusDot.classList.add('bad');
+    else els.statusDot.classList.add('warn');
+
+    els.statusText.textContent = s.title || s.label || sessionLabel(s);
+    els.pillVideo.textContent = 'Video: ' + s.capture.width + '\u00d7' + s.capture.height;
+    els.pillAudio.textContent = 'Audio: ' + s.audioState;
+    els.pillControl.textContent = 'Control: ' + s.controlState;
+    els.pillIce.textContent = 'ICE: ' + s.iceState;
+    els.lockIcon.textContent = s.url && s.url.startsWith('https') ? '\uD83D\uDD12' : '\u26A0\uFE0F';
+    els.lockIcon.style.color = s.url && s.url.startsWith('https') ? 'var(--good)' : 'var(--warn)';
+  }
+
+  function showOverlay(title, msg, show) {
+    els.overlayTitle.textContent = title;
+    els.overlayMsg.textContent = msg;
+    els.overlay.classList.toggle('show', show);
+  }
+
+  function hideOverlay() { els.overlay.classList.remove('show'); }
+
+  function updateViewport() {
+    const s = getSession();
+    if (!s || !s.remoteStream || s.remoteStream.getTracks().length === 0) {
+      els.emptyState.style.display = 'flex';
+      els.remoteVideo.style.display = 'none';
+      els.remoteVideo.srcObject = null;
+      hideOverlay();
+    } else {
+      els.emptyState.style.display = 'none';
+      els.remoteVideo.style.display = 'block';
+      els.remoteVideo.srcObject = s.remoteStream;
+      els.remoteVideo.play().catch(function(){});
+      hideOverlay();
+    }
+  }
+
+  function renderTabs() {
+    const existing = els.tabBar.querySelectorAll('.tab');
+    existing.forEach(function(t){ t.remove(); });
+
+    const sessions = [...state.sessions.values()];
+    if (!sessions.length) return;
+
+    sessions.forEach(function(s){
+      const tab = document.createElement('div');
+      tab.className = 'tab' + (isActive(s) ? ' active' : '');
+      tab.title = s.url;
+
+      const fav = document.createElement('span');
+      fav.className = 'favicon';
+      fav.textContent = sessionFavicon(s);
+
+      const title = document.createElement('span');
+      title.className = 'tab-title';
+      title.textContent = s.label || sessionLabel(s);
+
+      const close = document.createElement('button');
+      close.className = 'tab-close';
+      close.innerHTML = '\u00d7';
+      close.title = 'Close tab';
+      close.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        stopSession(s.id);
+      });
+
+      tab.appendChild(fav);
+      tab.appendChild(title);
+      tab.appendChild(close);
+      tab.addEventListener('click', function(){ setActiveSession(s.id); });
+      els.tabBar.insertBefore(tab, els.newTabBtn);
+    });
+  }
+
+  function setActiveSession(sessionId) {
+    state.activeSessionId = sessionId;
+    const s = getSession();
+    if (s) {
+      els.urlInput.value = s.url || '';
+      updateViewport();
+    } else {
+      els.urlInput.value = '';
+      els.emptyState.style.display = 'flex';
+      els.remoteVideo.style.display = 'none';
+    }
+    updateNavButtons();
+    updateStatusBar();
+    renderTabs();
+  }
+
+  function updateNavButtons() {
+    const s = getSession();
+    const hasControl = s && s.controlChannel && s.controlChannel.readyState === 'open';
+    els.navReload.disabled = !hasControl;
+    els.btnFocus.disabled = !hasControl;
+    els.navBack.disabled = true;
+    els.navForward.disabled = true;
+  }
+
+  // Coordinate mapping
+  function toRemoteCoords(event) {
+    const s = getSession();
+    if (!s) return null;
+    const rect = els.remoteVideo.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+
+    const cap = s.capture || DEFAULT_CAPTURE;
+    const frameW = cap.width  || DEFAULT_CAPTURE.width;
+    const frameH = cap.height || DEFAULT_CAPTURE.height;
+    const vpW = cap.viewportWidth  || frameW;
+    const vpH = cap.viewportHeight || frameH;
+
+    const scale = Math.min(rect.width / frameW, rect.height / frameH);
+    if (!Number.isFinite(scale) || scale <= 0) return null;
+
+    const contentW = frameW * scale;
+    const contentH = frameH * scale;
+    const offsetX  = (rect.width  - contentW) / 2;
+    const offsetY  = (rect.height - contentH) / 2;
+
+    const localX = event.clientX - rect.left - offsetX;
+    const localY = event.clientY - rect.top  - offsetY;
+
+    if (localX < 0 || localY < 0 || localX > contentW || localY > contentH) return null;
+
+    const x = Math.round((localX / contentW) * vpW);
+    const y = Math.round((localY / contentH) * vpH);
+    return { x: x, y: y };
+  }
+
+  // Control sending
+  function isTypingTarget(t) {
+    const tag = (t && t.tagName && t.tagName.toLowerCase()) || '';
+    return tag === 'input' || tag === 'textarea' || (t && t.isContentEditable);
+  }
+
+  function keyPayload(event, action) {
+    const text = event.key && event.key.length === 1 ? event.key : '';
+    return {
+      type: 'key', action: action,
+      key: event.key, code: event.code, text: text,
+      altKey: event.altKey, ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey, shiftKey: event.shiftKey,
+      repeat: event.repeat,
+      isKeypad: event.location === KeyboardEvent.DOM_KEY_LOCATION_NUMPAD,
+    };
+  }
+
+  function sendControl(payload) {
+    const s = getSession();
+    if (!s || !s.controlChannel || s.controlChannel.readyState !== 'open') return;
+    s.controlChannel.send(JSON.stringify(payload));
+  }
+
+  function focusRemote() {
+    if (!getSession()) return;
+    els.remoteVideo.focus();
+    sendControl({ type: 'focus' });
+  }
+
+  function reloadRemote() { if (getSession()) sendControl({ type: 'reload' }); }
+
+  function btnName(ev) {
+    return ev.button === 2 ? 'right' : ev.button === 1 ? 'middle' : 'left';
+  }
+
+  // Session lifecycle
+  function cleanupSession(sessionId, opts) {
+    opts = opts || {};
+    const s = getSession(sessionId);
+    if (!s) return;
+    if (s.sessionListener && s.sessionRef) {
+      try { s.sessionRef.off('value', s.sessionListener); } catch(e){}
+    }
+    if (s.controlChannel)  { try { s.controlChannel.close(); } catch(e){} }
+    if (s.pc)              { try { s.pc.close(); } catch(e){} }
+    if (s.remoteStream)    { s.remoteStream.getTracks().forEach(function(t){ try { t.stop(); } catch(e){} }); }
+    if (opts.stopRemote && s.sessionRef) {
+      try { s.sessionRef.update({ status: 'stopped', stoppedAt: firebase.database.ServerValue.TIMESTAMP }); } catch(e){}
+    }
+    state.sessions.delete(s.id);
+    if (state.activeSessionId === s.id) {
+      const next = state.sessions.keys().next();
+      state.activeSessionId = next.done ? null : next.value;
+    }
+    if (!state.sessions.size) {
+      els.remoteVideo.srcObject = null;
+      els.emptyState.style.display = 'flex';
+      els.remoteVideo.style.display = 'none';
+    }
+    renderTabs();
+    updateViewport();
+    updateStatusBar();
+    updateNavButtons();
+  }
+
+  async function drainPendingServerCandidates(s) {
+    if (!s.pc || !s.remoteDescSet || !s.pendingServerCandidates.length) return;
+    const queue = s.pendingServerCandidates.splice(0);
+    for (const c of queue) {
+      try { await s.pc.addIceCandidate(c); } catch (e) { slog(s, 'Server ICE: ' + e.message, 'bad'); }
+    }
+  }
+
+  function attachSessionListener(s) {
+    s.sessionListener = async function(snapshot) {
+      const data = snapshot.val();
+      if (!data) {
+        if (state.sessions.has(s.id)) {
+          slog(s, 'Session removed by server');
+          toast('Session ended', 'info');
+          cleanupSession(s.id);
+        }
+        return;
+      }
+
+      if (data.lastLog && data.lastLog.ts && data.lastLog.ts !== s.lastHostLogTs) {
+        s.lastHostLogTs = data.lastLog.ts;
+        slog(s, 'Host: ' + data.lastLog.message);
+      }
+
+      if (data.capture) {
+        s.capture = {
+          width:         data.capture.width  || DEFAULT_CAPTURE.width,
+          height:        data.capture.height || DEFAULT_CAPTURE.height,
+          fps:           data.capture.fps    || DEFAULT_CAPTURE.fps,
+          viewportWidth:  data.capture.viewportWidth  || data.capture.width  || DEFAULT_CAPTURE.width,
+          viewportHeight: data.capture.viewportHeight || data.capture.height || DEFAULT_CAPTURE.height,
+        };
+        updateStatusBar();
+      }
+
+      if (data.url) {
+        s.url = data.url;
+        if (!s.label) s.label = sessionLabel(s);
+        if (isActive(s)) {
+          els.urlInput.value = data.url;
+          updateStatusBar();
+        }
+        renderTabs();
+      }
+
+      if (data.title) {
+        s.title = data.title;
+        s.label = data.title;
+        if (isActive(s)) updateStatusBar();
+        renderTabs();
+      }
+
+      if (data.status) {
+        const statusMap = {
+          pending:        { title:'Waiting for host', msg:'Remote browser is starting up...' },
+          launching:      { title:'Launching', msg:'Browser is launching on remote host' },
+          'waiting-answer':{ title:'Negotiating', msg:'Setting up WebRTC connection' },
+          'answer-sent':  { title:'Negotiating', msg:'Setting up WebRTC connection' },
+          'offer-ready':  { title:'Negotiating', msg:'Waiting for answer from host' },
+          connected:      { title:'Connected', msg:'Receiving video stream' },
+          stopped:        { title:'Stopped', msg:'Session ended' },
+          deleted:        { title:'Stopped', msg:'Session ended' },
+          error:          { title:'Error', msg:'Remote host encountered an error' },
+        };
+        const info = statusMap[data.status] || { title: data.status, msg: '' };
+        if (data.status === 'pending' || data.status === 'launching' || data.status === 'waiting-answer' || data.status === 'offer-ready') {
+          if (isActive(s)) showOverlay(info.title, info.msg, true);
+        } else if (data.status === 'connected') {
+          if (isActive(s)) hideOverlay();
+        } else if (data.status === 'stopped' || data.status === 'deleted' || data.status === 'error') {
+          if (isActive(s)) showOverlay(info.title, info.msg, true);
+          toast('Session ' + data.status, data.status === 'error' ? 'error' : 'info');
+        }
+      }
+
+      // Handle offer
+      if (data.offer && s.pc && !s.remoteDescSet && !s.negotiating && !s.answerSent) {
+        s.negotiating = true;
+        try {
+          await s.pc.setRemoteDescription(data.offer);
+          s.remoteDescSet = true;
+          const answer = await s.pc.createAnswer();
+          await s.pc.setLocalDescription(answer);
+          await s.sessionRef.update({
+            answer: answer,
+            status: 'answer-sent',
+            answerSentAt: firebase.database.ServerValue.TIMESTAMP
+          });
+          s.answerSent = true;
+          slog(s, 'Answer sent to host');
+          await drainPendingServerCandidates(s);
+        } catch (e) {
+          slog(s, 'Answer error: ' + e.message, 'bad');
+          toast('Connection failed', 'error');
+        } finally { s.negotiating = false; }
+      }
+
+      // Handle server ICE candidates
+      const serverCandidates = data.serverCandidates || {};
+      for (const key in serverCandidates) {
+        if (!serverCandidates.hasOwnProperty(key)) continue;
+        const candidate = serverCandidates[key];
+        if (s.seenServerCandidates.has(key)) continue;
+        s.seenServerCandidates.add(key);
+        try {
+          if (!s.remoteDescSet) { s.pendingServerCandidates.push(candidate); continue; }
+          await s.pc.addIceCandidate(candidate);
+        } catch (e) { slog(s, 'Server ICE: ' + e.message, 'bad'); }
+      }
+
+      if (data.status === 'stopped' || data.status === 'deleted') {
+        cleanupSession(s.id);
+      }
+    };
+    s.sessionRef.on('value', s.sessionListener);
+  }
+
+  function setupPeerConnection(s) {
+    const PC = window.RTCPeerConnection || window.webkitRTCPeerConnection;
+    if (!PC) throw new Error('WebRTC not available');
+    s.pc = new PC({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    s.remoteStream = new MediaStream();
+
+    s.pc.ontrack = function(ev) {
+      const track = ev.track;
+      if (track && !s.remoteStream.getTracks().some(function(t){ return t.id === track.id; }))
+        s.remoteStream.addTrack(track);
+      if (track && track.kind === 'audio') {
+        s.audioState = 'live';
+        if (isActive(s)) updateStatusBar();
+      }
+      if (isActive(s)) {
+        els.remoteVideo.srcObject = s.remoteStream;
+        els.remoteVideo.play().catch(function(){});
+        updateViewport();
+      }
+      slog(s, 'Track: ' + (track && track.kind || 'unknown'));
+    };
+
+    s.pc.onicecandidate = async function(ev) {
+      if (!ev.candidate || !s.sessionRef) return;
+      try {
+        await s.sessionRef.child('clientCandidates').push(ev.candidate.toJSON());
+        s.iceState = 'candidate-sent';
+        if (isActive(s)) updateStatusBar();
+      } catch (e) { slog(s, 'Client ICE: ' + e.message, 'bad'); }
+    };
+
+    s.pc.ondatachannel = function(ev) {
+      if (ev.channel.label !== 'control') return;
+      s.controlChannel = ev.channel;
+      s.controlState = 'open';
+      slog(s, 'Control channel open');
+      if (isActive(s)) {
+        updateStatusBar();
+        updateNavButtons();
+        toast('Remote control connected', 'success');
+      }
+      ev.channel.onopen = function() {
+        s.controlState = 'open';
+        if (isActive(s)) { updateStatusBar(); updateNavButtons(); }
+      };
+      ev.channel.onclose = function() {
+        s.controlState = 'closed';
+        if (isActive(s)) { updateStatusBar(); updateNavButtons(); }
+      };
+    };
+
+    s.pc.onconnectionstatechange = function() {
+      const st = s.pc.connectionState;
+      s.connectionState = st;
+      if (isActive(s)) {
+        updateStatusBar();
+        if (st === 'connected') {
+          hideOverlay();
+          toast('Connected!', 'success');
+        } else if (st === 'failed' || st === 'closed') {
+          toast('Connection lost', 'error');
+        }
+      }
+      if (st === 'failed' || st === 'closed') cleanupSession(s.id);
+      renderTabs();
+    };
+
+    s.pc.oniceconnectionstatechange = function() {
+      s.iceState = s.pc.iceConnectionState;
+      if (isActive(s)) updateStatusBar();
+    };
+  }
+
+  async function startSession(url) {
+    await state.authReady;
+    if (!auth.currentUser) throw new Error('Firebase auth not ready');
+
+    url = (url || DEFAULT_URL).trim() || DEFAULT_URL;
+    const sessionId = crypto.randomUUID();
+    const s = createSessionRecord(sessionId, url);
+    s.label = sessionLabel(s);
+    state.sessions.set(sessionId, s);
+    state.activeSessionId = sessionId;
+
+    els.urlInput.value = url;
+    showOverlay('Starting...', 'Creating remote browser session', true);
+    updateViewport();
+    renderTabs();
+    updateStatusBar();
+
+    setupPeerConnection(s);
+    s.sessionRef = db.ref(SESSION_ROOT + '/' + sessionId);
+    attachSessionListener(s);
+
+    await s.sessionRef.set({
+      id: sessionId, url: url,
+      requestedBy: auth.currentUser.uid,
+      status: 'pending',
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      client: {
+        uid: auth.currentUser.uid,
+        userAgent: navigator.userAgent,
+        viewport: { width: window.innerWidth, height: window.innerHeight }
+      },
+    });
+    slog(s, 'Session created');
+    toast('Session started', 'success');
+  }
+
+  async function stopSession(sessionId) {
+    sessionId = sessionId || state.activeSessionId;
+    const s = getSession(sessionId);
+    if (!s) return;
+    if (s.sessionRef) {
+      try {
+        await s.sessionRef.update({
+          status: 'stopped',
+          stoppedAt: firebase.database.ServerValue.TIMESTAMP
+        });
+      } catch (e) { slog(s, 'Stop error: ' + e.message, 'bad'); }
+    }
+    slog(s, 'Session stopped');
+    toast('Tab closed', 'info');
+    cleanupSession(s.id);
+  }
+
+  function sendGlobalKey(event, action) {
+    if (isTypingTarget(event.target) || !getSession()) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      els.remoteVideo.blur();
+      log('Focus cleared');
+      return;
+    }
+    if (event.key === 'F5') {
+      event.preventDefault();
+      reloadRemote();
+      return;
+    }
+    event.preventDefault();
+    focusRemote();
+    sendControl(keyPayload(event, action));
+  }
+
+  // Event wiring
+  els.newTabBtn.addEventListener('click', function() {
+    els.urlInput.value = DEFAULT_URL;
+    els.urlInput.focus();
+    startSession(DEFAULT_URL).catch(function(e) {
+      toast(e.message, 'error');
+      log('Start failed: ' + e.message, 'bad');
+    });
+  });
+
+  els.urlInput.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      const url = (els.urlInput.value || '').trim() || DEFAULT_URL;
+      const s = getSession();
+      if (s && s.controlChannel && s.controlChannel.readyState === 'open') {
+        sendControl({ type: 'navigate', url: url });
+        s.url = url;
+        s.label = sessionLabel(s);
+        updateStatusBar();
+        renderTabs();
+      } else {
+        startSession(url).catch(function(e) {
+          toast(e.message, 'error');
+          log('Start failed: ' + e.message, 'bad');
+        });
+      }
+    }
+  });
+
+  els.navReload.addEventListener('click', reloadRemote);
+  els.btnFocus.addEventListener('click', focusRemote);
+
+  els.btnLogs.addEventListener('click', function() {
+    state.logsOpen = !state.logsOpen;
+    els.logPanel.classList.toggle('open', state.logsOpen);
+    els.btnLogs.style.color = state.logsOpen ? 'var(--accent)' : '';
+  });
+
+  els.clearLogs.addEventListener('click', function() {
+    els.logBody.innerHTML = '';
+  });
+
+  document.querySelectorAll('.quick-site').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const url = btn.dataset.url;
+      els.urlInput.value = url;
+      startSession(url).catch(function(e) {
+        toast(e.message, 'error');
+        log('Start failed: ' + e.message, 'bad');
+      });
+    });
+  });
+
+  // Video pointer events
+  els.remoteVideo.addEventListener('contextmenu', function(ev) { ev.preventDefault(); });
+  els.remoteVideo.addEventListener('pointerdown', function(ev) {
+    if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
+    ev.preventDefault(); focusRemote();
+    try { els.remoteVideo.setPointerCapture(ev.pointerId); } catch(e){}
+    const coords = toRemoteCoords(ev);
+    if (coords) sendControl({
+      type:'mouse', action:'down',
+      button:btnName(ev), buttons:ev.buttons,
+      clickCount:ev.detail||1, x:coords.x, y:coords.y
+    });
+  });
+  els.remoteVideo.addEventListener('pointerup', function(ev) {
+    if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
+    const coords = toRemoteCoords(ev);
+    if (coords) sendControl({
+      type:'mouse', action:'up',
+      button:btnName(ev), buttons:0,
+      clickCount:ev.detail||1, x:coords.x, y:coords.y
+    });
+    try { els.remoteVideo.releasePointerCapture(ev.pointerId); } catch(e){}
+  });
+  els.remoteVideo.addEventListener('pointermove', function(ev) {
+    if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
+    const coords = toRemoteCoords(ev);
+    if (coords) sendControl({
+      type:'mouse', action:'move',
+      button:'none', buttons:ev.buttons,
+      clickCount:0, x:coords.x, y:coords.y
+    });
+  });
+  els.remoteVideo.addEventListener('pointercancel', function(ev) {
+    try { els.remoteVideo.releasePointerCapture(ev.pointerId); } catch(e){}
+  });
+  els.remoteVideo.addEventListener('wheel', function(ev) {
+    ev.preventDefault();
+    const coords = toRemoteCoords(ev);
+    if (!coords) return;
+    sendControl({
+      type:'mouse', action:'wheel',
+      button:'none',
+      deltaX:ev.deltaX, deltaY:ev.deltaY,
+      x:coords.x, y:coords.y
+    });
+  }, { passive: false });
+
+  // Keyboard
+  window.addEventListener('keydown', function(ev) {
+    if (state.activeSessionId) sendGlobalKey(ev, 'down');
+  });
+  window.addEventListener('keyup', function(ev) {
+    if (!state.activeSessionId || isTypingTarget(ev.target)) return;
+    ev.preventDefault();
+    sendControl(keyPayload(ev, 'up'));
+  });
+
+  window.addEventListener('beforeunload', function() {
+    state.sessions.forEach(function(s){
+      try { if (s.sessionRef) s.sessionRef.update({ status: 'stopped' }); } catch(e){}
+    });
+  });
+
+  state.authReady = auth.signInAnonymously()
+    .then(function(c) { state.user = c.user; log('Signed in as ' + c.user.uid); })
+    .catch(function(e) { log('Auth error: ' + e.message, 'bad'); throw e; });
+
+  log('Ready');
+})();
+</script>
+</body>
+</html>
