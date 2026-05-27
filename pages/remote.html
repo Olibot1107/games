@@ -3,1138 +3,877 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Math Practice</title>
+  <title>Remote Browser</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
   <style>
-    :root{
-      --bg:#0d0d0d;
-      --bg-elevated:#141414;
-      --bg-surface:#1a1a1a;
-      --border:rgba(255,255,255,0.08);
-      --border-hover:rgba(255,255,255,0.14);
-      --text:#e8e8e8;
-      --text-muted:#888;
-      --accent:#4a9eff;
-      --accent-hover:#6ab2ff;
-      --good:#3ddc84;
-      --bad:#ff4d4d;
-      --warn:#ffaa00;
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap');
+
+    :root {
+      --bg:          #0a0a0b;
+      --bg-bar:      #111113;
+      --bg-surface:  #18181c;
+      --bg-input:    #1e1e23;
+      --border:      rgba(255,255,255,0.07);
+      --border-focus:rgba(255,255,255,0.18);
+      --text:        #e2e2e8;
+      --text-muted:  #666;
+      --text-dim:    #999;
+      --accent:      #5b8eff;
+      --accent-glow: rgba(91,142,255,0.25);
+      --good:        #39d98a;
+      --bad:         #ff4f4f;
+      --warn:        #ffa940;
+      --mono:        'JetBrains Mono', monospace;
+      --sans:        'Syne', sans-serif;
     }
-    *{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;overflow:hidden}
-    body{
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-      background:var(--bg);
-      color:var(--text);
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
     }
-    .browser-chrome{
-      display:flex;flex-direction:column;
-      height:100vh;
+
+    #shell { display: flex; flex-direction: column; height: 100vh; }
+
+    /* ── Address bar ── */
+    #chrome {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      background: var(--bg-bar);
+      border-bottom: 1px solid var(--border);
+      min-height: 44px;
+      flex-shrink: 0;
     }
-    .tab-bar{
-      display:flex;align-items:flex-end;
-      background:var(--bg);
-      border-bottom:1px solid var(--border);
-      padding:0 8px;gap:2px;
-      min-height:36px;
-      overflow-x:auto;overflow-y:hidden;
-      scrollbar-width:none;
+
+    .nav-btn {
+      width: 30px; height: 30px;
+      border-radius: 7px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      transition: background .12s, color .12s;
+      flex-shrink: 0;
     }
-    .tab-bar::-webkit-scrollbar{display:none}
-    .tab{
-      display:flex;align-items:center;gap:8px;
-      padding:7px 12px 7px 14px;
-      border-radius:10px 10px 0 0;
-      font-size:12.5px;
-      color:var(--text-muted);
-      cursor:pointer;
-      white-space:nowrap;
-      max-width:220px;min-width:120px;
-      border:1px solid transparent;
-      border-bottom:none;
-      position:relative;
-      transition:background .15s,color .15s;
-      user-select:none;
+    .nav-btn:hover:not(:disabled) { background: var(--bg-surface); color: var(--text); }
+    .nav-btn:disabled { opacity: .3; cursor: default; }
+    .nav-btn.close-btn:hover:not(:disabled) { background: rgba(255,79,79,0.15); color: var(--bad); }
+
+    #url-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 0 12px;
+      height: 32px;
+      transition: border-color .15s, box-shadow .15s;
     }
-    .tab:hover{background:var(--bg-surface);color:var(--text)}
-    .tab.active{
-      background:var(--bg-elevated);
-      color:var(--text);
-      border-color:var(--border);
-      border-bottom:1px solid var(--bg-elevated);
-      margin-bottom:-1px;
-      z-index:1;
+    #url-wrap:focus-within {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--accent-glow);
     }
-    .tab .favicon{
-      width:14px;height:14px;border-radius:3px;
-      background:var(--accent);
-      display:flex;align-items:center;justify-content:center;
-      font-size:8px;font-weight:bold;color:#fff;
-      flex-shrink:0;
+    #lock { font-size: 11px; flex-shrink: 0; }
+    #url-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12.5px;
+      outline: none;
     }
-    .tab .tab-title{overflow:hidden;text-overflow:ellipsis;flex:1}
-    .tab .tab-close{
-      width:16px;height:16px;border-radius:50%;
-      border:none;background:transparent;
-      color:var(--text-muted);cursor:pointer;
-      display:flex;align-items:center;justify-content:center;
-      font-size:14px;line-height:1;
-      opacity:0;transition:opacity .15s,background .15s;
-      flex-shrink:0;
+    #url-input::placeholder { color: var(--text-muted); }
+
+    #id-pill {
+      display: flex; align-items: center; gap: 5px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 10.5px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+      cursor: default;
+      user-select: none;
     }
-    .tab:hover .tab-close{opacity:1}
-    .tab .tab-close:hover{background:rgba(255,255,255,0.1);color:var(--bad)}
-    .tab.active .tab-close{opacity:1}
-    .new-tab-btn{
-      width:28px;height:28px;border-radius:8px;
-      border:none;background:transparent;
-      color:var(--text-muted);cursor:pointer;
-      display:flex;align-items:center;justify-content:center;
-      font-size:18px;margin-bottom:4px;flex-shrink:0;
-      transition:background .15s,color .15s;
+    #id-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+    #id-pill .dot.good { background: var(--good); }
+
+    /* ── Viewport ── */
+    #viewport { flex: 1; position: relative; background: #000; overflow: hidden; }
+
+    video {
+      width: 100%; height: 100%;
+      display: block;
+      object-fit: contain;
+      outline: none;
+      cursor: crosshair;
+      touch-action: none;
+      user-select: none;
     }
-    .new-tab-btn:hover{background:var(--bg-surface);color:var(--text)}
-    .address-bar{
-      display:flex;align-items:center;gap:8px;
-      padding:6px 12px;
-      background:var(--bg-elevated);
-      border-bottom:1px solid var(--border);
+
+    /* ── Splash ── */
+    #splash { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 20px; }
+    #splash.hidden { display: none; }
+    .splash-logo { width: 52px; height: 52px; border-radius: 14px; background: var(--bg-surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .splash-title { font-size: 18px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+    .splash-sub { font-size: 13px; color: var(--text-muted); max-width: 280px; text-align: center; line-height: 1.6; }
+    .quick-row { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; }
+    .quick-btn { padding: 6px 14px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-dim); font-family: var(--sans); font-size: 12px; cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
+    .quick-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(91,142,255,.05); }
+
+    /* ── Overlay ── */
+    #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .2s; }
+    #overlay.show { opacity: 1; pointer-events: auto; }
+    .overlay-box { text-align: center; padding: 28px 36px; border-radius: 14px; background: rgba(10,10,11,.85); backdrop-filter: blur(14px); border: 1px solid var(--border); }
+    .overlay-box h2 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .overlay-box p  { font-size: 12px; color: var(--text-muted); }
+    .spinner { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--accent); animation: spin 1s linear infinite; margin: 0 auto 14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Audio unlock banner ── */
+    #audio-btn {
+      position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+      padding: 7px 16px; border-radius: 9px;
+      background: rgba(91,142,255,.15);
+      border: 1px solid rgba(91,142,255,.35);
+      color: var(--accent); font-family: var(--sans); font-size: 12px;
+      cursor: pointer; backdrop-filter: blur(8px);
+      white-space: nowrap; z-index: 5; display: none;
+      transition: background .15s;
     }
-    .nav-btns{display:flex;gap:2px}
-    .nav-btn{
-      width:28px;height:28px;border-radius:8px;
-      border:none;background:transparent;
-      color:var(--text-muted);cursor:pointer;
-      display:flex;align-items:center;justify-content:center;
-      font-size:14px;transition:background .15s,color .15s;
-    }
-    .nav-btn:hover:not(:disabled){background:var(--bg-surface);color:var(--text)}
-    .nav-btn:disabled{opacity:0.3;cursor:not-allowed}
-    .url-box{
-      flex:1;display:flex;align-items:center;gap:8px;
-      background:var(--bg-surface);
-      border:1px solid var(--border);
-      border-radius:10px;
-      padding:0 12px;
-      height:32px;
-      transition:border-color .15s;
-    }
-    .url-box:focus-within{border-color:var(--accent)}
-    .url-box .lock-icon{color:var(--good);font-size:11px;flex-shrink:0}
-    .url-box input{
-      flex:1;background:transparent;border:none;
-      color:var(--text);font-size:13px;outline:none;
-      font-family:inherit;
-    }
-    .url-box input::placeholder{color:var(--text-muted)}
-    .url-actions{display:flex;gap:2px}
-    .url-action{
-      width:28px;height:28px;border-radius:8px;
-      border:none;background:transparent;
-      color:var(--text-muted);cursor:pointer;
-      display:flex;align-items:center;justify-content:center;
-      font-size:13px;transition:background .15s,color .15s;
-    }
-    .url-action:hover{background:var(--bg-surface);color:var(--text)}
-    .status-bar{
-      display:flex;align-items:center;gap:12px;
-      padding:3px 12px;
-      background:var(--bg);
-      border-top:1px solid var(--border);
-      font-size:11px;color:var(--text-muted);
-      min-height:22px;
-    }
-    .status-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);flex-shrink:0}
-    .status-dot.good{background:var(--good)}
-    .status-dot.bad{background:var(--bad)}
-    .status-dot.warn{background:var(--warn)}
-    .status-bar .status-text{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .status-bar .status-right{display:flex;gap:12px;align-items:center}
-    .status-pill{
-      display:flex;align-items:center;gap:4px;
-      padding:1px 6px;border-radius:4px;
-      background:var(--bg-surface);
-      font-size:10px;
-    }
-    .viewport{
-      flex:1;position:relative;
-      background:#000;
-      overflow:hidden;
-    }
-    video{
-      width:100%;height:100%;
-      display:block;object-fit:contain;
-      outline:none;cursor:crosshair;
-      touch-action:none;user-select:none;
-    }
-    .viewport-overlay{
-      position:absolute;inset:0;
-      display:flex;align-items:center;justify-content:center;
-      pointer-events:none;
-      opacity:0;transition:opacity .2s;
-    }
-    .viewport-overlay.show{opacity:1;pointer-events:auto}
-    .overlay-content{
-      text-align:center;
-      padding:32px;
-      border-radius:16px;
-      background:rgba(0,0,0,0.7);
-      backdrop-filter:blur(12px);
-      border:1px solid var(--border);
-    }
-    .overlay-content h2{font-size:18px;font-weight:600;margin-bottom:8px}
-    .overlay-content p{font-size:13px;color:var(--text-muted);margin-bottom:16px}
-    .overlay-content .big-btn{
-      padding:10px 24px;border-radius:10px;
-      border:none;background:var(--accent);color:#fff;
-      font-size:14px;font-weight:600;cursor:pointer;
-      transition:background .15s;
-    }
-    .overlay-content .big-btn:hover{background:var(--accent-hover)}
-    /* Audio unlock banner — shown when autoplay is blocked */
-    .audio-unlock{
-      position:absolute;bottom:28px;left:50%;transform:translateX(-50%);
-      padding:8px 18px;border-radius:10px;
-      background:rgba(74,158,255,0.18);
-      border:1px solid rgba(74,158,255,0.4);
-      color:var(--accent);font-size:12px;cursor:pointer;
-      backdrop-filter:blur(8px);
-      transition:opacity .3s;
-      white-space:nowrap;
-      z-index:5;
-    }
-    .audio-unlock:hover{background:rgba(74,158,255,0.28)}
-    .log-panel{
-      position:absolute;bottom:0;left:0;right:0;
-      background:var(--bg-elevated);
-      border-top:1px solid var(--border);
-      max-height:0;overflow:hidden;
-      transition:max-height .25s ease;
-      z-index:10;
-    }
-    .log-panel.open{max-height:200px}
-    .log-header{
-      display:flex;align-items:center;justify-content:space-between;
-      padding:6px 12px;border-bottom:1px solid var(--border);
-      font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;
-      color:var(--text-muted);
-    }
-    .log-header button{
-      background:transparent;border:none;color:var(--text-muted);
-      cursor:pointer;font-size:11px;
-    }
-    .log-header button:hover{color:var(--text)}
-    .log-body{
-      padding:8px 12px;
-      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-      font-size:11px;line-height:1.6;
-      color:#b0b0b0;
-      max-height:160px;overflow:auto;
-      white-space:pre-wrap;word-break:break-word;
-    }
-    .log-body .log-entry{margin-bottom:2px}
-    .log-body .log-time{color:var(--text-muted);margin-right:6px}
-    .log-body .log-good{color:var(--good)}
-    .log-body .log-bad{color:var(--bad)}
-    .log-body .log-warn{color:var(--warn)}
-    .toast-container{
-      position:fixed;top:12px;right:12px;
-      display:flex;flex-direction:column;gap:6px;
-      z-index:100;pointer-events:none;
-    }
-    .toast{
-      padding:10px 16px;border-radius:10px;
-      background:var(--bg-elevated);
-      border:1px solid var(--border);
-      font-size:13px;
-      box-shadow:0 8px 32px rgba(0,0,0,0.4);
-      animation:toastIn .3s ease,toastOut .3s ease 2.7s forwards;
-      pointer-events:auto;
-      max-width:320px;
-    }
-    .toast.success{border-color:rgba(61,220,132,0.3);color:var(--good)}
-    .toast.error{border-color:rgba(255,77,77,0.3);color:var(--bad)}
-    .toast.info{border-color:rgba(74,158,255,0.3);color:var(--accent)}
-    @keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
-    @keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(20px)}}
-    .empty-state{
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      height:100%;gap:16px;
-    }
-    .empty-state .empty-icon{
-      width:64px;height:64px;border-radius:16px;
-      background:var(--bg-surface);
-      display:flex;align-items:center;justify-content:center;
-      font-size:28px;color:var(--text-muted);
-    }
-    .empty-state h3{font-size:16px;font-weight:600;color:var(--text)}
-    .empty-state p{font-size:13px;color:var(--text-muted);text-align:center;max-width:300px;line-height:1.5}
-    .empty-state .quick-sites{
-      display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px;
-    }
-    .quick-site{
-      padding:6px 14px;border-radius:8px;
-      background:var(--bg-surface);
-      border:1px solid var(--border);
-      color:var(--text);font-size:12px;
-      cursor:pointer;transition:all .15s;
-    }
-    .quick-site:hover{border-color:var(--accent);color:var(--accent)}
-    .spinner{
-      width:20px;height:20px;border-radius:50%;
-      border:2px solid var(--border);
-      border-top-color:var(--accent);
-      animation:spin 1s linear infinite;
-    }
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .video-hint{
-      position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
-      padding:6px 14px;border-radius:8px;
-      background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);
-      border:1px solid var(--border);
-      font-size:11px;color:var(--text-muted);
-      opacity:0;transition:opacity .3s;
-      pointer-events:none;white-space:nowrap;
-    }
-    .viewport:hover .video-hint{opacity:1}
+    #audio-btn:hover { background: rgba(91,142,255,.25); }
+    #audio-btn.show { display: block; }
+
+    /* ── Status bar ── */
+    #statusbar { display: flex; align-items: center; gap: 10px; padding: 3px 12px; background: var(--bg-bar); border-top: 1px solid var(--border); min-height: 22px; flex-shrink: 0; }
+    .s-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+    .s-dot.good { background: var(--good); }
+    .s-dot.bad  { background: var(--bad); }
+    .s-dot.warn { background: var(--warn); }
+    #s-text { flex: 1; font-family: var(--mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .s-pills { display: flex; gap: 8px; align-items: center; }
+    .s-pill { font-family: var(--mono); font-size: 10px; color: var(--text-muted); padding: 1px 7px; border-radius: 4px; background: var(--bg-surface); white-space: nowrap; }
+
+    /* ── Toasts ── */
+    #toasts { position: fixed; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 5px; z-index: 200; pointer-events: none; }
+    .toast { padding: 9px 14px; border-radius: 9px; background: var(--bg-surface); border: 1px solid var(--border); font-size: 12.5px; pointer-events: auto; max-width: 300px; animation: tIn .25s ease, tOut .25s ease 2.75s forwards; }
+    .toast.ok   { border-color: rgba(57,217,138,.3); color: var(--good); }
+    .toast.err  { border-color: rgba(255,79,79,.3);  color: var(--bad); }
+    .toast.info { border-color: rgba(91,142,255,.3); color: var(--accent); }
+    @keyframes tIn  { from { opacity:0; transform:translateX(16px) } to { opacity:1; transform:none } }
+    @keyframes tOut { from { opacity:1 } to { opacity:0; transform:translateX(16px) } }
+
+    .hint { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); padding: 5px 12px; border-radius: 7px; background: rgba(0,0,0,.7); backdrop-filter: blur(8px); border: 1px solid var(--border); opacity: 0; transition: opacity .25s; pointer-events: none; white-space: nowrap; }
+    #viewport:hover .hint { opacity: 1; }
   </style>
 </head>
 <body>
-<div class="browser-chrome">
-  <div class="tab-bar" id="tab-bar">
-    <button class="new-tab-btn" id="new-tab-btn" title="New tab">+</button>
+<div id="shell">
+  <div id="chrome">
+    <button class="nav-btn" id="btn-back"    disabled title="Back">&#9664;</button>
+    <button class="nav-btn" id="btn-forward" disabled title="Forward">&#9654;</button>
+    <button class="nav-btn" id="btn-reload"  disabled title="Reload">&#8635;</button>
+
+    <div id="url-wrap">
+      <span id="lock">&#128274;</span>
+      <input id="url-input" type="text" placeholder="Enter URL or search…" spellcheck="false" autocomplete="off" />
+    </div>
+
+    <div id="id-pill" title="Your persistent browser identity">
+      <span class="dot" id="id-dot"></span>
+      <span id="id-label">—</span>
+    </div>
+
+    <!-- Close / stop session button -->
+    <button class="nav-btn close-btn" id="btn-close" disabled title="Close tab">&#10005;</button>
   </div>
-  <div class="address-bar">
-    <div class="nav-btns">
-      <button class="nav-btn" id="nav-back" disabled title="Back">&#9664;</button>
-      <button class="nav-btn" id="nav-forward" disabled title="Forward">&#9654;</button>
-      <button class="nav-btn" id="nav-reload" disabled title="Reload">&#8635;</button>
-    </div>
-    <div class="url-box">
-      <span class="lock-icon" id="lock-icon">&#128274;</span>
-      <input id="url-input" type="text" placeholder="Enter URL or search..." spellcheck="false" autocomplete="off" />
-    </div>
-    <div class="url-actions">
-      <button class="url-action" id="btn-focus" title="Focus remote browser" disabled>&#127919;</button>
-      <button class="url-action" id="btn-logs" title="Toggle logs">&#128203;</button>
-    </div>
-  </div>
-  <div class="viewport" id="viewport">
-    <div class="empty-state" id="empty-state">
-      <div class="empty-icon">&#127760;</div>
-      <h3>Remote Browser</h3>
-      <p>by the makers of voidium</p>
-      <div class="quick-sites">
-        <button class="quick-site" data-url="https://www.tiktok.com/">TikTok</button>
-        <button class="quick-site" data-url="https://www.youtube.com/">YouTube</button>
-        <button class="quick-site" data-url="https://www.google.com/">Google</button>
-        <button class="quick-site" data-url="https://www.reddit.com/">Reddit</button>
+
+  <div id="viewport">
+    <div id="splash">
+      <div class="splash-logo">🌐</div>
+      <div class="splash-title">Remote Browser</div>
+      <div class="splash-sub">Your sessions are persistent — accounts you log into stay logged in.</div>
+      <div class="quick-row">
+        <button class="quick-btn" data-url="https://www.tiktok.com/">TikTok</button>
+        <button class="quick-btn" data-url="https://www.youtube.com/">YouTube</button>
+        <button class="quick-btn" data-url="https://www.google.com/">Google</button>
+        <button class="quick-btn" data-url="https://www.reddit.com/">Reddit</button>
+        <button class="quick-btn" data-url="https://www.twitter.com/">Twitter</button>
       </div>
     </div>
-    <video id="remote-video" autoplay playsinline tabindex="0" style="display:none"></video>
-    <div class="viewport-overlay" id="overlay">
-      <div class="overlay-content">
-        <div class="spinner" style="margin:0 auto 12px"></div>
-        <h2 id="overlay-title">Connecting...</h2>
-        <p id="overlay-msg">Setting up remote browser session</p>
+
+    <video id="video" autoplay playsinline muted tabindex="0" style="display:none"></video>
+
+    <div id="overlay">
+      <div class="overlay-box">
+        <div class="spinner"></div>
+        <h2 id="ov-title">Connecting…</h2>
+        <p  id="ov-msg">Setting up your remote browser</p>
       </div>
     </div>
-    <div class="video-hint">
-      Click to focus &bull; Scroll &bull; Type &bull; Esc to unfocus
-    </div>
-    <div class="log-panel" id="log-panel">
-      <div class="log-header">
-        <span>Session Log</span>
-        <button id="clear-logs">Clear</button>
-      </div>
-      <div class="log-body" id="log-body"></div>
-    </div>
+
+    <button id="audio-btn">🔇 Click to enable audio</button>
+    <div class="hint">Click to focus &bull; Scroll &bull; Type &bull; Esc to release</div>
   </div>
-  <div class="status-bar">
-    <span class="status-dot" id="status-dot"></span>
-    <span class="status-text" id="status-text">Ready</span>
-    <div class="status-right">
-      <span class="status-pill" id="pill-video">Video: &mdash;</span>
-      <span class="status-pill" id="pill-audio">Audio: &mdash;</span>
-      <span class="status-pill" id="pill-control">Control: &mdash;</span>
-      <span class="status-pill" id="pill-ice">ICE: &mdash;</span>
+
+  <div id="statusbar">
+    <span class="s-dot" id="s-dot"></span>
+    <span id="s-text">Ready</span>
+    <div class="s-pills">
+      <span class="s-pill" id="p-ice">ICE —</span>
+      <span class="s-pill" id="p-ctrl">ctrl —</span>
+      <span class="s-pill" id="p-audio">audio —</span>
+      <span class="s-pill" id="p-res">— × —</span>
     </div>
   </div>
 </div>
-<div class="toast-container" id="toast-container"></div>
+
+<div id="toasts"></div>
 
 <script>
 (() => {
-  if (!window.firebase) { alert('Firebase failed to load.'); return; }
+'use strict';
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyA4BYjOa__uKZjOBvS5p_uMxmJ6AMsKcpg",
-    authDomain: "chat1-6cc2e.firebaseapp.com",
-    databaseURL: "https://chat1-6cc2e-default-rtdb.firebaseio.com",
-    projectId: "chat1-6cc2e",
-    storageBucket: "chat1-6cc2e.firebasestorage.app",
-    messagingSenderId: "771765903902",
-    appId: "1:771765903902:web:a6fb2e71b059c20ba7840f",
+/* ══════════ Firebase init ══════════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey:            'AIzaSyA4BYjOa__uKZjOBvS5p_uMxmJ6AMsKcpg',
+  authDomain:        'chat1-6cc2e.firebaseapp.com',
+  databaseURL:       'https://chat1-6cc2e-default-rtdb.firebaseio.com',
+  projectId:         'chat1-6cc2e',
+  storageBucket:     'chat1-6cc2e.firebasestorage.app',
+  messagingSenderId: '771765903902',
+  appId:             '1:771765903902:web:a6fb2e71b059c20ba7840f',
+};
+firebase.initializeApp(FIREBASE_CONFIG);
+const db   = firebase.database();
+const auth = firebase.auth();
+
+const SESSION_ROOT  = 'remoteBrowser/sessions';
+const DEFAULT_URL   = 'https://www.tiktok.com/';
+const DEFAULT_CAP   = { width:1920, height:1080, fps:30, viewportWidth:1920, viewportHeight:1080 };
+
+/* ══════════ Persistent identity ════════════════════════════════════════ */
+const IDENTITY_KEY = '__rb_identity';
+function getStoredIdentity() {
+  try { return JSON.parse(localStorage.getItem(IDENTITY_KEY) || 'null'); } catch { return null; }
+}
+function setStoredIdentity(uid) {
+  try { localStorage.setItem(IDENTITY_KEY, JSON.stringify({ uid, createdAt: Date.now() })); } catch {}
+}
+
+let _uid = null;
+function sk(key) { return `rb:${_uid || 'pre'}:${key}`; }
+function uSet(k, v) { try { localStorage.setItem(sk(k), JSON.stringify(v)); } catch {} }
+function uGet(k, fb) {
+  try { const v = localStorage.getItem(sk(k)); return v === null ? fb : JSON.parse(v); }
+  catch { return fb; }
+}
+
+/* ══════════ DOM refs ════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const el = {
+  splash:   $('splash'),
+  video:    $('video'),
+  overlay:  $('overlay'),
+  ovTitle:  $('ov-title'),
+  ovMsg:    $('ov-msg'),
+  urlInput: $('url-input'),
+  btnBack:  $('btn-back'),
+  btnFwd:   $('btn-forward'),
+  btnRel:   $('btn-reload'),
+  btnClose: $('btn-close'),
+  lock:     $('lock'),
+  idDot:    $('id-dot'),
+  idLabel:  $('id-label'),
+  sDot:     $('s-dot'),
+  sText:    $('s-text'),
+  pIce:     $('p-ice'),
+  pCtrl:    $('p-ctrl'),
+  pAudio:   $('p-audio'),
+  pRes:     $('p-res'),
+  audioBtn: $('audio-btn'),
+  toasts:   $('toasts'),
+  viewport: $('viewport'),
+};
+
+/* ══════════ Toast / log ═════════════════════════════════════════════ */
+function toast(msg, type = 'info') {
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  el.toasts.appendChild(t);
+  setTimeout(() => t.remove(), 3100);
+}
+function log(...args) { console.log('[rb]', ...args); }
+
+/* ══════════ Session state ══════════════════════════════════════════ */
+const S = {
+  uid:           null,
+  sessionId:     null,
+  sessionRef:    null,
+  sessionSub:    null,
+  pc:            null,
+  ctrl:          null,
+  stream:        null,
+  capture:       { ...DEFAULT_CAP },
+  connState:     'idle',
+  iceState:      'idle',
+  ctrlState:     'none',
+  audioState:    'wait',
+  remoteDescSet: false,
+  negotiating:   false,
+  answerSent:    false,
+  seenSrvCands:  new Set(),
+  pendingSrvCands: [],
+  authReady:     null,
+};
+
+/* ══════════ UI helpers ══════════════════════════════════════════════ */
+function setOverlay(title, msg, show) {
+  el.ovTitle.textContent = title;
+  el.ovMsg.textContent   = msg;
+  el.overlay.classList.toggle('show', show);
+}
+function showVideo() {
+  el.splash.classList.add('hidden');
+  el.video.style.display = 'block';
+}
+function showSplash() {
+  el.splash.classList.remove('hidden');
+  el.video.style.display = 'none';
+  el.video.srcObject = null;
+  el.urlInput.value = '';
+  updateLock('');
+}
+function updateStatus() {
+  const conn = S.connState;
+  el.sDot.className = 's-dot' + (conn === 'connected' ? ' good' : conn === 'failed' || conn === 'closed' ? ' bad' : conn !== 'idle' ? ' warn' : '');
+  el.sText.textContent = conn;
+  el.pIce.textContent  = 'ICE ' + S.iceState;
+  el.pCtrl.textContent = 'ctrl ' + S.ctrlState;
+  el.pAudio.textContent = 'audio ' + S.audioState;
+  const c = S.capture;
+  el.pRes.textContent  = c.width + '×' + c.height;
+  const ctrlOpen = S.ctrl && S.ctrl.readyState === 'open';
+  el.btnRel.disabled   = !ctrlOpen;
+  el.btnClose.disabled = !S.sessionId;
+}
+function updateLock(url) {
+  if (!url) { el.lock.textContent = '🔒'; el.lock.style.color = 'var(--text-muted)'; return; }
+  el.lock.textContent = url.startsWith('https') ? '🔒' : '⚠️';
+  el.lock.style.color = url.startsWith('https') ? 'var(--good)' : 'var(--warn)';
+}
+function setIdentityUI(uid) {
+  el.idLabel.textContent = uid.slice(0, 8) + '…';
+  el.idDot.className = 'dot good';
+}
+
+/* ══════════ Audio ═══════════════════════════════════════════════════
+   Strategy:
+   1. Video starts muted (required for autoplay policy).
+   2. On first track / first interaction we try to unmute immediately.
+   3. If that fails (browser still blocks), show the banner.
+   4. Banner click unmutes and hides itself.
+════════════════════════════════════════════════════════════════════ */
+function tryUnmute() {
+  if (!el.video.muted) return;          // already unmuted
+  el.video.muted = false;
+  el.video.play().then(() => {
+    el.audioBtn.classList.remove('show');
+    S.audioState = 'live';
+    updateStatus();
+  }).catch(() => {
+    el.video.muted = true;              // revert — blocked
+    el.video.play().catch(() => {});
+    S.audioState = 'blocked';
+    updateStatus();
+    el.audioBtn.classList.add('show');
+  });
+}
+
+el.audioBtn.addEventListener('click', () => {
+  el.video.muted = false;
+  el.video.play().catch(() => {});
+  el.audioBtn.classList.remove('show');
+  S.audioState = 'live';
+  updateStatus();
+  toast('Audio enabled', 'ok');
+});
+
+// Unmute on any user gesture inside the viewport
+el.viewport.addEventListener('pointerdown', () => { if (S.sessionId) tryUnmute(); }, { passive: true });
+
+/* ══════════ Coordinate translation ═════════════════════════════════ */
+function remoteCoords(ev) {
+  const r   = el.video.getBoundingClientRect();
+  if (!r.width || !r.height) return null;
+  const c   = S.capture;
+  const fw  = c.width  || DEFAULT_CAP.width;
+  const fh  = c.height || DEFAULT_CAP.height;
+  const vpW = c.viewportWidth  || fw;
+  const vpH = c.viewportHeight || fh;
+  const sc  = Math.min(r.width / fw, r.height / fh);
+  if (!isFinite(sc) || sc <= 0) return null;
+  const cw  = fw * sc;
+  const ch  = fh * sc;
+  const ox  = (r.width  - cw) / 2;
+  const oy  = (r.height - ch) / 2;
+  const lx  = ev.clientX - r.left - ox;
+  const ly  = ev.clientY - r.top  - oy;
+  if (lx < 0 || ly < 0 || lx > cw || ly > ch) return null;
+  return { x: Math.round((lx / cw) * vpW), y: Math.round((ly / ch) * vpH) };
+}
+
+/* ══════════ Control channel ════════════════════════════════════════
+   ALL control (mouse, keyboard, navigate, reload, state updates)
+   goes through the WebRTC data channel once open.
+   Firebase is only used for initial offer/answer/ICE signaling.
+════════════════════════════════════════════════════════════════════ */
+function send(payload) {
+  if (S.ctrl && S.ctrl.readyState === 'open') {
+    S.ctrl.send(JSON.stringify(payload));
+    return true;
+  }
+  return false;
+}
+
+function focusRemote() {
+  el.video.focus();
+  send({ type: 'focus' });
+  tryUnmute();
+}
+
+function keyPayload(ev, action) {
+  return {
+    type: 'key', action,
+    key: ev.key, code: ev.code,
+    text: ev.key?.length === 1 ? ev.key : '',
+    altKey: ev.altKey, ctrlKey: ev.ctrlKey, metaKey: ev.metaKey, shiftKey: ev.shiftKey,
+    repeat: ev.repeat,
+    isKeypad: ev.location === KeyboardEvent.DOM_KEY_LOCATION_NUMPAD,
   };
-  firebase.initializeApp(firebaseConfig);
-  const db   = firebase.database();
-  const auth = firebase.auth();
+}
+function btnName(ev) { return ev.button === 2 ? 'right' : ev.button === 1 ? 'middle' : 'left'; }
 
-  const SESSION_ROOT  = 'remoteBrowser/sessions';
-  const DEFAULT_URL   = 'https://www.tiktok.com/';
-  const DEFAULT_CAPTURE = { width:1920, height:1080, fps:30, viewportWidth:1920, viewportHeight:1080 };
-
-  // ─── Per-user namespaced storage ──────────────────────────────────────
-  // All localStorage keys are prefixed with rb:<uid>: so every anonymous
-  // Firebase user gets their own isolated bucket of preferences/session data.
-  let _uid = null;
-  let _storagePrefix = '';
-
-  function _sk(key) { return _storagePrefix ? `${_storagePrefix}:${key}` : `rb_pre:${key}`; }
-  function uStore(key, value) {
-    try { localStorage.setItem(_sk(key), JSON.stringify(value)); } catch(e) {}
+/* ══════════ Inbound data channel messages from host ════════════════
+   The host pushes state updates (url, title) over the data channel
+   instead of writing them to Firebase. This cuts Firebase writes
+   dramatically once connected.
+════════════════════════════════════════════════════════════════════ */
+function handleHostMessage(msg) {
+  if (!msg || typeof msg !== 'object') return;
+  switch (msg.type) {
+    case 'url':
+      if (msg.url) {
+        el.urlInput.value = msg.url;
+        updateLock(msg.url);
+        uSet('lastUrl', msg.url);
+      }
+      break;
+    case 'capture':
+      if (msg.capture) {
+        S.capture = {
+          width:          msg.capture.width  || DEFAULT_CAP.width,
+          height:         msg.capture.height || DEFAULT_CAP.height,
+          fps:            msg.capture.fps    || DEFAULT_CAP.fps,
+          viewportWidth:  msg.capture.viewportWidth  || msg.capture.width  || DEFAULT_CAP.width,
+          viewportHeight: msg.capture.viewportHeight || msg.capture.height || DEFAULT_CAP.height,
+        };
+        updateStatus();
+      }
+      break;
+    case 'title':
+      if (msg.title) document.title = `Remote Browser — ${msg.title}`;
+      break;
+    case 'pong':
+      break;
+    default:
+      log('unknown host msg:', msg.type);
   }
-  function uLoad(key, fallback) {
-    try {
-      const v = localStorage.getItem(_sk(key));
-      return v === null ? fallback : JSON.parse(v);
-    } catch(e) { return fallback; }
-  }
-  function uRemove(key) { try { localStorage.removeItem(_sk(key)); } catch(e) {} }
+}
 
-  // Per-user cookies (namespaced by uid so each user's cookies don't collide)
-  function setCookie(name, value, days) {
-    const exp = days ? `;expires=${new Date(Date.now()+days*864e5).toUTCString()}` : '';
-    document.cookie = `${_sk(name)}=${encodeURIComponent(value)}${exp};path=/;SameSite=Lax`;
-  }
-  function getCookie(name) {
-    const key = _sk(name) + '=';
-    for (const c of document.cookie.split(';')) {
-      const p = c.trim();
-      if (p.startsWith(key)) return decodeURIComponent(p.slice(key.length));
+/* ══════════ WebRTC peer connection ════════════════════════════════ */
+function setupPC() {
+  const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  S.pc     = pc;
+  S.stream = new MediaStream();
+
+  pc.ontrack = ev => {
+    const track = ev.track;
+    if (track && !S.stream.getTracks().some(t => t.id === track.id)) S.stream.addTrack(track);
+    if (track?.kind === 'audio') {
+      S.audioState = 'live';
+      updateStatus();
     }
-    return null;
-  }
-  function deleteCookie(name) {
-    document.cookie = `${_sk(name)}=;expires=Thu,01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax`;
-  }
+    if (el.video.srcObject !== S.stream) {
+      el.video.srcObject = S.stream;
+      el.video.muted = true;          // must start muted
+      el.video.play().then(() => {
+        showVideo();
+        el.overlay.classList.remove('show');
+        // Try unmuting after a tick — some browsers need this gap
+        setTimeout(tryUnmute, 200);
+      }).catch(() => {
+        showVideo();
+        el.overlay.classList.remove('show');
+      });
+    }
+  };
 
-  // Migrate any pre-uid temp keys once uid is known
-  function onUidReady(uid) {
-    if (_uid === uid) return;
-    const prevPrefix = _storagePrefix;
-    _uid = uid;
-    _storagePrefix = `rb:${uid}`;
-    // Copy any pre-auth temp keys into the uid namespace
-    if (prevPrefix !== _storagePrefix) {
-      const tmpPrefix = 'rb_pre:';
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith(tmpPrefix)) {
-          const shortKey = k.slice(tmpPrefix.length);
-          const val = localStorage.getItem(k);
-          if (val !== null && !localStorage.getItem(_sk(shortKey))) {
-            localStorage.setItem(_sk(shortKey), val);
-          }
-          localStorage.removeItem(k);
-        }
+  pc.onicecandidate = async ev => {
+    if (!ev.candidate || !S.sessionRef) return;
+    try { await S.sessionRef.child('clientCandidates').push(ev.candidate.toJSON()); }
+    catch (e) { log('client ICE push:', e.message); }
+  };
+
+  // Data channel — server creates it with label 'control'
+  pc.ondatachannel = ev => {
+    if (ev.channel.label !== 'control') return;
+    S.ctrl = ev.channel;
+    ev.channel.onopen  = () => {
+      S.ctrlState = 'open';
+      updateStatus();
+      toast('Connected!', 'ok');
+      // Send a ping to verify the channel works both ways
+      send({ type: 'ping' });
+    };
+    ev.channel.onclose = () => { S.ctrlState = 'closed'; updateStatus(); };
+    ev.channel.onmessage = ev2 => {
+      try { handleHostMessage(JSON.parse(ev2.data)); } catch {}
+    };
+  };
+
+  pc.onconnectionstatechange = () => {
+    S.connState = pc.connectionState;
+    updateStatus();
+    if (S.connState === 'failed' || S.connState === 'closed') {
+      toast('Connection lost', 'err');
+      cleanup(false);
+    }
+  };
+
+  pc.oniceconnectionstatechange = () => { S.iceState = pc.iceConnectionState; updateStatus(); };
+}
+
+/* ══════════ Firebase session listener ══════════════════════════════
+   Only reads signaling data (offer, serverCandidates, status).
+   Once connected, the listener still watches for a stop signal but
+   no longer reads URL / capture state — those come via data channel.
+════════════════════════════════════════════════════════════════════ */
+async function drainPendingSrvCands() {
+  if (!S.pc || !S.remoteDescSet || !S.pendingSrvCands.length) return;
+  const q = S.pendingSrvCands.splice(0);
+  for (const c of q) {
+    try { await S.pc.addIceCandidate(c); } catch (e) { log('drain ICE:', e.message); }
+  }
+}
+
+function attachListener() {
+  S.sessionSub = S.sessionRef.on('value', async snap => {
+    const data = snap.val();
+    if (!data) { cleanup(false); return; }
+
+    // Capture / URL updates from Firebase only used BEFORE data channel is open
+    if (data.capture && S.ctrlState !== 'open') {
+      S.capture = {
+        width:          data.capture.width  || DEFAULT_CAP.width,
+        height:         data.capture.height || DEFAULT_CAP.height,
+        fps:            data.capture.fps    || DEFAULT_CAP.fps,
+        viewportWidth:  data.capture.viewportWidth  || data.capture.width  || DEFAULT_CAP.width,
+        viewportHeight: data.capture.viewportHeight || data.capture.height || DEFAULT_CAP.height,
+      };
+      updateStatus();
+    }
+    if (data.url && S.ctrlState !== 'open') {
+      el.urlInput.value = data.url;
+      updateLock(data.url);
+    }
+
+    const waiting = ['pending','launching','waiting-answer','offer-ready'].includes(data.status);
+    if (data.status) {
+      const labels = {
+        pending:          ['Waiting for host', 'Remote browser is starting…'],
+        launching:        ['Launching', 'Browser is starting on remote host'],
+        'waiting-answer': ['Negotiating', 'Setting up WebRTC connection'],
+        'offer-ready':    ['Negotiating', 'Waiting for answer from host'],
+        connected:        ['Connected', 'Receiving video stream'],
+        stopped:          ['Stopped', 'Session ended'],
+        error:            ['Error', 'Remote host encountered an error'],
+      };
+      const [title, msg] = labels[data.status] || [data.status, ''];
+      if (waiting) setOverlay(title, msg, true);
+      else if (data.status === 'connected') el.overlay.classList.remove('show');
+      else if (['stopped','deleted','error'].includes(data.status)) {
+        setOverlay(title, msg, true);
+        toast('Session ' + data.status, data.status === 'error' ? 'err' : 'info');
+        cleanup(false);
+        return;
       }
     }
-    log('Storage ready for user ' + uid.slice(0,8), 'good');
-  }
 
-  const els = {
-    tabBar:      document.getElementById('tab-bar'),
-    newTabBtn:   document.getElementById('new-tab-btn'),
-    urlInput:    document.getElementById('url-input'),
-    navBack:     document.getElementById('nav-back'),
-    navForward:  document.getElementById('nav-forward'),
-    navReload:   document.getElementById('nav-reload'),
-    btnFocus:    document.getElementById('btn-focus'),
-    btnLogs:     document.getElementById('btn-logs'),
-    lockIcon:    document.getElementById('lock-icon'),
-    viewport:    document.getElementById('viewport'),
-    emptyState:  document.getElementById('empty-state'),
-    remoteVideo: document.getElementById('remote-video'),
-    overlay:     document.getElementById('overlay'),
-    overlayTitle:document.getElementById('overlay-title'),
-    overlayMsg:  document.getElementById('overlay-msg'),
-    logPanel:    document.getElementById('log-panel'),
-    logBody:     document.getElementById('log-body'),
-    clearLogs:   document.getElementById('clear-logs'),
-    statusDot:   document.getElementById('status-dot'),
-    statusText:  document.getElementById('status-text'),
-    pillVideo:   document.getElementById('pill-video'),
-    pillAudio:   document.getElementById('pill-audio'),
-    pillControl: document.getElementById('pill-control'),
-    pillIce:     document.getElementById('pill-ice'),
-    toastContainer: document.getElementById('toast-container'),
-  };
+    // Handle offer → create answer (one-time per session)
+    if (data.offer && S.pc && !S.remoteDescSet && !S.negotiating && !S.answerSent) {
+      S.negotiating = true;
+      try {
+        await S.pc.setRemoteDescription(data.offer);
+        S.remoteDescSet = true;
+        const answer = await S.pc.createAnswer();
+        await S.pc.setLocalDescription(answer);
+        await S.sessionRef.update({
+          answer,
+          status: 'answer-sent',
+          answerSentAt: firebase.database.ServerValue.TIMESTAMP,
+        });
+        S.answerSent = true;
+        await drainPendingSrvCands();
+      } catch (e) {
+        log('answer error:', e.message);
+        toast('Connection setup failed', 'err');
+      } finally { S.negotiating = false; }
+    }
 
-  const state = { user:null, sessions:new Map(), activeSessionId:null, authReady:null, logsOpen:false };
+    // Server ICE candidates
+    for (const [key, cand] of Object.entries(data.serverCandidates || {})) {
+      if (S.seenSrvCands.has(key)) continue;
+      S.seenSrvCands.add(key);
+      if (!S.remoteDescSet) { S.pendingSrvCands.push(cand); continue; }
+      try { await S.pc.addIceCandidate(cand); } catch (e) { log('srv ICE:', e.message); }
+    }
+  });
+}
 
-  function now()     { return new Date().toLocaleTimeString(); }
-  function shortId(id) { return id ? id.slice(0,8) : '\u2014'; }
-  function isActive(s) { const id = typeof s==='string' ? s : s?.id; return Boolean(id && state.activeSessionId===id); }
-  function getSession(id=state.activeSessionId) { return id ? (state.sessions.get(id)||null) : null; }
+/* ══════════ Start / stop session ═══════════════════════════════════ */
+async function startSession(url) {
+  await S.authReady;
+  if (!auth.currentUser) throw new Error('Not authenticated');
+  if (S.sessionId) await stopSession();
 
-  function toast(msg, type='info') {
-    const t = document.createElement('div');
-    t.className = 'toast ' + type;
-    t.textContent = msg;
-    els.toastContainer.appendChild(t);
-    setTimeout(() => t.remove(), 3000);
-  }
-  function log(m, tone) {
-    const entry = document.createElement('div');
-    entry.className = 'log-entry';
-    const time = document.createElement('span');
-    time.className = 'log-time';
-    time.textContent = '[' + now() + ']';
-    const text = document.createElement('span');
-    if (tone) text.className = 'log-' + tone;
-    text.textContent = ' ' + m;
-    entry.appendChild(time);
-    entry.appendChild(text);
-    els.logBody.prepend(entry);
-    while (els.logBody.children.length > 100) els.logBody.lastChild.remove();
-    console.log(m);
-  }
-  function slog(s, m, tone) { log('[' + shortId(s.id) + '] ' + m, tone); }
+  url = (url || DEFAULT_URL).trim() || DEFAULT_URL;
+  const sessionId = crypto.randomUUID();
 
-  function createSessionRecord(id, url) {
-    return {
-      id, url, label:'', title:'',
-      sessionRef:null, sessionListener:null,
-      pc:null, controlChannel:null, remoteStream:null,
-      remoteDescSet:false, negotiating:false, answerSent:false,
-      seenServerCandidates:new Set(),
-      pendingServerCandidates:[],
-      capture:{ ...DEFAULT_CAPTURE },
-      lastHostLogTs:0,
-      connectionState:'disconnected',
-      audioState:'waiting',
-      controlState:'not-connected',
-      iceState:'idle',
-    };
-  }
+  S.sessionId        = sessionId;
+  S.remoteDescSet    = false;
+  S.negotiating      = false;
+  S.answerSent       = false;
+  S.seenSrvCands     = new Set();
+  S.pendingSrvCands  = [];
+  S.connState        = 'connecting';
+  S.iceState         = 'idle';
+  S.ctrlState        = 'none';
+  S.audioState       = 'wait';
+  S.capture          = { ...DEFAULT_CAP };
 
-  function sessionLabel(s) {
-    if (s.title) return s.title;
+  el.urlInput.value = url;
+  updateLock(url);
+  updateStatus();
+  setOverlay('Starting…', 'Creating your session', true);
+
+  setupPC();
+
+  S.sessionRef = db.ref(`${SESSION_ROOT}/${sessionId}`);
+  attachListener();
+
+  await S.sessionRef.set({
+    id: sessionId, url,
+    requestedBy: auth.currentUser.uid,
+    status: 'pending',
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    client: {
+      uid: auth.currentUser.uid,
+      userAgent: navigator.userAgent,
+      viewport: { width: innerWidth, height: innerHeight },
+    },
+  });
+
+  uSet('lastUrl', url);
+  toast('Session started', 'ok');
+}
+
+async function stopSession() {
+  if (!S.sessionId) return;
+  const ref = S.sessionRef;
+  const id  = S.sessionId;
+  cleanup(false);
+  if (ref) {
     try {
-      const h = new URL(s.url).hostname.replace(/^www\./i,'');
-      if (h.includes('tiktok'))   return 'TikTok';
-      if (h.includes('youtube'))  return 'YouTube';
-      if (h.includes('google'))   return 'Google';
-      return h || shortId(s.id);
-    } catch { return shortId(s.id); }
-  }
-  function sessionFavicon(s) {
-    try {
-      const h = new URL(s.url).hostname.replace(/^www\./i,'');
-      if (h.includes('tiktok'))  return 'TT';
-      if (h.includes('youtube')) return 'YT';
-      if (h.includes('google'))  return 'G';
-      if (h.includes('reddit'))  return 'R';
-      return (h[0] || '?').toUpperCase();
-    } catch { return '?'; }
-  }
-
-  function updateStatusBar() {
-    const s = getSession();
-    if (!s) {
-      els.statusDot.className = 'status-dot';
-      els.statusText.textContent = 'Ready \u2014 No active session';
-      els.pillVideo.textContent = 'Video: \u2014';
-      els.pillAudio.textContent = 'Audio: \u2014';
-      els.pillControl.textContent = 'Control: \u2014';
-      els.pillIce.textContent = 'ICE: \u2014';
-      els.lockIcon.textContent = '\uD83D\uDD12';
-      els.lockIcon.style.color = 'var(--good)';
-      return;
-    }
-    const conn = s.connectionState;
-    els.statusDot.className = 'status-dot';
-    if (conn === 'connected') els.statusDot.classList.add('good');
-    else if (conn === 'failed' || conn === 'closed') els.statusDot.classList.add('bad');
-    else els.statusDot.classList.add('warn');
-    els.statusText.textContent = s.title || s.label || sessionLabel(s);
-    els.pillVideo.textContent = 'Video: ' + s.capture.width + '\u00d7' + s.capture.height;
-    els.pillAudio.textContent = 'Audio: ' + s.audioState;
-    els.pillControl.textContent = 'Control: ' + s.controlState;
-    els.pillIce.textContent = 'ICE: ' + s.iceState;
-    els.lockIcon.textContent = s.url && s.url.startsWith('https') ? '\uD83D\uDD12' : '\u26A0\uFE0F';
-    els.lockIcon.style.color = s.url && s.url.startsWith('https') ? 'var(--good)' : 'var(--warn)';
-  }
-
-  function showOverlay(title, msg, show) {
-    els.overlayTitle.textContent = title;
-    els.overlayMsg.textContent = msg;
-    els.overlay.classList.toggle('show', show);
-  }
-  function hideOverlay() { els.overlay.classList.remove('show'); }
-
-  // ─── Audio unlock banner ───────────────────────────────────────────────
-  // Browsers block autoplay with audio until a user gesture. We show a
-  // small banner that calls video.play() inside a click handler so it works.
-  let _audioUnlockBanner = null;
-  function showAudioUnlockBanner() {
-    if (_audioUnlockBanner) return;
-    const btn = document.createElement('button');
-    btn.className = 'audio-unlock';
-    btn.textContent = '🔇 Click to enable audio';
-    btn.addEventListener('click', () => {
-      els.remoteVideo.muted = false;
-      els.remoteVideo.play().catch(() => {});
-      btn.remove();
-      _audioUnlockBanner = null;
-      const s = getSession();
-      if (s) { s.audioState = 'live'; updateStatusBar(); }
-      log('Audio unlocked by user gesture', 'good');
-      toast('Audio enabled', 'success');
-    });
-    els.viewport.appendChild(btn);
-    _audioUnlockBanner = btn;
-  }
-  function removeAudioUnlockBanner() {
-    if (_audioUnlockBanner) { _audioUnlockBanner.remove(); _audioUnlockBanner = null; }
-  }
-
-  // ─── Attempt autoplay with audio; fall back to muted then show banner ──
-  function tryPlay(s) {
-    const video = els.remoteVideo;
-    video.muted = false;
-    const playPromise = video.play();
-    if (!playPromise) return; // old browser
-    playPromise.catch(() => {
-      // Autoplay with audio blocked — try muted first, then show banner
-      video.muted = true;
-      video.play().catch(() => {});
-      s.audioState = 'blocked';
-      updateStatusBar();
-      showAudioUnlockBanner();
-      log('Autoplay blocked — showing audio unlock banner', 'warn');
-    });
-  }
-
-  function updateViewport() {
-    const s = getSession();
-    if (!s || !s.remoteStream || s.remoteStream.getTracks().length === 0) {
-      els.emptyState.style.display = 'flex';
-      els.remoteVideo.style.display = 'none';
-      els.remoteVideo.srcObject = null;
-      removeAudioUnlockBanner();
-      hideOverlay();
-    } else {
-      els.emptyState.style.display = 'none';
-      els.remoteVideo.style.display = 'block';
-      if (els.remoteVideo.srcObject !== s.remoteStream) {
-        els.remoteVideo.srcObject = s.remoteStream;
-      }
-      tryPlay(s);
-      hideOverlay();
-    }
-  }
-
-  function renderTabs() {
-    els.tabBar.querySelectorAll('.tab').forEach(t => t.remove());
-    for (const s of state.sessions.values()) {
-      const tab = document.createElement('div');
-      tab.className = 'tab' + (isActive(s) ? ' active' : '');
-      tab.title = s.url;
-      const fav = document.createElement('span');
-      fav.className = 'favicon';
-      fav.textContent = sessionFavicon(s);
-      const title = document.createElement('span');
-      title.className = 'tab-title';
-      title.textContent = s.label || sessionLabel(s);
-      const close = document.createElement('button');
-      close.className = 'tab-close';
-      close.innerHTML = '\u00d7';
-      close.title = 'Close tab';
-      close.addEventListener('click', ev => { ev.stopPropagation(); stopSession(s.id); });
-      tab.appendChild(fav);
-      tab.appendChild(title);
-      tab.appendChild(close);
-      tab.addEventListener('click', () => setActiveSession(s.id));
-      els.tabBar.insertBefore(tab, els.newTabBtn);
-    }
-  }
-
-  function setActiveSession(sessionId) {
-    state.activeSessionId = sessionId;
-    const s = getSession();
-    els.urlInput.value = s ? (s.url || '') : '';
-    updateViewport();
-    updateNavButtons();
-    updateStatusBar();
-    renderTabs();
-    // Persist last active session id per user
-    if (sessionId) uStore('lastSessionId', sessionId);
-  }
-
-  function updateNavButtons() {
-    const s = getSession();
-    const hasControl = s && s.controlChannel && s.controlChannel.readyState === 'open';
-    els.navReload.disabled = !hasControl;
-    els.btnFocus.disabled  = !hasControl;
-    els.navBack.disabled   = true;
-    els.navForward.disabled = true;
-  }
-
-  function toRemoteCoords(event) {
-    const s = getSession();
-    if (!s) return null;
-    const rect = els.remoteVideo.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
-    const cap  = s.capture || DEFAULT_CAPTURE;
-    const frameW = cap.width  || DEFAULT_CAPTURE.width;
-    const frameH = cap.height || DEFAULT_CAPTURE.height;
-    const vpW    = cap.viewportWidth  || frameW;
-    const vpH    = cap.viewportHeight || frameH;
-    const scale  = Math.min(rect.width/frameW, rect.height/frameH);
-    if (!Number.isFinite(scale) || scale <= 0) return null;
-    const contentW = frameW * scale;
-    const contentH = frameH * scale;
-    const offsetX  = (rect.width  - contentW) / 2;
-    const offsetY  = (rect.height - contentH) / 2;
-    const localX = event.clientX - rect.left - offsetX;
-    const localY = event.clientY - rect.top  - offsetY;
-    if (localX < 0 || localY < 0 || localX > contentW || localY > contentH) return null;
-    return { x: Math.round((localX/contentW)*vpW), y: Math.round((localY/contentH)*vpH) };
-  }
-
-  function isTypingTarget(t) {
-    const tag = (t?.tagName||'').toLowerCase();
-    return tag==='input' || tag==='textarea' || t?.isContentEditable;
-  }
-  function keyPayload(event, action) {
-    const text = event.key?.length===1 ? event.key : '';
-    return {
-      type:'key', action,
-      key:event.key, code:event.code, text,
-      altKey:event.altKey, ctrlKey:event.ctrlKey,
-      metaKey:event.metaKey, shiftKey:event.shiftKey,
-      repeat:event.repeat,
-      isKeypad:event.location===KeyboardEvent.DOM_KEY_LOCATION_NUMPAD,
-    };
-  }
-  function sendControl(payload) {
-    const s = getSession();
-    if (!s?.controlChannel || s.controlChannel.readyState!=='open') return;
-    s.controlChannel.send(JSON.stringify(payload));
-  }
-  function focusRemote() {
-    if (!getSession()) return;
-    els.remoteVideo.focus();
-    sendControl({ type:'focus' });
-    // User gesture — try to unmute if still blocked
-    if (els.remoteVideo.muted) {
-      els.remoteVideo.muted = false;
-      els.remoteVideo.play().catch(() => {});
-      removeAudioUnlockBanner();
-      const s = getSession();
-      if (s && s.audioState !== 'live') { s.audioState = 'live'; updateStatusBar(); }
-    }
-  }
-  function reloadRemote() { if (getSession()) sendControl({ type:'reload' }); }
-  function btnName(ev) {
-    return ev.button===2 ? 'right' : ev.button===1 ? 'middle' : 'left';
-  }
-
-  // ─── Full Firebase cleanup ─────────────────────────────────────────────
-  // Deletes the session node AND all associated signaling paths so nothing
-  // is left behind in Firebase after a session ends.
-  async function firebaseWipe(sessionId, sessionRef) {
-    if (!sessionRef) return;
-    const writes = {};
-    writes[`${SESSION_ROOT}/${sessionId}`] = null;
-    writes[`remoteBrowser/signaling/${sessionId}`] = null;
-    try {
-      await db.ref().update(writes);
-    } catch(e) {
-      // Best-effort: individual fallbacks
-      try { await sessionRef.remove(); } catch(e2) {}
-      try { await db.ref(`remoteBrowser/signaling/${sessionId}`).remove(); } catch(e2) {}
-    }
-  }
-
-  function cleanupSession(sessionId, opts={}) {
-    const s = getSession(sessionId);
-    if (!s) return;
-    if (s.sessionListener && s.sessionRef) {
-      try { s.sessionRef.off('value', s.sessionListener); } catch(e) {}
-    }
-    if (s.controlChannel)  { try { s.controlChannel.close(); } catch(e) {} }
-    if (s.pc)              { try { s.pc.close(); } catch(e) {} }
-    if (s.remoteStream)    { s.remoteStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} }); }
-
-    if (opts.stopRemote && s.sessionRef) {
-      // Mark stopped then wipe everything
-      s.sessionRef.update({
+      await ref.update({
         status: 'stopped',
         stoppedAt: firebase.database.ServerValue.TIMESTAMP,
         stopReason: 'client-close',
         offer: null, answer: null,
         clientCandidates: null, serverCandidates: null,
-      }).then(() => firebaseWipe(s.id, s.sessionRef))
-        .catch(() => firebaseWipe(s.id, s.sessionRef));
-    }
-
-    state.sessions.delete(s.id);
-    uRemove('lastSessionId');
-
-    if (state.activeSessionId === s.id) {
-      const next = state.sessions.keys().next();
-      state.activeSessionId = next.done ? null : next.value;
-    }
-    if (!state.sessions.size) {
-      els.remoteVideo.srcObject = null;
-      els.remoteVideo.style.display = 'none';
-      els.emptyState.style.display = 'flex';
-      removeAudioUnlockBanner();
-    }
-    renderTabs();
-    updateViewport();
-    updateStatusBar();
-    updateNavButtons();
+      });
+    } catch {}
+    setTimeout(async () => {
+      const writes = {};
+      writes[`${SESSION_ROOT}/${id}`] = null;
+      writes[`remoteBrowser/signaling/${id}`] = null;
+      try { await db.ref().update(writes); } catch {}
+    }, 600);
   }
+}
 
-  async function drainPendingServerCandidates(s) {
-    if (!s.pc || !s.remoteDescSet || !s.pendingServerCandidates.length) return;
-    const queue = s.pendingServerCandidates.splice(0);
-    for (const c of queue) {
-      try { await s.pc.addIceCandidate(c); } catch(e) { slog(s, 'Server ICE drain: ' + e.message, 'bad'); }
-    }
+function cleanup(doShowSplash) {
+  if (S.sessionSub && S.sessionRef) {
+    try { S.sessionRef.off('value', S.sessionSub); } catch {}
+    S.sessionSub = null;
   }
+  if (S.ctrl) { try { S.ctrl.close(); } catch {} S.ctrl = null; }
+  if (S.pc)   { try { S.pc.close();   } catch {} S.pc   = null; }
+  if (S.stream) { S.stream.getTracks().forEach(t => { try { t.stop(); } catch {} }); S.stream = null; }
 
-  function attachSessionListener(s) {
-    s.sessionListener = async function(snapshot) {
-      const data = snapshot.val();
-      if (!data) {
-        if (state.sessions.has(s.id)) {
-          slog(s, 'Session removed by server');
-          toast('Session ended', 'info');
-          cleanupSession(s.id);
-        }
-        return;
-      }
-      if (data.lastLog?.ts && data.lastLog.ts !== s.lastHostLogTs) {
-        s.lastHostLogTs = data.lastLog.ts;
-        slog(s, 'Host: ' + data.lastLog.message);
-      }
-      if (data.capture) {
-        s.capture = {
-          width:          data.capture.width  || DEFAULT_CAPTURE.width,
-          height:         data.capture.height || DEFAULT_CAPTURE.height,
-          fps:            data.capture.fps    || DEFAULT_CAPTURE.fps,
-          viewportWidth:  data.capture.viewportWidth  || data.capture.width  || DEFAULT_CAPTURE.width,
-          viewportHeight: data.capture.viewportHeight || data.capture.height || DEFAULT_CAPTURE.height,
-        };
-        if (isActive(s)) updateStatusBar();
-      }
-      if (data.url) {
-        s.url = data.url;
-        if (!s.label) s.label = sessionLabel(s);
-        if (isActive(s)) { els.urlInput.value = data.url; updateStatusBar(); }
-        renderTabs();
-      }
-      if (data.title) {
-        s.title = data.title;
-        s.label = data.title;
-        if (isActive(s)) updateStatusBar();
-        renderTabs();
-      }
-      if (data.status) {
-        const statusMap = {
-          pending:          { title:'Waiting for host',   msg:'Remote browser is starting up...' },
-          launching:        { title:'Launching',           msg:'Browser is launching on remote host' },
-          'waiting-answer': { title:'Negotiating',         msg:'Setting up WebRTC connection' },
-          'answer-sent':    { title:'Negotiating',         msg:'Setting up WebRTC connection' },
-          'offer-ready':    { title:'Negotiating',         msg:'Waiting for answer from host' },
-          connected:        { title:'Connected',           msg:'Receiving video stream' },
-          stopped:          { title:'Stopped',             msg:'Session ended' },
-          deleted:          { title:'Stopped',             msg:'Session ended' },
-          error:            { title:'Error',               msg:'Remote host encountered an error' },
-        };
-        const info = statusMap[data.status] || { title:data.status, msg:'' };
-        const isWaiting = ['pending','launching','waiting-answer','offer-ready'].includes(data.status);
-        if (isWaiting && isActive(s)) showOverlay(info.title, info.msg, true);
-        else if (data.status === 'connected' && isActive(s)) hideOverlay();
-        else if (['stopped','deleted','error'].includes(data.status)) {
-          if (isActive(s)) showOverlay(info.title, info.msg, true);
-          toast('Session ' + data.status, data.status==='error' ? 'error' : 'info');
-        }
-      }
-      // Handle offer → send answer
-      if (data.offer && s.pc && !s.remoteDescSet && !s.negotiating && !s.answerSent) {
-        s.negotiating = true;
-        try {
-          await s.pc.setRemoteDescription(data.offer);
-          s.remoteDescSet = true;
-          const answer = await s.pc.createAnswer();
-          await s.pc.setLocalDescription(answer);
-          await s.sessionRef.update({
-            answer,
-            status: 'answer-sent',
-            answerSentAt: firebase.database.ServerValue.TIMESTAMP,
-          });
-          s.answerSent = true;
-          slog(s, 'Answer sent to host');
-          await drainPendingServerCandidates(s);
-        } catch(e) {
-          slog(s, 'Answer error: ' + e.message, 'bad');
-          toast('Connection failed', 'error');
-        } finally { s.negotiating = false; }
-      }
-      // Handle server ICE candidates
-      for (const [key, candidate] of Object.entries(data.serverCandidates || {})) {
-        if (s.seenServerCandidates.has(key)) continue;
-        s.seenServerCandidates.add(key);
-        try {
-          if (!s.remoteDescSet) { s.pendingServerCandidates.push(candidate); continue; }
-          await s.pc.addIceCandidate(candidate);
-        } catch(e) { slog(s, 'Server ICE: ' + e.message, 'bad'); }
-      }
-      if (data.status === 'stopped' || data.status === 'deleted') {
-        cleanupSession(s.id);
-      }
-    };
-    s.sessionRef.on('value', s.sessionListener);
+  S.sessionId = null;
+  S.sessionRef = null;
+  S.connState  = 'idle';
+  S.iceState   = 'idle';
+  S.ctrlState  = 'none';
+  S.audioState = 'wait';
+
+  el.audioBtn.classList.remove('show');
+  el.overlay.classList.remove('show');
+  el.video.srcObject = null;
+  el.video.muted = true;
+  el.btnRel.disabled  = true;
+  el.btnClose.disabled = true;
+  document.title = 'Remote Browser';
+  updateStatus();
+
+  showSplash();
+}
+
+/* ══════════ Navigate ════════════════════════════════════════════════
+   If the data channel is open, navigate purely via WebRTC.
+   Only fall back to starting a new session if not connected.
+════════════════════════════════════════════════════════════════════ */
+function navigate(url) {
+  if (url && !/^https?:\/\//i.test(url) && !url.startsWith('//')) {
+    // Treat bare strings as Google searches unless they look like a hostname
+    url = /\.\w{2,}(\b|$)/.test(url) ? 'https://' + url : 'https://www.google.com/search?q=' + encodeURIComponent(url);
   }
-
-  function setupPeerConnection(s) {
-    const PC = window.RTCPeerConnection || window.webkitRTCPeerConnection;
-    if (!PC) throw new Error('WebRTC not available');
-    s.pc = new PC({ iceServers:[{ urls:'stun:stun.l.google.com:19302' }] });
-    s.remoteStream = new MediaStream();
-
-    s.pc.ontrack = function(ev) {
-      const track = ev.track;
-      if (track && !s.remoteStream.getTracks().some(t => t.id===track.id)) {
-        s.remoteStream.addTrack(track);
-      }
-      if (track?.kind === 'audio') {
-        // Audio track arrived — mark as live (actual mute state handled by tryPlay)
-        s.audioState = 'live';
-        if (isActive(s)) updateStatusBar();
-        slog(s, 'Audio track received', 'good');
-      }
-      if (isActive(s)) {
-        if (els.remoteVideo.srcObject !== s.remoteStream) {
-          els.remoteVideo.srcObject = s.remoteStream;
-        }
-        tryPlay(s);
-        updateViewport();
-      }
-      slog(s, 'Track: ' + (track?.kind || 'unknown'));
-    };
-
-    s.pc.onicecandidate = async function(ev) {
-      if (!ev.candidate || !s.sessionRef) return;
-      try {
-        await s.sessionRef.child('clientCandidates').push(ev.candidate.toJSON());
-        s.iceState = 'candidate-sent';
-        if (isActive(s)) updateStatusBar();
-      } catch(e) { slog(s, 'Client ICE: ' + e.message, 'bad'); }
-    };
-
-    s.pc.ondatachannel = function(ev) {
-      if (ev.channel.label !== 'control') return;
-      s.controlChannel = ev.channel;
-      s.controlState = 'open';
-      slog(s, 'Control channel open', 'good');
-      if (isActive(s)) { updateStatusBar(); updateNavButtons(); toast('Remote control connected', 'success'); }
-      ev.channel.onopen  = () => { s.controlState = 'open';   if (isActive(s)) { updateStatusBar(); updateNavButtons(); } };
-      ev.channel.onclose = () => { s.controlState = 'closed'; if (isActive(s)) { updateStatusBar(); updateNavButtons(); } };
-    };
-
-    s.pc.onconnectionstatechange = function() {
-      const st = s.pc.connectionState;
-      s.connectionState = st;
-      if (isActive(s)) {
-        updateStatusBar();
-        if (st === 'connected') { hideOverlay(); toast('Connected!', 'success'); }
-        else if (st === 'failed' || st === 'closed') toast('Connection lost', 'error');
-      }
-      if (st === 'failed' || st === 'closed') cleanupSession(s.id);
-      renderTabs();
-    };
-    s.pc.oniceconnectionstatechange = function() {
-      s.iceState = s.pc.iceConnectionState;
-      if (isActive(s)) updateStatusBar();
-    };
+  if (send({ type: 'navigate', url })) {
+    el.urlInput.value = url;
+    updateLock(url);
+    uSet('lastUrl', url);
+  } else {
+    startSession(url).catch(e => toast(e.message, 'err'));
   }
+}
 
-  async function startSession(url) {
-    await state.authReady;
-    if (!auth.currentUser) throw new Error('Firebase auth not ready');
-    url = (url || DEFAULT_URL).trim() || DEFAULT_URL;
-    const sessionId = crypto.randomUUID();
-    const s = createSessionRecord(sessionId, url);
-    s.label = sessionLabel(s);
-    state.sessions.set(sessionId, s);
-    state.activeSessionId = sessionId;
-    els.urlInput.value = url;
-    uStore('lastSessionId', sessionId);
-    uStore('lastUrl', url);
-    showOverlay('Starting...', 'Creating remote browser session', true);
-    updateViewport();
-    renderTabs();
-    updateStatusBar();
-    setupPeerConnection(s);
-    s.sessionRef = db.ref(SESSION_ROOT + '/' + sessionId);
-    attachSessionListener(s);
-    await s.sessionRef.set({
-      id: sessionId, url,
-      requestedBy: auth.currentUser.uid,
-      status: 'pending',
-      createdAt: firebase.database.ServerValue.TIMESTAMP,
-      client: {
-        uid: auth.currentUser.uid,
-        userAgent: navigator.userAgent,
-        viewport: { width: window.innerWidth, height: window.innerHeight },
-      },
-    });
-    slog(s, 'Session created');
-    toast('Session started', 'success');
+/* ══════════ Input forwarding ════════════════════════════════════════ */
+el.video.addEventListener('contextmenu', ev => ev.preventDefault());
+
+el.video.addEventListener('pointerdown', ev => {
+  if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
+  ev.preventDefault();
+  focusRemote();
+  try { el.video.setPointerCapture(ev.pointerId); } catch {}
+  const c = remoteCoords(ev);
+  if (c) send({ type:'mouse', action:'down', button:btnName(ev), buttons:ev.buttons, clickCount:ev.detail||1, x:c.x, y:c.y });
+});
+el.video.addEventListener('pointerup', ev => {
+  if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
+  const c = remoteCoords(ev);
+  if (c) send({ type:'mouse', action:'up', button:btnName(ev), buttons:0, clickCount:ev.detail||1, x:c.x, y:c.y });
+  try { el.video.releasePointerCapture(ev.pointerId); } catch {}
+});
+el.video.addEventListener('pointermove', ev => {
+  if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
+  const c = remoteCoords(ev);
+  if (c) send({ type:'mouse', action:'move', button:'none', buttons:ev.buttons, clickCount:0, x:c.x, y:c.y });
+});
+el.video.addEventListener('pointercancel', ev => {
+  try { el.video.releasePointerCapture(ev.pointerId); } catch {}
+});
+el.video.addEventListener('wheel', ev => {
+  ev.preventDefault();
+  const c = remoteCoords(ev);
+  if (c) send({ type:'mouse', action:'wheel', button:'none', deltaX:ev.deltaX, deltaY:ev.deltaY, x:c.x, y:c.y });
+}, { passive: false });
+
+function isTyping(t) { const tag=(t?.tagName||'').toLowerCase(); return tag==='input'||tag==='textarea'||t?.isContentEditable; }
+
+window.addEventListener('keydown', ev => {
+  if (!S.sessionId) return;
+  if (isTyping(ev.target)) return;
+  if (ev.key === 'Escape') { ev.preventDefault(); el.video.blur(); return; }
+  if (ev.key === 'F5') { ev.preventDefault(); send({ type:'reload' }); return; }
+  ev.preventDefault();
+  focusRemote();
+  send(keyPayload(ev, 'down'));
+});
+window.addEventListener('keyup', ev => {
+  if (!S.sessionId || isTyping(ev.target)) return;
+  ev.preventDefault();
+  send(keyPayload(ev, 'up'));
+});
+
+/* ══════════ Chrome controls ════════════════════════════════════════ */
+el.urlInput.addEventListener('keydown', ev => {
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  navigate(el.urlInput.value.trim() || DEFAULT_URL);
+});
+el.btnRel.addEventListener('click', () => send({ type: 'reload' }));
+el.btnClose.addEventListener('click', () => {
+  stopSession().catch(e => log('stop error:', e.message));
+});
+
+document.querySelectorAll('.quick-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    startSession(btn.dataset.url).catch(e => toast(e.message, 'err'));
+  });
+});
+
+/* ══════════ Unload cleanup ════════════════════════════════════════ */
+window.addEventListener('beforeunload', () => {
+  if (S.sessionRef) {
+    try {
+      S.sessionRef.update({
+        status: 'stopped',
+        stoppedAt: Date.now(),
+        offer: null, answer: null,
+        clientCandidates: null, serverCandidates: null,
+      });
+    } catch {}
   }
+});
 
-  async function stopSession(sessionId) {
-    sessionId = sessionId || state.activeSessionId;
-    const s = getSession(sessionId);
-    if (!s) return;
-    slog(s, 'Stopping session...');
-    toast('Tab closed', 'info');
-    cleanupSession(s.id, { stopRemote: true });
-  }
-
-  function sendGlobalKey(event, action) {
-    if (isTypingTarget(event.target) || !getSession()) return;
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      els.remoteVideo.blur();
-      log('Focus cleared');
-      return;
-    }
-    if (event.key === 'F5') { event.preventDefault(); reloadRemote(); return; }
-    event.preventDefault();
-    focusRemote();
-    sendControl(keyPayload(event, action));
-  }
-
-  // ─── Event wiring ──────────────────────────────────────────────────────
-  els.newTabBtn.addEventListener('click', () => {
-    els.urlInput.value = DEFAULT_URL;
-    els.urlInput.focus();
-    startSession(DEFAULT_URL).catch(e => { toast(e.message,'error'); log('Start failed: '+e.message,'bad'); });
-  });
-  els.urlInput.addEventListener('keydown', ev => {
-    if (ev.key !== 'Enter') return;
-    ev.preventDefault();
-    const url = els.urlInput.value.trim() || DEFAULT_URL;
-    const s = getSession();
-    if (s?.controlChannel?.readyState === 'open') {
-      sendControl({ type:'navigate', url });
-      s.url = url;
-      s.label = sessionLabel(s);
-      uStore('lastUrl', url);
-      updateStatusBar();
-      renderTabs();
-    } else {
-      startSession(url).catch(e => { toast(e.message,'error'); log('Start failed: '+e.message,'bad'); });
-    }
-  });
-  els.navReload.addEventListener('click', reloadRemote);
-  els.btnFocus.addEventListener('click', focusRemote);
-  els.btnLogs.addEventListener('click', () => {
-    state.logsOpen = !state.logsOpen;
-    els.logPanel.classList.toggle('open', state.logsOpen);
-    els.btnLogs.style.color = state.logsOpen ? 'var(--accent)' : '';
-  });
-  els.clearLogs.addEventListener('click', () => { els.logBody.innerHTML = ''; });
-  document.querySelectorAll('.quick-site').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const url = btn.dataset.url;
-      els.urlInput.value = url;
-      startSession(url).catch(e => { toast(e.message,'error'); log('Start failed: '+e.message,'bad'); });
-    });
-  });
-
-  // Pointer / mouse
-  els.remoteVideo.addEventListener('contextmenu', ev => ev.preventDefault());
-  els.remoteVideo.addEventListener('pointerdown', ev => {
-    if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
-    ev.preventDefault();
-    focusRemote();
-    try { els.remoteVideo.setPointerCapture(ev.pointerId); } catch(e) {}
-    const coords = toRemoteCoords(ev);
-    if (coords) sendControl({ type:'mouse', action:'down', button:btnName(ev), buttons:ev.buttons, clickCount:ev.detail||1, x:coords.x, y:coords.y });
-  });
-  els.remoteVideo.addEventListener('pointerup', ev => {
-    if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
-    const coords = toRemoteCoords(ev);
-    if (coords) sendControl({ type:'mouse', action:'up', button:btnName(ev), buttons:0, clickCount:ev.detail||1, x:coords.x, y:coords.y });
-    try { els.remoteVideo.releasePointerCapture(ev.pointerId); } catch(e) {}
-  });
-  els.remoteVideo.addEventListener('pointermove', ev => {
-    if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
-    const coords = toRemoteCoords(ev);
-    if (coords) sendControl({ type:'mouse', action:'move', button:'none', buttons:ev.buttons, clickCount:0, x:coords.x, y:coords.y });
-  });
-  els.remoteVideo.addEventListener('pointercancel', ev => {
-    try { els.remoteVideo.releasePointerCapture(ev.pointerId); } catch(e) {}
-  });
-  els.remoteVideo.addEventListener('wheel', ev => {
-    ev.preventDefault();
-    const coords = toRemoteCoords(ev);
-    if (!coords) return;
-    sendControl({ type:'mouse', action:'wheel', button:'none', deltaX:ev.deltaX, deltaY:ev.deltaY, x:coords.x, y:coords.y });
-  }, { passive:false });
-
-  // Keyboard
-  window.addEventListener('keydown', ev => { if (state.activeSessionId) sendGlobalKey(ev, 'down'); });
-  window.addEventListener('keyup',   ev => {
-    if (!state.activeSessionId || isTypingTarget(ev.target)) return;
-    ev.preventDefault();
-    sendControl(keyPayload(ev, 'up'));
-  });
-
-  // Wipe sessions on page unload
-  window.addEventListener('beforeunload', () => {
-    for (const s of state.sessions.values()) {
-      try {
-        // synchronous best-effort update; full async wipe runs next load
-        if (s.sessionRef) {
-          s.sessionRef.update({ status:'stopped', stoppedAt: Date.now(), offer:null, answer:null, clientCandidates:null, serverCandidates:null });
-        }
-      } catch(e) {}
-    }
-  });
-
-  // ─── Auth: sign in anonymously, set up per-user storage ───────────────
-  state.authReady = auth.signInAnonymously()
-    .then(c => {
-      state.user = c.user;
-      onUidReady(c.user.uid);
-      log('Signed in as ' + c.user.uid.slice(0,8), 'good');
-    })
-    .catch(e => { log('Auth error: ' + e.message, 'bad'); throw e; });
-
-  // Restore uid prefix early from localStorage if available
-  const savedUid = localStorage.getItem('__rb_last_uid');
-  if (savedUid) { _storagePrefix = `rb:${savedUid}`; }
-
-  auth.onAuthStateChanged(user => {
+/* ══════════ Auth & boot ════════════════════════════════════════════ */
+S.authReady = new Promise(resolve => {
+  auth.onAuthStateChanged(async user => {
     if (user) {
-      localStorage.setItem('__rb_last_uid', user.uid);
-      onUidReady(user.uid);
+      _uid = user.uid;
+      const stored = getStoredIdentity();
+      if (!stored || stored.uid !== user.uid) setStoredIdentity(user.uid);
+      setIdentityUI(user.uid);
+      S.uid = user.uid;
+      log('identity ready:', user.uid.slice(0,8));
+      const lastUrl = uGet('lastUrl', null);
+      if (lastUrl) { el.urlInput.value = lastUrl; updateLock(lastUrl); }
+      resolve();
     }
   });
+  auth.signInAnonymously().catch(e => {
+    toast('Auth error: ' + e.message, 'err');
+    log('auth error:', e.message);
+  });
+});
 
-  log('Ready');
+log('boot');
 })();
 </script>
 <script src="/lib/fps.js"></script>
