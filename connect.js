@@ -401,16 +401,13 @@ class RemoteBrowserSession {
     this.connectedPollMs = readEnvInt('REMOTE_BROWSER_CONNECTED_POLL_MS', 3000);
 
     this.lastInputAt    = Date.now();
-    this.lastHostLogTs  = 0;
     this.sessionPath    = `remoteBrowser/sessions/${this.id}`;
     this.cleaningUp     = false;
     this.monitoring     = false;
     this.autoStopTimer  = null;
     this.signalingCleaned = false;
 
-    // Timers / state for reduced Firebase writes
-    this._urlWriteTimer  = null;
-    this._rtcConnected   = false;
+    this._rtcConnected  = false;
   }
 
   _updateFrameSize() {
@@ -427,43 +424,19 @@ class RemoteBrowserSession {
   /* ── Logging — skip Firebase writes once WebRTC is connected ── */
   log(msg) {
     console.log(`[remote-browser ${this.id.slice(0, 8)} uid:${this.clientUid.slice(0, 8)}] ${msg}`);
-    const isError = /(error|fail|stopp)/i.test(String(msg));
-    // Once WebRTC is up, only write errors/stops to Firebase
-    if (this._rtcConnected && !isError) return;
-    const now = Date.now();
-    if (now - this.lastHostLogTs < 1500) return;
-    this.updatedAt     = now;
-    this.lastHostLogTs = now;
-    void this.db.patch(this.sessionPath, {
-      updatedAt: this.updatedAt,
-      lastLog:   { ts: this.updatedAt, message: msg },
-    }).catch(() => {});
-  }
-
-  async writeSession(patch) {
-    await this.db.patch(this.sessionPath, { ...patch, updatedAt: Date.now() });
   }
 
   async claim() {
-    await this.writeSession({
-      hostId:     this.db.localId,
-      hostState:  'launching',
-      status:     'launching',
-      transport:  'firebase-signaling',
-      clientUid:  this.clientUid,
-      profileKey: this.clientUid,
-      timeouts:   { idleMs: this.idleTimeoutMs, maxMs: this.maxSessionMs },
+    await this.db.patch(this.sessionPath, {
+      hostId: this.db.localId, state: 'launch', status: 'launch',
     });
   }
 
   captureInfo() {
     return {
-      width:          this.captureWidth,
-      height:         this.captureHeight,
-      fps:            this.captureFps,
-      viewportWidth:  this.viewportWidth,
-      viewportHeight: this.viewportHeight,
-      contentRect:    this.contentRect,
+      w: this.captureWidth, h: this.captureHeight, fps: this.captureFps,
+      vw: this.viewportWidth, vh: this.viewportHeight,
+      rect: this.contentRect,
     };
   }
 
@@ -576,12 +549,6 @@ class RemoteBrowserSession {
         this.url = url;
         // Push to client over data channel — no Firebase round-trip
         this.sendToClient({ type: 'urlChange', url });
-        // Debounced Firebase write for persistence only (5 s)
-        clearTimeout(this._urlWriteTimer);
-        this._urlWriteTimer = setTimeout(() => {
-          this.writeSession({ url }).catch(() => {});
-        }, 5000);
-        this._urlWriteTimer.unref?.();
       }
     }
   }
@@ -652,7 +619,7 @@ class RemoteBrowserSession {
       this.sendToClient({ type: 'urlChange',   url:     this.url });
     };
     this.controlChannel.onclose = () => this.log('control channel closed');
-    this.controlChannel.onmessage = async ev => {
+this.controlChannel.onmessage = async ev => {
       const msg = parseJson(ev.data);
       if (!msg) return;
       this.lastInputAt = Date.now();
@@ -662,26 +629,18 @@ class RemoteBrowserSession {
 
     this.pc.onicecandidate = ev => {
       if (!ev.candidate) return;
-      const key = randomId();
-      void this.db.put(`${this.sessionPath}/serverCandidates/${key}`, ev.candidate.toJSON())
-        .catch(e => this.log(`server candidate write: ${e.message}`));
+      void this.db.put(`${this.sessionPath}/sc/${randomId()}`, ev.candidate.toJSON()).catch(() => {});
     };
 
     this.pc.onconnectionstatechange = () => {
-      this.state     = this.pc.connectionState;
+      this.state = this.pc.connectionState;
       this.updatedAt = Date.now();
       this.log(`peer state: ${this.pc.connectionState}`);
 
       if (this.pc.connectionState === 'connected') {
         this._rtcConnected = true;
-        // Prune all Firebase signaling data — WebRTC is sole channel from here
         void this.pruneSignalingData().catch(e => this.log(`signal cleanup: ${e.message}`));
-        // One final status write, then Firebase goes quiet
-        void this.writeSession({
-          status:          'connected',
-          connectionState: 'connected',
-          transport:       'webrtc-data-channel',
-        }).catch(() => {});
+        void this.db.patch(this.sessionPath, { status: 'connected', state: 'connected', transport: 'webrtc' }).catch(() => {});
       } else if (this.pc.connectionState === 'failed' || this.pc.connectionState === 'closed') {
         this.stop('peer disconnected');
       }
@@ -692,15 +651,8 @@ class RemoteBrowserSession {
   async pruneSignalingData() {
     if (this.signalingCleaned) return;
     this.signalingCleaned = true;
-    await this.db.patch(this.sessionPath, {
-      offer:             null,
-      answer:            null,
-      clientCandidates:  null,
-      serverCandidates:  null,
-      signalingPrunedAt: Date.now(),
-      transport:         'webrtc-data-channel',
-    });
-    this.log('Firebase signaling pruned — all state sync is WebRTC');
+    await this.db.patch(this.sessionPath, { offer: null, answer: null, cc: null, sc: null });
+    this.log('signaling pruned');
   }
 
   /* ── Control message handler ── */
@@ -730,14 +682,8 @@ class RemoteBrowserSession {
       setTimeout(async () => {
         try {
           await this.refreshViewportMetrics();
-          this.sendToClient({ type: 'urlChange',   url:     this.url });
+          this.sendToClient({ type: 'urlChange', url: this.url });
           this.sendToClient({ type: 'captureInfo', capture: this.captureInfo() });
-          // Persist to Firebase with a delay — not time-critical
-          clearTimeout(this._urlWriteTimer);
-          this._urlWriteTimer = setTimeout(() => {
-            this.writeSession({ url: this.url }).catch(() => {});
-          }, 5000);
-          this._urlWriteTimer.unref?.();
         } catch (e) { this.log(`viewport refresh: ${e.message}`); }
       }, 1000).unref?.();
       return;
@@ -795,12 +741,7 @@ class RemoteBrowserSession {
 
     this.offer = await this.pc.createOffer();
     await this.pc.setLocalDescription(this.offer);
-    await this.writeSession({
-      offer:     this.offer,
-      status:    'offer-ready',
-      hostState: 'waiting-answer',
-      capture:   this.captureInfo(),
-    });
+    await this.db.patch(this.sessionPath, { offer: this.offer, status: 'offer-ready', state: 'wait-answer', capture: this.captureInfo() });
     this.state = 'offer-ready';
   }
 
@@ -939,7 +880,7 @@ class RemoteBrowserSession {
   async setAnswer(answer) {
     await this.pc.setRemoteDescription(new this.RTCSessionDescription(answer));
     this.state = 'connected';
-    await this.writeSession({ status: 'connected', hostState: 'connected' });
+    await this.db.patch(this.sessionPath, { status: 'connected', state: 'answer' });
   }
   async addClientCandidate(candidate) {
     if (!candidate) return;
@@ -965,19 +906,18 @@ class RemoteBrowserSession {
         await this.stop('idle timeout'); return;
       }
 
-      if (session.answer && !this.remoteDescriptionSet) {
+if (session.answer && !this.remoteDescriptionSet) {
         try { await this.setAnswer(session.answer); this.remoteDescriptionSet = true; }
         catch (e) { this.log(`answer error: ${e.message}`); }
       }
 
-      for (const [key, cand] of Object.entries(session.clientCandidates || {})) {
+      for (const [key, cand] of Object.entries(session.cc || {})) {
         if (this.seenClientCandidateKeys.has(key)) continue;
         this.seenClientCandidateKeys.add(key);
         try { await this.addClientCandidate(cand); }
         catch (e) { this.log(`client ICE: ${e.message}`); }
       }
 
-      // Once WebRTC is connected, poll very infrequently — only for stop signals
       await sleep(this._rtcConnected ? 30000 : this.remoteDescriptionSet ? this.connectedPollMs : this.signalPollMs);
     }
     await this.stop('session ended');
@@ -1038,8 +978,7 @@ class RemoteBrowserSession {
 
     clearTimeout(this.autoStopTimer);
     clearTimeout(this.audioFallbackTimer);
-    clearTimeout(this._urlWriteTimer);
-    this.autoStopTimer = null; this.audioFallbackTimer = null; this._urlWriteTimer = null;
+    this.autoStopTimer = null; this.audioFallbackTimer = null;
     this.stopSilentAudio();
 
     if (this.devtoolsPort) { releaseDevtoolsPort(this.devtoolsPort); this.devtoolsPort = null; }
@@ -1063,16 +1002,6 @@ class RemoteBrowserSession {
 
     try { fs.rmSync(this.sessionTmpDir, { recursive: true, force: true }); } catch {}
 
-    try {
-      await this.db.patch(this.sessionPath, {
-        status:           'stopped',
-        stoppedAt:        Date.now(),
-        stopReason:       reason,
-        offer:            null, answer: null,
-        clientCandidates: null, serverCandidates: null,
-      });
-    } catch {}
-
     await sleep(500);
     try { await this.db.delete(this.sessionPath); } catch {}
     try { await this.db.delete(`remoteBrowser/signaling/${this.id}`); } catch {}
@@ -1080,9 +1009,6 @@ class RemoteBrowserSession {
       try { await this.db.delete(`remoteBrowser/hosts/${this.db.localId}/sessions/${this.id}`); } catch {}
     }
     this.log(`session ${this.id.slice(0, 8)} fully stopped`);
-    if (this.db.localId) {
-      try { await this.db.delete(`remoteBrowser/hosts/${this.db.localId}/sessions/${this.id}`); } catch {}
-    }
   }
 }
 
@@ -1105,14 +1031,9 @@ async function main() {
 
   async function writeHostStatus(status = 'online', extra = {}) {
     await db.patch(hostPath, {
-      status, updatedAt: Date.now(), pid: process.pid, platform: process.platform,
-      activeSessions: activeSessions.size,
-      capabilities: {
-        webrtc: true, video: true, audio: true,
-        control: 'webrtc-data-channel',
-        ffmpeg: Boolean(findExe([process.env.REMOTE_BROWSER_FFMPEG_BIN, process.env.FFMPEG_BIN,
-          IS_WINDOWS ? 'ffmpeg.exe' : 'ffmpeg'].filter(Boolean))),
-      },
+      status, ts: Date.now(), pid: process.pid, platform: process.platform,
+      sess: activeSessions.size,
+      caps: { control: 'webrtc-data-channel', ffmpeg: Boolean(findExe([process.env.REMOTE_BROWSER_FFMPEG_BIN, process.env.FFMPEG_BIN, IS_WINDOWS ? 'ffmpeg.exe' : 'ffmpeg'].filter(Boolean))) },
       ...extra,
     });
   }
@@ -1129,7 +1050,7 @@ async function main() {
     console.log(`[connect] ${sig} — stopping all sessions…`);
     clearInterval(heartbeat);
     await Promise.all([...activeSessions.values()].map(s => s.stop('host shutdown').catch(() => {})));
-    await writeHostStatus('offline', { activeSessions: 0, stoppedAt: Date.now(), stopReason: sig }).catch(() => {});
+    await writeHostStatus('offline', { sess: 0, stoppedAt: Date.now(), stopReason: sig }).catch(() => {});
     try { await db.delete(hostPath); } catch {}
     process.exit(0);
   }
