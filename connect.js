@@ -451,6 +451,7 @@ class RemoteBrowserSession {
       `--remote-debugging-port=${this.devtoolsPort}`,
       '--remote-debugging-address=0.0.0.0',
       `--app=${this.url}`,
+      '--kiosk',
       `--window-size=${this.captureWidth},${this.captureHeight}`,
       '--window-position=0,0',
       '--no-first-run',
