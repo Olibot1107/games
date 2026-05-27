@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Math Practice</title>
+  <title>Remote Browser</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -264,7 +264,7 @@ const auth = firebase.auth();
 
 const SESSION_ROOT  = 'remoteBrowser/sessions';
 const DEFAULT_URL   = 'https://www.tiktok.com/';
-const DEFAULT_CAP   = { width:1920, height:1080, fps:30, viewportWidth:1920, viewportHeight:1080 };
+const DEFAULT_CAP   = { w:1920, h:1080, fps:30, vw:1920, vh:1080 };
 
 /* ══════════ Persistent identity ════════════════════════════════════════ */
 const IDENTITY_KEY = '__rb_identity';
@@ -367,7 +367,7 @@ function updateStatus() {
   el.pCtrl.textContent = 'ctrl ' + S.ctrlState;
   el.pAudio.textContent = 'audio ' + S.audioState;
   const c = S.capture;
-  el.pRes.textContent  = c.width + '×' + c.height;
+  el.pRes.textContent  = c.w + '×' + c.h;
   const ctrlOpen = S.ctrl && S.ctrl.readyState === 'open';
   el.btnRel.disabled   = !ctrlOpen;
   el.btnClose.disabled = !S.sessionId;
@@ -422,10 +422,10 @@ function remoteCoords(ev) {
   const r   = el.video.getBoundingClientRect();
   if (!r.width || !r.height) return null;
   const c   = S.capture;
-  const fw  = c.width  || DEFAULT_CAP.width;
-  const fh  = c.height || DEFAULT_CAP.height;
-  const vpW = c.viewportWidth  || fw;
-  const vpH = c.viewportHeight || fh;
+  const fw  = c.w || DEFAULT_CAP.w;
+  const fh  = c.h || DEFAULT_CAP.h;
+  const vpW = c.vw || fw;
+  const vpH = c.vh || fh;
   const sc  = Math.min(r.width / fw, r.height / fh);
   if (!isFinite(sc) || sc <= 0) return null;
   const cw  = fw * sc;
@@ -477,21 +477,21 @@ function btnName(ev) { return ev.button === 2 ? 'right' : ev.button === 1 ? 'mid
 function handleHostMessage(msg) {
   if (!msg || typeof msg !== 'object') return;
   switch (msg.type) {
-    case 'url':
+    case 'urlChange':
       if (msg.url) {
         el.urlInput.value = msg.url;
         updateLock(msg.url);
         uSet('lastUrl', msg.url);
       }
       break;
-    case 'capture':
+    case 'captureInfo':
       if (msg.capture) {
         S.capture = {
-          width:          msg.capture.width  || DEFAULT_CAP.width,
-          height:         msg.capture.height || DEFAULT_CAP.height,
-          fps:            msg.capture.fps    || DEFAULT_CAP.fps,
-          viewportWidth:  msg.capture.viewportWidth  || msg.capture.width  || DEFAULT_CAP.width,
-          viewportHeight: msg.capture.viewportHeight || msg.capture.height || DEFAULT_CAP.height,
+          w:  msg.capture.w  || DEFAULT_CAP.w,
+          h:  msg.capture.h || DEFAULT_CAP.h,
+          fps: msg.capture.fps || DEFAULT_CAP.fps,
+          vw:  msg.capture.vw  || msg.capture.width  || DEFAULT_CAP.vw,
+          vh:  msg.capture.vh || msg.capture.height || DEFAULT_CAP.vh,
         };
         updateStatus();
       }
@@ -536,7 +536,7 @@ function setupPC() {
 
   pc.onicecandidate = async ev => {
     if (!ev.candidate || !S.sessionRef) return;
-    try { await S.sessionRef.child('clientCandidates').push(ev.candidate.toJSON()); }
+    try { await S.sessionRef.child('cc').push(ev.candidate.toJSON()); }
     catch (e) { log('client ICE push:', e.message); }
   };
 
@@ -590,11 +590,11 @@ function attachListener() {
     // Capture / URL updates from Firebase only used BEFORE data channel is open
     if (data.capture && S.ctrlState !== 'open') {
       S.capture = {
-        width:          data.capture.width  || DEFAULT_CAP.width,
-        height:         data.capture.height || DEFAULT_CAP.height,
-        fps:            data.capture.fps    || DEFAULT_CAP.fps,
-        viewportWidth:  data.capture.viewportWidth  || data.capture.width  || DEFAULT_CAP.width,
-        viewportHeight: data.capture.viewportHeight || data.capture.height || DEFAULT_CAP.height,
+        w:  data.capture.w  || DEFAULT_CAP.w,
+        h:  data.capture.h || DEFAULT_CAP.h,
+        fps: data.capture.fps || DEFAULT_CAP.fps,
+        vw:  data.capture.vw  || data.capture.width  || DEFAULT_CAP.vw,
+        vh:  data.capture.vh || data.capture.height || DEFAULT_CAP.vh,
       };
       updateStatus();
     }
@@ -603,15 +603,15 @@ function attachListener() {
       updateLock(data.url);
     }
 
-    const waiting = ['pending','launching','waiting-answer','offer-ready'].includes(data.status);
+    const waiting = ['pending','launch','wait-answer','offer-ready'].includes(data.status);
     if (data.status) {
       const labels = {
         pending:          ['Waiting for host', 'Remote browser is starting…'],
-        launching:        ['Launching', 'Browser is starting on remote host'],
-        'waiting-answer': ['Negotiating', 'Setting up WebRTC connection'],
+        launch:         ['Launching', 'Browser is starting on remote host'],
+        'wait-answer':    ['Negotiating', 'Setting up WebRTC connection'],
         'offer-ready':    ['Negotiating', 'Waiting for answer from host'],
         connected:        ['Connected', 'Receiving video stream'],
-        stopped:          ['Stopped', 'Session ended'],
+        stopped:        ['Stopped', 'Session ended'],
         error:            ['Error', 'Remote host encountered an error'],
       };
       const [title, msg] = labels[data.status] || [data.status, ''];
@@ -633,11 +633,11 @@ function attachListener() {
         S.remoteDescSet = true;
         const answer = await S.pc.createAnswer();
         await S.pc.setLocalDescription(answer);
-        await S.sessionRef.update({
-          answer,
-          status: 'answer-sent',
-          answerSentAt: firebase.database.ServerValue.TIMESTAMP,
-        });
+await S.sessionRef.update({
+           answer,
+           status: 'connected',
+           answerSentAt: firebase.database.ServerValue.TIMESTAMP,
+         });
         S.answerSent = true;
         await drainPendingSrvCands();
       } catch (e) {
@@ -647,7 +647,7 @@ function attachListener() {
     }
 
     // Server ICE candidates
-    for (const [key, cand] of Object.entries(data.serverCandidates || {})) {
+    for (const [key, cand] of Object.entries(data.sc || {})) {
       if (S.seenSrvCands.has(key)) continue;
       S.seenSrvCands.add(key);
       if (!S.remoteDescSet) { S.pendingSrvCands.push(cand); continue; }
@@ -714,8 +714,7 @@ async function stopSession() {
         status: 'stopped',
         stoppedAt: firebase.database.ServerValue.TIMESTAMP,
         stopReason: 'client-close',
-        offer: null, answer: null,
-        clientCandidates: null, serverCandidates: null,
+        offer: null, answer: null, cc: null, sc: null,
       });
     } catch {}
     setTimeout(async () => {
@@ -845,8 +844,7 @@ window.addEventListener('beforeunload', () => {
       S.sessionRef.update({
         status: 'stopped',
         stoppedAt: Date.now(),
-        offer: null, answer: null,
-        clientCandidates: null, serverCandidates: null,
+        offer: null, answer: null, cc: null, sc: null,
       });
     } catch {}
   }
