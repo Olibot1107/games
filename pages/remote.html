@@ -208,9 +208,9 @@
       <div class="splash-title">Remote Browser</div>
       <div class="splash-sub">Your sessions are persistent — accounts you log into stay logged in.</div>
       <div class="quick-row">
+        <button class="quick-btn" data-url="https://olibot1109.github.io/home/">Home</button>
         <button class="quick-btn" data-url="https://www.tiktok.com/">TikTok</button>
         <button class="quick-btn" data-url="https://www.youtube.com/">YouTube</button>
-        <button class="quick-btn" data-url="https://www.google.com/">Google</button>
         <button class="quick-btn" data-url="https://www.reddit.com/">Reddit</button>
         <button class="quick-btn" data-url="https://www.twitter.com/">Twitter</button>
       </div>
@@ -263,7 +263,7 @@ const db   = firebase.database();
 const auth = firebase.auth();
 
 const SESSION_ROOT  = 'remoteBrowser/sessions';
-const DEFAULT_URL   = 'https://www.tiktok.com/';
+const DEFAULT_URL   = 'https://home.voidbase.uk';
 const DEFAULT_CAP   = { w:1920, h:1080, fps:30, vw:1920, vh:1080 };
 
 /* ══════════ Persistent identity ════════════════════════════════════════ */
@@ -759,6 +759,10 @@ function cleanup(doShowSplash) {
    Only fall back to starting a new session if not connected.
 ════════════════════════════════════════════════════════════════════ */
 function navigate(url) {
+  // if url is https://home.voidbase.uk change it to https://olibot1109.github.io/home/
+  if (url === 'https://home.voidbase.uk') {
+    url = 'https://olibot1109.github.io/home/';
+  }
   if (url && !/^https?:\/\//i.test(url) && !url.startsWith('//')) {
     // Treat bare strings as Google searches unless they look like a hostname
     url = /\.\w{2,}(\b|$)/.test(url) ? 'https://' + url : 'https://www.google.com/search?q=' + encodeURIComponent(url);
