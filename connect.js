@@ -463,6 +463,8 @@ class RemoteBrowserSession {
       '--disable-sync',
       '--autoplay-policy=no-user-gesture-required',
       '--force-device-scale-factor=1',
+      '--disable-popup-blocking',   // let CDP see popups so we can redirect them
+      '--block-new-web-contents',   // Chrome flag to block new windows at browser level
       `--user-data-dir=${this.userDataDir}`,
     ];
 
@@ -521,7 +523,92 @@ class RemoteBrowserSession {
     await this.devtoolsClient.send('Runtime.enable');
     await this.devtoolsClient.send('DOM.enable');
     await this.devtoolsClient.send('Network.enable');
+    // At the top of your file — load inject.js once at startup
+    const INJECT_JS_PATH = path.join(__dirname, 'inject.js');
+    let EXTRA_INJECT_SCRIPT = '';
+    try {
+      EXTRA_INJECT_SCRIPT = fs.readFileSync(INJECT_JS_PATH, 'utf8');
+      console.log(`[inject] loaded inject.js (${EXTRA_INJECT_SCRIPT.length} bytes)`);
+    } catch (e) {
+      console.warn(`[inject] no inject.js at ${INJECT_JS_PATH}: ${e.message}`);
+    }
 
+    function readInjectJs() {
+      try { return fs.readFileSync(INJECT_JS_PATH, 'utf8'); }
+      catch { return EXTRA_INJECT_SCRIPT; }
+    }
+
+    function wrapScript(src) {
+      return `(function(){\n${src}\n})();`;
+    }
+
+    async function injectIntoPage(client, src) {
+      if (!client || client.closed || !src?.trim()) return;
+      await client.send('Runtime.evaluate', {
+        expression: wrapScript(src),
+        allowUnsafeEvalBlockedByCSP: true,
+      }).catch(() => {});
+    }
+
+    // ── In connectDevtools(), replace the old injection block with: ──
+
+    const src = readInjectJs();
+
+    // Runs before page scripts on every navigation
+    await this.devtoolsClient.send('Page.addScriptToEvaluateOnNewDocument', {
+      source: wrapScript(src),
+    });
+
+    // Inject into the already-open page
+    await injectIntoPage(this.devtoolsClient, src);
+
+    // Re-inject on every top-level navigation, re-reading inject.js each time
+    this.devtoolsClient.onEvent = ev => {
+      this._handleCdpEvent(ev);
+      if (ev.method === 'Page.frameNavigated' && ev.params?.frame?.parentId == null) {
+        setTimeout(() => injectIntoPage(this.devtoolsClient, readInjectJs()), 300);
+      }
+    };
+    // Enable Target domain so we get notified of new windows/tabs
+    await this.devtoolsClient.send('Target.setDiscoverTargets', { discover: true });
+
+    // Auto-attach to new targets so we can control them
+    await this.devtoolsClient.send('Target.setAutoAttach', {
+      autoAttach:             true,
+      waitForDebuggerOnStart: false,
+      flatten:                true,
+    });
+
+    // Intercept window.open and target="_blank" at the browser level
+    // Redirect the URL into the current page instead of opening a new window
+    await this.devtoolsClient.send('Target.setNewTabPageCreationEnabled', {
+      enabled: false,
+    }).catch(() => {}); // not supported on all Chrome versions, ignore
+
+    // Handle new target events
+    const origOnEvent = this.devtoolsClient.onEvent.bind(this.devtoolsClient);
+    this.devtoolsClient.onEvent = ev => {
+      origOnEvent(ev);
+
+      // A new window/tab was created
+      if (ev.method === 'Target.targetCreated') {
+        const { targetId, type, url } = ev.params?.targetInfo || {};
+        if (type !== 'page') return;
+
+        this.log(`new target opened: ${url} (${targetId})`);
+
+        // Navigate the main page to that URL then close the new target
+        const dest = url && url !== 'about:blank' ? url : null;
+        if (dest) {
+          this.url = dest;
+          this.devtoolsClient.send('Page.navigate', { url: dest }).catch(() => {});
+          this.sendToClient({ type: 'urlChange', url: dest });
+        }
+
+        // Close the rogue target
+        this.devtoolsClient.send('Target.closeTarget', { targetId }).catch(() => {});
+      }
+    };
     try {
       const winInfo = await this.devtoolsClient.send('Browser.getWindowForTarget');
       if (winInfo?.windowId) {
@@ -1017,6 +1104,9 @@ if (session.answer && !this.remoteDescriptionSet) {
    Main loop
 ══════════════════════════════════════════════════════════════════════════ */
 async function main() {
+  // At the very top of main(), before anything else:
+process.stdin.pause();
+process.stdin.unref();
   const db = new FirebaseRestClient();
   await db.signInAnonymously();
   console.log(`[connect] signed in as host ${db.localId}`);
