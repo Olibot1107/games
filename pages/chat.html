@@ -128,19 +128,6 @@ emoji-picker { position: absolute; z-index: 999; }
   <span id="typingText">Someone is typing...</span>
 </div>
 
-<div id="rulesOverlay"></div>
-<div id="rulesPopup">
-  <h3>Chat Rules</h3>
-  <ul>
-    <li>✅ Be respectful to everyone</li>
-    <li>🚫 No swearing or inappropriate language</li>
-    <li>🚫 No spam or flooding</li>
-    <li>🔞 No inappropriate content</li>
-    <li>⚠️ Messages are filtered automatically</li>
-  </ul>
-  <button id="closeRules" disabled>Read for 20 seconds...</button>
-</div>
-
 <div id="controls">
   <input type="text" id="message" placeholder="Type message" maxlength="500">
   <span class="char-count" id="charCount">0/500</span>
@@ -706,36 +693,6 @@ function getCookie(name){
   return match ? decodeURIComponent(match[2]) : null;
 }
 
-window.addEventListener('load', () => {
-  if(!getCookie('rulesAccepted')){
-    const popup = document.getElementById('rulesPopup');
-    const overlay = document.getElementById('rulesOverlay');
-    const closeBtn = document.getElementById('closeRules');
-    popup.style.display = 'block'; 
-    overlay.style.display = 'block';
-    
-    let secondsLeft = 20;
-    const countdown = setInterval(() => {
-      secondsLeft--;
-      if(secondsLeft <= 0){
-        clearInterval(countdown);
-        closeBtn.disabled = false;
-        closeBtn.classList.add('enabled');
-        closeBtn.textContent = "I Understand";
-      } else {
-        closeBtn.textContent = `Read for ${secondsLeft} seconds...`;
-      }
-    }, 1000);
-    
-    closeBtn.addEventListener('click', () => {
-      if(secondsLeft <= 0){
-        popup.style.display = 'none';
-        overlay.style.display = 'none';
-        setCookie('rulesAccepted', 'true', 30);
-      }
-    });
-  }
-});
 </script>
 <script src="/lib/fps.js"></script>
 <script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>

@@ -247,7 +247,8 @@
 <script>
 (() => {
 'use strict';
-
+let url_history = [];
+let history_index = -1;
 /* ══════════ Firebase init ══════════════════════════════════════════════ */
 const FIREBASE_CONFIG = {
   apiKey:            'AIzaSyA4BYjOa__uKZjOBvS5p_uMxmJ6AMsKcpg',
@@ -482,6 +483,7 @@ function handleHostMessage(msg) {
         el.urlInput.value = msg.url;
         updateLock(msg.url);
         uSet('lastUrl', msg.url);
+        pushHistory(msg.url);
       }
       break;
     case 'captureInfo':
@@ -775,6 +777,56 @@ function navigate(url) {
     startSession(url).catch(e => toast(e.message, 'err'));
   }
 }
+
+function pushHistory(url) {
+  if (!url) return;
+
+  if (url_history[history_index] === url) return;
+
+  url_history = url_history.slice(0, history_index + 1);
+
+  url_history.push(url);
+  history_index = url_history.length - 1;
+
+  updateNavButtons();
+}
+
+function updateNavButtons() {
+  el.btnBack.disabled = history_index <= 0;
+  el.btnFwd.disabled = history_index >= url_history.length - 1;
+}
+
+el.btnBack.addEventListener('click', () => {
+  if (history_index <= 0) return;
+
+  history_index--;
+
+  const url = url_history[history_index];
+
+  el.urlInput.value = url;
+  updateLock(url);
+  uSet('lastUrl', url);
+
+  navigate(url);
+
+  updateNavButtons();
+});
+
+el.btnFwd.addEventListener('click', () => {
+  if (history_index >= url_history.length - 1) return;
+
+  history_index++;
+
+  const url = url_history[history_index];
+
+  el.urlInput.value = url;
+  updateLock(url);
+  uSet('lastUrl', url);
+
+  navigate(url);
+
+  updateNavButtons();
+});
 
 /* ══════════ Input forwarding ════════════════════════════════════════ */
 el.video.addEventListener('contextmenu', ev => ev.preventDefault());
