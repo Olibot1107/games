@@ -36,26 +36,6 @@
       background: var(--bg);
       color: var(--text);
       -webkit-font-smoothing: antialiased;
-      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    }
-    body.is-tablet {
-      --button-size: 44px;
-      --chrome-height: 52px;
-    }
-    body.is-tablet #chrome { min-height: 52px; padding: 10px 12px; }
-    body.is-tablet .nav-btn { width: 44px; height: 44px; font-size: 15px; }
-    body.is-tablet #url-wrap { height: 40px; }
-    body.is-tablet #url-input { font-size: 14px; }
-    body.is-tablet #id-pill { font-size: 11.5px; }
-    body.is-tablet #statusbar { min-height: 28px; }
-    body.is-tablet #s-text { font-size: 12px; }
-    body.is-tablet .s-pill { font-size: 11px; }
-    body.is-tablet .hint { font-size: 11.5px; }
-    @media (orientation: landscape) {
-      body.is-tablet #chrome { padding: 8px 12px; }
-    }
-    @media (max-width: 600px) {
-      .hint { display: none; }
     }
 
     #shell { display: flex; flex-direction: column; height: 100vh; }
@@ -156,10 +136,9 @@
     .quick-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(91,142,255,.05); }
 
     /* ── Overlay ── */
-    #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .3s ease-out; }
+    #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .2s; }
     #overlay.show { opacity: 1; pointer-events: auto; }
-    .overlay-box { text-align: center; padding: 28px 36px; border-radius: 14px; background: rgba(10,10,11,.85); backdrop-filter: blur(14px); border: 1px solid var(--border); transform: scale(0.95); transition: transform .3s ease-out; }
-    #overlay.show .overlay-box { transform: scale(1); }
+    .overlay-box { text-align: center; padding: 28px 36px; border-radius: 14px; background: rgba(10,10,11,.85); backdrop-filter: blur(14px); border: 1px solid var(--border); }
     .overlay-box h2 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
     .overlay-box p  { font-size: 12px; color: var(--text-muted); }
     .spinner { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--accent); animation: spin 1s linear infinite; margin: 0 auto 14px; }
@@ -200,7 +179,6 @@
 
     .hint { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); padding: 5px 12px; border-radius: 7px; background: rgba(0,0,0,.7); backdrop-filter: blur(8px); border: 1px solid var(--border); opacity: 0; transition: opacity .25s; pointer-events: none; white-space: nowrap; }
     #viewport:hover .hint { opacity: 1; }
-    body.is-tablet .hint { display: none; }
   </style>
 </head>
 <body>
@@ -271,18 +249,6 @@
 'use strict';
 let url_history = [];
 let history_index = -1;
-
-// Device detection
-const isTablet = (() => {
-  const ua = navigator.userAgent;
-  const isIpad = /iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const isAndroid = /Android.*Tablet|Android.*Pad/.test(ua);
-  return isIpad || isAndroid || /Tablet|iPad|Android/i.test(ua);
-})();
-
-if (isTablet) {
-  document.body.classList.add('is-tablet');
-}
 /* ══════════ Firebase init ══════════════════════════════════════════════ */
 const FIREBASE_CONFIG = {
   apiKey:            'AIzaSyA4BYjOa__uKZjOBvS5p_uMxmJ6AMsKcpg',
@@ -346,21 +312,11 @@ const el = {
 };
 
 /* ══════════ Toast / log ═════════════════════════════════════════════ */
-const MAX_VISIBLE_TOASTS = 3;
 function toast(msg, type = 'info') {
   const t = document.createElement('div');
   t.className = `toast ${type}`;
   t.textContent = msg;
   el.toasts.appendChild(t);
-
-  // Limit visible toasts
-  const toasts = el.toasts.querySelectorAll('.toast');
-  if (toasts.length > MAX_VISIBLE_TOASTS) {
-    for (let i = 0; i < toasts.length - MAX_VISIBLE_TOASTS; i++) {
-      toasts[i].remove();
-    }
-  }
-
   setTimeout(() => t.remove(), 3100);
 }
 function log(...args) { console.log('[rb]', ...args); }
@@ -407,20 +363,10 @@ function showSplash() {
 function updateStatus() {
   const conn = S.connState;
   el.sDot.className = 's-dot' + (conn === 'connected' ? ' good' : conn === 'failed' || conn === 'closed' ? ' bad' : conn !== 'idle' ? ' warn' : '');
-
-  let statusText = conn;
-  if (conn === 'connecting') statusText = 'connecting…';
-  else if (conn === 'connected') statusText = 'connected';
-  else if (conn === 'failed') statusText = 'connection failed';
-  else if (conn === 'closed') statusText = 'closed';
-
-  el.sText.textContent = statusText;
+  el.sText.textContent = conn;
   el.pIce.textContent  = 'ICE ' + S.iceState;
   el.pCtrl.textContent = 'ctrl ' + S.ctrlState;
-
-  const audioStatus = S.audioState === 'live' ? 'audio ✓' : S.audioState === 'blocked' ? 'audio blocked' : 'audio ' + S.audioState;
-  el.pAudio.textContent = audioStatus;
-
+  el.pAudio.textContent = 'audio ' + S.audioState;
   const c = S.capture;
   el.pRes.textContent  = c.w + '×' + c.h;
   const ctrlOpen = S.ctrl && S.ctrl.readyState === 'open';
@@ -438,47 +384,39 @@ function setIdentityUI(uid) {
 }
 
 /* ══════════ Audio ═══════════════════════════════════════════════════
-   Improved audio handling with better state tracking.
-   States: init → pending → live OR blocked → live OR error → silent
+   Strategy:
+   1. Video starts muted (required for autoplay policy).
+   2. On first track / first interaction we try to unmute immediately.
+   3. If that fails (browser still blocks), show the banner.
+   4. Banner click unmutes and hides itself.
 ════════════════════════════════════════════════════════════════════ */
-async function attemptAudioUnmute() {
-  if (!el.video.muted) return;
-  if (S.audioState === 'pending') return;
-
-  S.audioState = 'pending';
-  updateStatus();
-
-  try {
-    el.video.muted = false;
-    await el.video.play();
+function tryUnmute() {
+  if (!el.video.muted) return;          // already unmuted
+  el.video.muted = false;
+  el.video.play().then(() => {
+    el.audioBtn.classList.remove('show');
     S.audioState = 'live';
     updateStatus();
-    el.audioBtn.classList.remove('show');
-  } catch (e) {
-    el.video.muted = true;
-    await el.video.play().catch(() => {});
+  }).catch(() => {
+    el.video.muted = true;              // revert — blocked
+    el.video.play().catch(() => {});
     S.audioState = 'blocked';
     updateStatus();
     el.audioBtn.classList.add('show');
-  }
+  });
 }
 
-el.audioBtn.addEventListener('click', async () => {
-  try {
-    el.video.muted = false;
-    await el.video.play();
-    S.audioState = 'live';
-    updateStatus();
-    el.audioBtn.classList.remove('show');
-    toast('Audio enabled', 'ok');
-  } catch (e) {
-    S.audioState = 'error';
-    updateStatus();
-    toast('Audio enable failed', 'err');
-  }
+el.audioBtn.addEventListener('click', () => {
+  el.video.muted = false;
+  el.video.play().catch(() => {});
+  el.audioBtn.classList.remove('show');
+  S.audioState = 'live';
+  updateStatus();
+  toast('Audio enabled', 'ok');
 });
 
-el.viewport.addEventListener('pointerdown', () => { if (S.sessionId) attemptAudioUnmute(); }, { passive: true });
+// Unmute on any user gesture inside the viewport
+el.viewport.addEventListener('pointerdown', () => { if (S.sessionId) tryUnmute(); }, { passive: true });
 
 /* ══════════ Coordinate translation ═════════════════════════════════ */
 function remoteCoords(ev) {
@@ -517,7 +455,7 @@ function send(payload) {
 function focusRemote() {
   el.video.focus();
   send({ type: 'focus' });
-  attemptAudioUnmute();
+  tryUnmute();
 }
 
 function keyPayload(ev, action) {
@@ -585,21 +523,15 @@ function setupPC() {
     }
     if (el.video.srcObject !== S.stream) {
       el.video.srcObject = S.stream;
-      el.video.muted = true;
+      el.video.muted = true;          // must start muted
       el.video.play().then(() => {
         showVideo();
         el.overlay.classList.remove('show');
-        attemptAudioUnmute();
-      }).catch(err => {
-        log('video play error:', err.message);
+        // Try unmuting after a tick — some browsers need this gap
+        setTimeout(tryUnmute, 200);
+      }).catch(() => {
         showVideo();
         el.overlay.classList.remove('show');
-        // Retry video playback
-        setTimeout(() => {
-          if (el.video.srcObject === S.stream) {
-            el.video.play().catch(() => {});
-          }
-        }, 1000);
       });
     }
   };
@@ -766,7 +698,6 @@ async function startSession(url) {
       uid: auth.currentUser.uid,
       userAgent: navigator.userAgent,
       viewport: { width: innerWidth, height: innerHeight },
-      isTablet: isTablet,
     },
   });
 
@@ -897,22 +828,7 @@ el.btnFwd.addEventListener('click', () => {
   updateNavButtons();
 });
 
-/* ══════════ Input forwarding ════════════════════════════════════════
-   Throttled pointer events to reduce jank and data channel flooding.
-════════════════════════════════════════════════════════════════════ */
-const INPUT_THROTTLE_MS = 50;
-let lastPointerMoveTime = 0;
-let pendingPointerMove = null;
-
-function throttledPointerMove(ev) {
-  pendingPointerMove = ev;
-  const now = performance.now();
-  if (now - lastPointerMoveTime < INPUT_THROTTLE_MS) return;
-  lastPointerMoveTime = now;
-  const c = remoteCoords(ev);
-  if (c) send({ type:'mouse', action:'move', button:'none', buttons:ev.buttons, clickCount:0, x:c.x, y:c.y });
-}
-
+/* ══════════ Input forwarding ════════════════════════════════════════ */
 el.video.addEventListener('contextmenu', ev => ev.preventDefault());
 
 el.video.addEventListener('pointerdown', ev => {
@@ -929,7 +845,11 @@ el.video.addEventListener('pointerup', ev => {
   if (c) send({ type:'mouse', action:'up', button:btnName(ev), buttons:0, clickCount:ev.detail||1, x:c.x, y:c.y });
   try { el.video.releasePointerCapture(ev.pointerId); } catch {}
 });
-el.video.addEventListener('pointermove', throttledPointerMove);
+el.video.addEventListener('pointermove', ev => {
+  if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
+  const c = remoteCoords(ev);
+  if (c) send({ type:'mouse', action:'move', button:'none', buttons:ev.buttons, clickCount:0, x:c.x, y:c.y });
+});
 el.video.addEventListener('pointercancel', ev => {
   try { el.video.releasePointerCapture(ev.pointerId); } catch {}
 });
@@ -938,16 +858,6 @@ el.video.addEventListener('wheel', ev => {
   const c = remoteCoords(ev);
   if (c) send({ type:'mouse', action:'wheel', button:'none', deltaX:ev.deltaX, deltaY:ev.deltaY, x:c.x, y:c.y });
 }, { passive: false });
-
-// Video element event monitoring
-el.video.addEventListener('stalled', () => log('video stalled'));
-el.video.addEventListener('suspend', () => log('video suspended'));
-el.video.addEventListener('waiting', () => log('video waiting'));
-el.video.addEventListener('error', (e) => {
-  if (el.video.error) {
-    log('video error:', el.video.error.code, el.video.error.message);
-  }
-});
 
 function isTyping(t) { const tag=(t?.tagName||'').toLowerCase(); return tag==='input'||tag==='textarea'||t?.isContentEditable; }
 
@@ -1019,26 +929,6 @@ S.authReady = new Promise(resolve => {
 
 log('boot');
 })();
-
-function goFullscreen() {
-  const el = document.documentElement;
-  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
-  if (req) req.call(el).catch(() => {});
-}
-
-// Must be triggered by a user gesture — auto-call on first tap/click anywhere
-document.addEventListener('pointerdown', goFullscreen, { once: true });
-
-// Re-enter if user accidentally exits (e.g. hits esc)
-document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-    // small delay so it doesn't feel jarring
-    setTimeout(goFullscreen, 800);
-  }
-});
-document.addEventListener('webkitfullscreenchange', () => {
-  if (!document.webkitFullscreenElement) setTimeout(goFullscreen, 800);
-});
 </script>
 <script src="/lib/fps.js"></script>
 <script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
