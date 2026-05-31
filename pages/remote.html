@@ -27,84 +27,46 @@
       --warn:        #ffa940;
       --mono:        'JetBrains Mono', monospace;
       --sans:        'Syne', sans-serif;
-      /* iPad safe area support */
-      --safe-top:    env(safe-area-inset-top, 0px);
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
-      --safe-left:   env(safe-area-inset-left, 0px);
-      --safe-right:  env(safe-area-inset-right, 0px);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    /* Prevent iOS bounce scroll and text size adjustment */
-    html {
-      height: 100%;
-      -webkit-text-size-adjust: 100%;
-      text-size-adjust: 100%;
-    }
-
+    html, body { height: 100%; overflow: hidden; }
     body {
       font-family: var(--sans);
       background: var(--bg);
       color: var(--text);
       -webkit-font-smoothing: antialiased;
-      /* Prevent pull-to-refresh and overscroll on iPad */
-      overscroll-behavior: none;
-      overflow: hidden;
-      height: 100%;
-      /* Prevent tap callout on long press */
-      -webkit-touch-callout: none;
     }
 
-    #shell {
-      display: flex;
-      flex-direction: column;
-      height: 100dvh; /* dynamic viewport height — handles iPad keyboard */
-      padding-top: var(--safe-top);
-      padding-bottom: var(--safe-bottom);
-      padding-left: var(--safe-left);
-      padding-right: var(--safe-right);
-    }
+    #shell { display: flex; flex-direction: column; height: 100vh; }
 
     /* ── Address bar ── */
     #chrome {
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 12px;
+      padding: 7px 10px;
       background: var(--bg-bar);
       border-bottom: 1px solid var(--border);
-      /* Taller bar on iPad for comfortable touch */
-      min-height: 56px;
+      min-height: 44px;
       flex-shrink: 0;
     }
 
     .nav-btn {
-      /* 44×44 minimum touch target per Apple HIG */
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
+      width: 30px; height: 30px;
+      border-radius: 7px;
       border: none;
       background: transparent;
       color: var(--text-muted);
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px; /* larger icons for iPad */
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
       transition: background .12s, color .12s;
       flex-shrink: 0;
-      /* Prevent text selection on tap */
-      -webkit-user-select: none;
-      user-select: none;
-      /* Remove iOS tap highlight */
-      -webkit-tap-highlight-color: transparent;
     }
-    .nav-btn:hover:not(:disabled),
-    .nav-btn:active:not(:disabled) { background: var(--bg-surface); color: var(--text); }
+    .nav-btn:hover:not(:disabled) { background: var(--bg-surface); color: var(--text); }
     .nav-btn:disabled { opacity: .3; cursor: default; }
-    .nav-btn.close-btn:hover:not(:disabled),
-    .nav-btn.close-btn:active:not(:disabled) { background: rgba(255,79,79,0.15); color: var(--bad); }
+    .nav-btn.close-btn:hover:not(:disabled) { background: rgba(255,79,79,0.15); color: var(--bad); }
 
     #url-wrap {
       flex: 1;
@@ -113,270 +75,110 @@
       gap: 8px;
       background: var(--bg-input);
       border: 1px solid var(--border);
-      border-radius: 11px;
-      padding: 0 14px;
-      height: 40px; /* taller for iPad */
+      border-radius: 9px;
+      padding: 0 12px;
+      height: 32px;
       transition: border-color .15s, box-shadow .15s;
     }
     #url-wrap:focus-within {
       border-color: var(--border-focus);
       box-shadow: 0 0 0 3px var(--accent-glow);
     }
-    #lock { font-size: 13px; flex-shrink: 0; }
+    #lock { font-size: 11px; flex-shrink: 0; }
     #url-input {
       flex: 1;
       background: transparent;
       border: none;
       color: var(--text);
       font-family: var(--mono);
-      font-size: 14px; /* readable on iPad without zooming */
+      font-size: 12.5px;
       outline: none;
-      /* Prevent iOS zoom on input focus (needs font-size >= 16px OR explicit override) */
-      font-size: max(16px, 14px);
-      -webkit-tap-highlight-color: transparent;
     }
     #url-input::placeholder { color: var(--text-muted); }
 
     #id-pill {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      padding: 6px 10px;
+      display: flex; align-items: center; gap: 5px;
+      padding: 3px 9px;
       border-radius: 20px;
       background: var(--bg-surface);
       border: 1px solid var(--border);
       font-family: var(--mono);
-      font-size: 11px;
+      font-size: 10.5px;
       color: var(--text-dim);
       flex-shrink: 0;
       cursor: default;
-      -webkit-user-select: none;
       user-select: none;
-      /* Hide on small iPads in portrait to save space */
-      white-space: nowrap;
     }
-    @media (max-width: 600px) {
-      #id-pill { display: none; }
-    }
-    #id-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+    #id-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
     #id-pill .dot.good { background: var(--good); }
 
     /* ── Viewport ── */
-    #viewport {
-      flex: 1;
-      position: relative;
-      background: #000;
-      overflow: hidden;
-      /* Allow the viewport to shrink when iPad keyboard appears */
-      min-height: 0;
-    }
+    #viewport { flex: 1; position: relative; background: #000; overflow: hidden; }
 
     video {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       display: block;
       object-fit: contain;
       outline: none;
-      /* Use default cursor on iPad — crosshair doesn't make sense on touch */
-      cursor: default;
+      cursor: crosshair;
       touch-action: none;
-      -webkit-user-select: none;
       user-select: none;
-      /* Prevent iOS from trying to save/share the video on long press */
-      -webkit-touch-callout: none;
     }
 
     /* ── Splash ── */
-    #splash {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      gap: 20px;
-      padding: 20px;
-    }
+    #splash { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 20px; }
     #splash.hidden { display: none; }
-    .splash-logo {
-      width: 60px;
-      height: 60px;
-      border-radius: 16px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 26px;
-    }
-    .splash-title { font-size: 20px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
-    .splash-sub {
-      font-size: 14px;
-      color: var(--text-muted);
-      max-width: 320px;
-      text-align: center;
-      line-height: 1.6;
-    }
-    .quick-row {
-      display: flex;
-      gap: 9px;
-      flex-wrap: wrap;
-      justify-content: center;
-      max-width: 380px;
-    }
-    .quick-btn {
-      /* 44px minimum height for touch */
-      padding: 10px 18px;
-      min-height: 44px;
-      border-radius: 10px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      color: var(--text-dim);
-      font-family: var(--sans);
-      font-size: 14px;
-      cursor: pointer;
-      transition: border-color .15s, color .15s, background .15s;
-      -webkit-tap-highlight-color: transparent;
-      -webkit-user-select: none;
-      user-select: none;
-      display: flex;
-      align-items: center;
-    }
-    .quick-btn:hover,
-    .quick-btn:active { border-color: var(--accent); color: var(--accent); background: rgba(91,142,255,.05); }
+    .splash-logo { width: 52px; height: 52px; border-radius: 14px; background: var(--bg-surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .splash-title { font-size: 18px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+    .splash-sub { font-size: 13px; color: var(--text-muted); max-width: 280px; text-align: center; line-height: 1.6; }
+    .quick-row { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; }
+    .quick-btn { padding: 6px 14px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-dim); font-family: var(--sans); font-size: 12px; cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
+    .quick-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(91,142,255,.05); }
 
     /* ── Overlay ── */
-    #overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity .2s;
-    }
+    #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .2s; }
     #overlay.show { opacity: 1; pointer-events: auto; }
-    .overlay-box {
-      text-align: center;
-      padding: 32px 40px;
-      border-radius: 16px;
-      background: rgba(10,10,11,.88);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border: 1px solid var(--border);
-      max-width: 80vw;
-    }
-    .overlay-box h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
-    .overlay-box p  { font-size: 13px; color: var(--text-muted); }
-    .spinner {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      animation: spin 1s linear infinite;
-      margin: 0 auto 14px;
-    }
+    .overlay-box { text-align: center; padding: 28px 36px; border-radius: 14px; background: rgba(10,10,11,.85); backdrop-filter: blur(14px); border: 1px solid var(--border); }
+    .overlay-box h2 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .overlay-box p  { font-size: 12px; color: var(--text-muted); }
+    .spinner { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--accent); animation: spin 1s linear infinite; margin: 0 auto 14px; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Audio unlock banner ── */
     #audio-btn {
-      position: absolute;
-      bottom: 28px;
-      left: 50%;
-      transform: translateX(-50%);
-      /* Big tap target for iPad */
-      padding: 12px 22px;
-      min-height: 44px;
-      border-radius: 11px;
+      position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+      padding: 7px 16px; border-radius: 9px;
       background: rgba(91,142,255,.15);
       border: 1px solid rgba(91,142,255,.35);
-      color: var(--accent);
-      font-family: var(--sans);
-      font-size: 14px;
-      cursor: pointer;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      white-space: nowrap;
-      z-index: 5;
-      display: none;
+      color: var(--accent); font-family: var(--sans); font-size: 12px;
+      cursor: pointer; backdrop-filter: blur(8px);
+      white-space: nowrap; z-index: 5; display: none;
       transition: background .15s;
-      -webkit-tap-highlight-color: transparent;
     }
-    #audio-btn:hover,
-    #audio-btn:active { background: rgba(91,142,255,.28); }
-    #audio-btn.show { display: flex; align-items: center; gap: 6px; }
+    #audio-btn:hover { background: rgba(91,142,255,.25); }
+    #audio-btn.show { display: block; }
 
     /* ── Status bar ── */
-    #statusbar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 4px 14px;
-      background: var(--bg-bar);
-      border-top: 1px solid var(--border);
-      min-height: 28px;
-      flex-shrink: 0;
-      overflow: hidden;
-    }
-    .s-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+    #statusbar { display: flex; align-items: center; gap: 10px; padding: 3px 12px; background: var(--bg-bar); border-top: 1px solid var(--border); min-height: 22px; flex-shrink: 0; }
+    .s-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
     .s-dot.good { background: var(--good); }
     .s-dot.bad  { background: var(--bad); }
     .s-dot.warn { background: var(--warn); }
-    #s-text {
-      flex: 1;
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--text-muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+    #s-text { flex: 1; font-family: var(--mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .s-pills { display: flex; gap: 8px; align-items: center; }
-    .s-pill {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      padding: 2px 7px;
-      border-radius: 4px;
-      background: var(--bg-surface);
-      white-space: nowrap;
-    }
-    /* Hide less-important pills on narrow iPads */
-    @media (max-width: 700px) {
-      #p-ice, #p-audio { display: none; }
-    }
+    .s-pill { font-family: var(--mono); font-size: 10px; color: var(--text-muted); padding: 1px 7px; border-radius: 4px; background: var(--bg-surface); white-space: nowrap; }
 
     /* ── Toasts ── */
-    #toasts {
-      position: fixed;
-      top: calc(10px + var(--safe-top));
-      right: calc(10px + var(--safe-right));
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      z-index: 200;
-      pointer-events: none;
-    }
-    .toast {
-      padding: 11px 16px;
-      border-radius: 11px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      font-size: 13px;
-      pointer-events: auto;
-      max-width: 300px;
-      animation: tIn .25s ease, tOut .25s ease 2.75s forwards;
-    }
+    #toasts { position: fixed; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 5px; z-index: 200; pointer-events: none; }
+    .toast { padding: 9px 14px; border-radius: 9px; background: var(--bg-surface); border: 1px solid var(--border); font-size: 12.5px; pointer-events: auto; max-width: 300px; animation: tIn .25s ease, tOut .25s ease 2.75s forwards; }
     .toast.ok   { border-color: rgba(57,217,138,.3); color: var(--good); }
     .toast.err  { border-color: rgba(255,79,79,.3);  color: var(--bad); }
     .toast.info { border-color: rgba(91,142,255,.3); color: var(--accent); }
     @keyframes tIn  { from { opacity:0; transform:translateX(16px) } to { opacity:1; transform:none } }
     @keyframes tOut { from { opacity:1 } to { opacity:0; transform:translateX(16px) } }
 
-    /* Hint hidden on iPad — no hover state on touch */
-    .hint { display: none; }
+    .hint { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); padding: 5px 12px; border-radius: 7px; background: rgba(0,0,0,.7); backdrop-filter: blur(8px); border: 1px solid var(--border); opacity: 0; transition: opacity .25s; pointer-events: none; white-space: nowrap; }
+    #viewport:hover .hint { opacity: 1; }
   </style>
 </head>
 <body>
@@ -1131,4 +933,4 @@ log('boot');
 <script src="/lib/fps.js"></script>
 <script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
 </body>
-</html>  
+</html>
