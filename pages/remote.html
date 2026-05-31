@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Math Practice</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
@@ -27,18 +29,40 @@
       --warn:        #ffa940;
       --mono:        'JetBrains Mono', monospace;
       --sans:        'Syne', sans-serif;
+      /* Safe area insets for iPad notch/home bar */
+      --sat: env(safe-area-inset-top, 0px);
+      --sar: env(safe-area-inset-right, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+      --sal: env(safe-area-inset-left, 0px);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; overflow: hidden; }
+
+    /* Use dvh so Safari's collapsing address bar doesn't cause overflow */
+    html { height: 100%; height: -webkit-fill-available; }
     body {
       font-family: var(--sans);
       background: var(--bg);
       color: var(--text);
       -webkit-font-smoothing: antialiased;
+      height: 100%;
+      height: -webkit-fill-available;
+      /* Prevent iOS bounce scroll on the body */
+      overscroll-behavior: none;
+      overflow: hidden;
     }
 
-    #shell { display: flex; flex-direction: column; height: 100vh; }
+    #shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      height: -webkit-fill-available;
+      /* Respect safe areas */
+      padding-top: var(--sat);
+      padding-left: var(--sal);
+      padding-right: var(--sar);
+      padding-bottom: var(--sab);
+    }
 
     /* ── Address bar ── */
     #chrome {
@@ -50,10 +74,13 @@
       border-bottom: 1px solid var(--border);
       min-height: 44px;
       flex-shrink: 0;
+      /* Prevent text selection on toolbar on iOS */
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     .nav-btn {
-      width: 30px; height: 30px;
+      width: 36px; height: 36px; /* Larger tap target for touch */
       border-radius: 7px;
       border: none;
       background: transparent;
@@ -63,21 +90,26 @@
       font-size: 13px;
       transition: background .12s, color .12s;
       flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
     .nav-btn:hover:not(:disabled) { background: var(--bg-surface); color: var(--text); }
+    .nav-btn:active:not(:disabled) { background: var(--bg-surface); color: var(--text); }
     .nav-btn:disabled { opacity: .3; cursor: default; }
-    .nav-btn.close-btn:hover:not(:disabled) { background: rgba(255,79,79,0.15); color: var(--bad); }
+    .nav-btn.close-btn:hover:not(:disabled),
+    .nav-btn.close-btn:active:not(:disabled) { background: rgba(255,79,79,0.15); color: var(--bad); }
 
     #url-wrap {
       flex: 1;
+      min-width: 0; /* Allow shrinking */
       display: flex;
       align-items: center;
       gap: 8px;
       background: var(--bg-input);
       border: 1px solid var(--border);
       border-radius: 9px;
-      padding: 0 12px;
-      height: 32px;
+      padding: 0 10px;
+      height: 36px;
       transition: border-color .15s, box-shadow .15s;
     }
     #url-wrap:focus-within {
@@ -87,12 +119,16 @@
     #lock { font-size: 11px; flex-shrink: 0; }
     #url-input {
       flex: 1;
+      min-width: 0;
       background: transparent;
       border: none;
       color: var(--text);
       font-family: var(--mono);
-      font-size: 12.5px;
+      font-size: 13px;
       outline: none;
+      /* iOS: prevent zoom on focus (font-size >= 16 avoids zoom, but 13px is fine with meta viewport) */
+      -webkit-appearance: none;
+      appearance: none;
     }
     #url-input::placeholder { color: var(--text-muted); }
 
@@ -107,38 +143,51 @@
       color: var(--text-dim);
       flex-shrink: 0;
       cursor: default;
+      -webkit-user-select: none;
       user-select: none;
+      /* Hide on very small screens */
     }
+    @media (max-width: 480px) { #id-pill { display: none; } }
     #id-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
     #id-pill .dot.good { background: var(--good); }
 
     /* ── Viewport ── */
-    #viewport { flex: 1; position: relative; background: #000; overflow: hidden; }
+    #viewport { flex: 1; position: relative; background: #000; overflow: hidden; min-height: 0; }
 
     video {
       width: 100%; height: 100%;
       display: block;
       object-fit: contain;
       outline: none;
+      /* crosshair works on desktop; pointer is fine on touch */
       cursor: crosshair;
       touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
       user-select: none;
     }
 
     /* ── Splash ── */
-    #splash { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 20px; }
+    #splash { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 20px; padding: 16px; }
     #splash.hidden { display: none; }
     .splash-logo { width: 52px; height: 52px; border-radius: 14px; background: var(--bg-surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 22px; }
     .splash-title { font-size: 18px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
     .splash-sub { font-size: 13px; color: var(--text-muted); max-width: 280px; text-align: center; line-height: 1.6; }
     .quick-row { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; }
-    .quick-btn { padding: 6px 14px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-dim); font-family: var(--sans); font-size: 12px; cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
-    .quick-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(91,142,255,.05); }
+    .quick-btn {
+      padding: 8px 16px; /* Larger tap target */
+      border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-dim); font-family: var(--sans); font-size: 13px; cursor: pointer;
+      transition: border-color .15s, color .15s, background .15s;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      min-height: 44px; /* iOS recommended minimum */
+    }
+    .quick-btn:hover, .quick-btn:active { border-color: var(--accent); color: var(--accent); background: rgba(91,142,255,.05); }
 
     /* ── Overlay ── */
     #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .2s; }
     #overlay.show { opacity: 1; pointer-events: auto; }
-    .overlay-box { text-align: center; padding: 28px 36px; border-radius: 14px; background: rgba(10,10,11,.85); backdrop-filter: blur(14px); border: 1px solid var(--border); }
+    .overlay-box { text-align: center; padding: 28px 36px; border-radius: 14px; background: rgba(10,10,11,.85); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--border); }
     .overlay-box h2 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
     .overlay-box p  { font-size: 12px; color: var(--text-muted); }
     .spinner { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--accent); animation: spin 1s linear infinite; margin: 0 auto 14px; }
@@ -147,19 +196,39 @@
     /* ── Audio unlock banner ── */
     #audio-btn {
       position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
-      padding: 7px 16px; border-radius: 9px;
+      padding: 10px 20px; border-radius: 9px;
       background: rgba(91,142,255,.15);
       border: 1px solid rgba(91,142,255,.35);
-      color: var(--accent); font-family: var(--sans); font-size: 12px;
-      cursor: pointer; backdrop-filter: blur(8px);
+      color: var(--accent); font-family: var(--sans); font-size: 13px;
+      cursor: pointer; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
       white-space: nowrap; z-index: 5; display: none;
       transition: background .15s;
+      min-height: 44px;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
-    #audio-btn:hover { background: rgba(91,142,255,.25); }
-    #audio-btn.show { display: block; }
+    #audio-btn:hover, #audio-btn:active { background: rgba(91,142,255,.25); }
+    #audio-btn.show { display: flex; align-items: center; }
+
+    /* ── Touch gesture hint (replaces mouse hint) ── */
+    .hint {
+      position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+      font-family: var(--mono); font-size: 10.5px; color: var(--text-muted);
+      padding: 5px 12px; border-radius: 7px;
+      background: rgba(0,0,0,.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--border); opacity: 0; transition: opacity .25s;
+      pointer-events: none; white-space: nowrap;
+    }
+    /* On touch devices, show hint briefly on first touch */
+    #viewport:hover .hint,
+    #viewport.touch-hint .hint { opacity: 1; }
 
     /* ── Status bar ── */
-    #statusbar { display: flex; align-items: center; gap: 10px; padding: 3px 12px; background: var(--bg-bar); border-top: 1px solid var(--border); min-height: 22px; flex-shrink: 0; }
+    #statusbar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 3px 12px; background: var(--bg-bar);
+      border-top: 1px solid var(--border); min-height: 22px; flex-shrink: 0;
+    }
     .s-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
     .s-dot.good { background: var(--good); }
     .s-dot.bad  { background: var(--bad); }
@@ -167,9 +236,13 @@
     #s-text { flex: 1; font-family: var(--mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .s-pills { display: flex; gap: 8px; align-items: center; }
     .s-pill { font-family: var(--mono); font-size: 10px; color: var(--text-muted); padding: 1px 7px; border-radius: 4px; background: var(--bg-surface); white-space: nowrap; }
+    /* Hide some pills on smaller screens */
+    @media (max-width: 600px) {
+      #p-ice, #p-ctrl { display: none; }
+    }
 
     /* ── Toasts ── */
-    #toasts { position: fixed; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 5px; z-index: 200; pointer-events: none; }
+    #toasts { position: fixed; top: calc(10px + var(--sat)); right: 10px; display: flex; flex-direction: column; gap: 5px; z-index: 200; pointer-events: none; }
     .toast { padding: 9px 14px; border-radius: 9px; background: var(--bg-surface); border: 1px solid var(--border); font-size: 12.5px; pointer-events: auto; max-width: 300px; animation: tIn .25s ease, tOut .25s ease 2.75s forwards; }
     .toast.ok   { border-color: rgba(57,217,138,.3); color: var(--good); }
     .toast.err  { border-color: rgba(255,79,79,.3);  color: var(--bad); }
@@ -177,8 +250,36 @@
     @keyframes tIn  { from { opacity:0; transform:translateX(16px) } to { opacity:1; transform:none } }
     @keyframes tOut { from { opacity:1 } to { opacity:0; transform:translateX(16px) } }
 
-    .hint { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); padding: 5px 12px; border-radius: 7px; background: rgba(0,0,0,.7); backdrop-filter: blur(8px); border: 1px solid var(--border); opacity: 0; transition: opacity .25s; pointer-events: none; white-space: nowrap; }
-    #viewport:hover .hint { opacity: 1; }
+    /* ── On-screen keyboard trigger (iPad) ── */
+    #kbd-trigger {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      width: 1px; height: 1px;
+      top: 0; left: 0;
+      /* Must not be display:none or iOS won't focus it */
+    }
+    #kbd-overlay {
+      position: absolute;
+      bottom: 60px; right: 12px;
+      z-index: 10;
+      display: none;
+    }
+    #kbd-overlay.show { display: block; }
+    #kbd-btn {
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      background: rgba(30,30,35,0.9);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-size: 20px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #kbd-btn:active { background: var(--bg-surface); color: var(--text); }
   </style>
 </head>
 <body>
@@ -190,7 +291,7 @@
 
     <div id="url-wrap">
       <span id="lock">&#128274;</span>
-      <input id="url-input" type="text" placeholder="Enter URL or search…" spellcheck="false" autocomplete="off" />
+      <input id="url-input" type="url" inputmode="url" placeholder="Enter URL or search…" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
     </div>
 
     <div id="id-pill" title="Your persistent browser identity">
@@ -198,7 +299,6 @@
       <span id="id-label">—</span>
     </div>
 
-    <!-- Close / stop session button -->
     <button class="nav-btn close-btn" id="btn-close" disabled title="Close tab">&#10005;</button>
   </div>
 
@@ -216,6 +316,9 @@
       </div>
     </div>
 
+    <!-- Hidden input that tricks iOS into showing the keyboard -->
+    <input id="kbd-trigger" type="text" aria-hidden="true" tabindex="-1" readonly />
+
     <video id="video" autoplay playsinline muted tabindex="0" style="display:none"></video>
 
     <div id="overlay">
@@ -226,8 +329,14 @@
       </div>
     </div>
 
-    <button id="audio-btn">🔇 Click to enable audio</button>
-    <div class="hint">Click to focus &bull; Scroll &bull; Type &bull; Esc to release</div>
+    <button id="audio-btn">🔇 Tap to enable audio</button>
+
+    <!-- Keyboard button — visible when session is active -->
+    <div id="kbd-overlay">
+      <button id="kbd-btn" title="Toggle keyboard">⌨</button>
+    </div>
+
+    <div class="hint">Tap to interact &bull; Pinch/scroll &bull; ⌨ for keyboard</div>
   </div>
 
   <div id="statusbar">
@@ -247,8 +356,19 @@
 <script>
 (() => {
 'use strict';
+
+/* ── Touch-hint flash ── */
+const viewport = document.getElementById('viewport');
+let hintTimer = null;
+function flashHint() {
+  viewport.classList.add('touch-hint');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => viewport.classList.remove('touch-hint'), 1800);
+}
+
 let url_history = [];
 let history_index = -1;
+
 /* ══════════ Firebase init ══════════════════════════════════════════════ */
 const FIREBASE_CONFIG = {
   apiKey:            'AIzaSyA4BYjOa__uKZjOBvS5p_uMxmJ6AMsKcpg',
@@ -309,6 +429,9 @@ const el = {
   audioBtn: $('audio-btn'),
   toasts:   $('toasts'),
   viewport: $('viewport'),
+  kbdTrigger: $('kbd-trigger'),
+  kbdOverlay: $('kbd-overlay'),
+  kbdBtn:     $('kbd-btn'),
 };
 
 /* ══════════ Toast / log ═════════════════════════════════════════════ */
@@ -341,6 +464,7 @@ const S = {
   seenSrvCands:  new Set(),
   pendingSrvCands: [],
   authReady:     null,
+  kbdVisible:    false,
 };
 
 /* ══════════ UI helpers ══════════════════════════════════════════════ */
@@ -352,6 +476,7 @@ function setOverlay(title, msg, show) {
 function showVideo() {
   el.splash.classList.add('hidden');
   el.video.style.display = 'block';
+  el.kbdOverlay.classList.add('show');
 }
 function showSplash() {
   el.splash.classList.remove('hidden');
@@ -359,6 +484,8 @@ function showSplash() {
   el.video.srcObject = null;
   el.urlInput.value = '';
   updateLock('');
+  el.kbdOverlay.classList.remove('show');
+  S.kbdVisible = false;
 }
 function updateStatus() {
   const conn = S.connState;
@@ -383,22 +510,87 @@ function setIdentityUI(uid) {
   el.idDot.className = 'dot good';
 }
 
-/* ══════════ Audio ═══════════════════════════════════════════════════
-   Strategy:
-   1. Video starts muted (required for autoplay policy).
-   2. On first track / first interaction we try to unmute immediately.
-   3. If that fails (browser still blocks), show the banner.
-   4. Banner click unmutes and hides itself.
-════════════════════════════════════════════════════════════════════ */
+/* ══════════ iPad keyboard handling ════════════════════════════════
+   iOS does not fire keydown on a <video> element.
+   Solution: maintain a hidden <input> that captures keyboard input
+   and translates each keystroke to a control-channel message.
+   The ⌨ button toggles the software keyboard by focusing/blurring
+   the hidden input.
+══════════════════════════════════════════════════════════════════ */
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+el.kbdBtn.addEventListener('click', () => {
+  if (S.kbdVisible) {
+    el.kbdTrigger.blur();
+    S.kbdVisible = false;
+  } else {
+    // Must not be readonly to trigger keyboard; briefly make it editable
+    el.kbdTrigger.removeAttribute('readonly');
+    el.kbdTrigger.focus();
+    S.kbdVisible = true;
+  }
+});
+
+el.kbdTrigger.addEventListener('blur', () => { S.kbdVisible = false; });
+
+// Forward keystrokes from the hidden input
+el.kbdTrigger.addEventListener('keydown', ev => {
+  if (!S.sessionId) return;
+  if (ev.key === 'Escape') { el.kbdTrigger.blur(); return; }
+  ev.preventDefault();
+  send(keyPayload(ev, 'down'));
+});
+el.kbdTrigger.addEventListener('keyup', ev => {
+  if (!S.sessionId) return;
+  ev.preventDefault();
+  send(keyPayload(ev, 'up'));
+});
+
+// Handle text input from virtual keyboard (compositionend / input events)
+// iOS often fires 'input' instead of key events for printable characters
+el.kbdTrigger.addEventListener('input', ev => {
+  if (!S.sessionId) return;
+  const val = el.kbdTrigger.value;
+  if (!val) return;
+  // Send each character as a key event
+  for (const ch of val) {
+    send({ type: 'key', action: 'down', key: ch, code: '', text: ch,
+           altKey:false, ctrlKey:false, metaKey:false, shiftKey:false, repeat:false, isKeypad:false });
+    send({ type: 'key', action: 'up',   key: ch, code: '', text: ch,
+           altKey:false, ctrlKey:false, metaKey:false, shiftKey:false, repeat:false, isKeypad:false });
+  }
+  // Clear the input so subsequent characters are always the delta
+  el.kbdTrigger.value = '';
+});
+
+// Backspace from virtual keyboard often fires as 'deleteContentBackward'
+el.kbdTrigger.addEventListener('beforeinput', ev => {
+  if (!S.sessionId) return;
+  if (ev.inputType === 'deleteContentBackward') {
+    send({ type: 'key', action: 'down', key: 'Backspace', code: 'Backspace', text: '',
+           altKey:false, ctrlKey:false, metaKey:false, shiftKey:false, repeat:false, isKeypad:false });
+    send({ type: 'key', action: 'up', key: 'Backspace', code: 'Backspace', text: '',
+           altKey:false, ctrlKey:false, metaKey:false, shiftKey:false, repeat:false, isKeypad:false });
+  }
+  if (ev.inputType === 'insertLineBreak') {
+    send({ type: 'key', action: 'down', key: 'Enter', code: 'Enter', text: '',
+           altKey:false, ctrlKey:false, metaKey:false, shiftKey:false, repeat:false, isKeypad:false });
+    send({ type: 'key', action: 'up', key: 'Enter', code: 'Enter', text: '',
+           altKey:false, ctrlKey:false, metaKey:false, shiftKey:false, repeat:false, isKeypad:false });
+  }
+});
+
+/* ══════════ Audio ═══════════════════════════════════════════════════ */
 function tryUnmute() {
-  if (!el.video.muted) return;          // already unmuted
+  if (!el.video.muted) return;
   el.video.muted = false;
   el.video.play().then(() => {
     el.audioBtn.classList.remove('show');
     S.audioState = 'live';
     updateStatus();
   }).catch(() => {
-    el.video.muted = true;              // revert — blocked
+    el.video.muted = true;
     el.video.play().catch(() => {});
     S.audioState = 'blocked';
     updateStatus();
@@ -415,8 +607,44 @@ el.audioBtn.addEventListener('click', () => {
   toast('Audio enabled', 'ok');
 });
 
-// Unmute on any user gesture inside the viewport
 el.viewport.addEventListener('pointerdown', () => { if (S.sessionId) tryUnmute(); }, { passive: true });
+
+/* ══════════ Scroll via touch (iOS wheel fallback) ═══════════════════
+   iOS Safari does not fire 'wheel' events on elements with
+   touch-action:none. We capture touchmove on the video and send
+   scroll deltas manually.
+════════════════════════════════════════════════════════════════════ */
+let _lastTouchY = null;
+let _lastTouchX = null;
+let _touchScrollTimer = null;
+const SCROLL_THROTTLE_MS = 16; // ~60fps
+
+el.video.addEventListener('touchstart', ev => {
+  if (ev.touches.length === 1) {
+    _lastTouchX = ev.touches[0].clientX;
+    _lastTouchY = ev.touches[0].clientY;
+  }
+}, { passive: true });
+
+el.video.addEventListener('touchmove', ev => {
+  ev.preventDefault(); // Prevent page scroll
+  if (ev.touches.length !== 1 || _lastTouchY === null) return;
+  if (_touchScrollTimer) return; // throttle
+  _touchScrollTimer = setTimeout(() => { _touchScrollTimer = null; }, SCROLL_THROTTLE_MS);
+
+  const dx = ev.touches[0].clientX - _lastTouchX;
+  const dy = ev.touches[0].clientY - _lastTouchY;
+  _lastTouchX = ev.touches[0].clientX;
+  _lastTouchY = ev.touches[0].clientY;
+
+  const c = remoteCoords(ev.touches[0]);
+  if (c) {
+    // Invert: drag down = scroll up content (natural scroll)
+    send({ type:'mouse', action:'wheel', button:'none', deltaX: -dx * 2, deltaY: -dy * 2, x: c.x, y: c.y });
+  }
+}, { passive: false });
+
+el.video.addEventListener('touchend', () => { _lastTouchX = null; _lastTouchY = null; }, { passive: true });
 
 /* ══════════ Coordinate translation ═════════════════════════════════ */
 function remoteCoords(ev) {
@@ -439,11 +667,7 @@ function remoteCoords(ev) {
   return { x: Math.round((lx / cw) * vpW), y: Math.round((ly / ch) * vpH) };
 }
 
-/* ══════════ Control channel ════════════════════════════════════════
-   ALL control (mouse, keyboard, navigate, reload, state updates)
-   goes through the WebRTC data channel once open.
-   Firebase is only used for initial offer/answer/ICE signaling.
-════════════════════════════════════════════════════════════════════ */
+/* ══════════ Control channel ════════════════════════════════════════ */
 function send(payload) {
   if (S.ctrl && S.ctrl.readyState === 'open') {
     S.ctrl.send(JSON.stringify(payload));
@@ -453,9 +677,10 @@ function send(payload) {
 }
 
 function focusRemote() {
-  el.video.focus();
+  el.video.focus({ preventScroll: true });
   send({ type: 'focus' });
   tryUnmute();
+  flashHint();
 }
 
 function keyPayload(ev, action) {
@@ -470,11 +695,7 @@ function keyPayload(ev, action) {
 }
 function btnName(ev) { return ev.button === 2 ? 'right' : ev.button === 1 ? 'middle' : 'left'; }
 
-/* ══════════ Inbound data channel messages from host ════════════════
-   The host pushes state updates (url, title) over the data channel
-   instead of writing them to Firebase. This cuts Firebase writes
-   dramatically once connected.
-════════════════════════════════════════════════════════════════════ */
+/* ══════════ Inbound data channel messages ══════════════════════════ */
 function handleHostMessage(msg) {
   if (!msg || typeof msg !== 'object') return;
   switch (msg.type) {
@@ -517,17 +738,13 @@ function setupPC() {
   pc.ontrack = ev => {
     const track = ev.track;
     if (track && !S.stream.getTracks().some(t => t.id === track.id)) S.stream.addTrack(track);
-    if (track?.kind === 'audio') {
-      S.audioState = 'live';
-      updateStatus();
-    }
+    if (track?.kind === 'audio') { S.audioState = 'live'; updateStatus(); }
     if (el.video.srcObject !== S.stream) {
       el.video.srcObject = S.stream;
-      el.video.muted = true;          // must start muted
+      el.video.muted = true;
       el.video.play().then(() => {
         showVideo();
         el.overlay.classList.remove('show');
-        // Try unmuting after a tick — some browsers need this gap
         setTimeout(tryUnmute, 200);
       }).catch(() => {
         showVideo();
@@ -542,7 +759,6 @@ function setupPC() {
     catch (e) { log('client ICE push:', e.message); }
   };
 
-  // Data channel — server creates it with label 'control'
   pc.ondatachannel = ev => {
     if (ev.channel.label !== 'control') return;
     S.ctrl = ev.channel;
@@ -550,7 +766,6 @@ function setupPC() {
       S.ctrlState = 'open';
       updateStatus();
       toast('Connected!', 'ok');
-      // Send a ping to verify the channel works both ways
       send({ type: 'ping' });
     };
     ev.channel.onclose = () => { S.ctrlState = 'closed'; updateStatus(); };
@@ -571,11 +786,7 @@ function setupPC() {
   pc.oniceconnectionstatechange = () => { S.iceState = pc.iceConnectionState; updateStatus(); };
 }
 
-/* ══════════ Firebase session listener ══════════════════════════════
-   Only reads signaling data (offer, serverCandidates, status).
-   Once connected, the listener still watches for a stop signal but
-   no longer reads URL / capture state — those come via data channel.
-════════════════════════════════════════════════════════════════════ */
+/* ══════════ Firebase session listener ══════════════════════════════ */
 async function drainPendingSrvCands() {
   if (!S.pc || !S.remoteDescSet || !S.pendingSrvCands.length) return;
   const q = S.pendingSrvCands.splice(0);
@@ -589,7 +800,6 @@ function attachListener() {
     const data = snap.val();
     if (!data) { cleanup(false); return; }
 
-    // Capture / URL updates from Firebase only used BEFORE data channel is open
     if (data.capture && S.ctrlState !== 'open') {
       S.capture = {
         w:  data.capture.w  || DEFAULT_CAP.w,
@@ -608,13 +818,13 @@ function attachListener() {
     const waiting = ['pending','launch','wait-answer','offer-ready'].includes(data.status);
     if (data.status) {
       const labels = {
-        pending:          ['Waiting for host', 'Remote browser is starting…'],
+        pending:        ['Waiting for host', 'Remote browser is starting…'],
         launch:         ['Launching', 'Browser is starting on remote host'],
-        'wait-answer':    ['Negotiating', 'Setting up WebRTC connection'],
-        'offer-ready':    ['Negotiating', 'Waiting for answer from host'],
-        connected:        ['Connected', 'Receiving video stream'],
+        'wait-answer':  ['Negotiating', 'Setting up WebRTC connection'],
+        'offer-ready':  ['Negotiating', 'Waiting for answer from host'],
+        connected:      ['Connected', 'Receiving video stream'],
         stopped:        ['Stopped', 'Session ended'],
-        error:            ['Error', 'Remote host encountered an error'],
+        error:          ['Error', 'Remote host encountered an error'],
       };
       const [title, msg] = labels[data.status] || [data.status, ''];
       if (waiting) setOverlay(title, msg, true);
@@ -627,7 +837,6 @@ function attachListener() {
       }
     }
 
-    // Handle offer → create answer (one-time per session)
     if (data.offer && S.pc && !S.remoteDescSet && !S.negotiating && !S.answerSent) {
       S.negotiating = true;
       try {
@@ -635,11 +844,11 @@ function attachListener() {
         S.remoteDescSet = true;
         const answer = await S.pc.createAnswer();
         await S.pc.setLocalDescription(answer);
-await S.sessionRef.update({
-           answer,
-           status: 'connected',
-           answerSentAt: firebase.database.ServerValue.TIMESTAMP,
-         });
+        await S.sessionRef.update({
+          answer,
+          status: 'connected',
+          answerSentAt: firebase.database.ServerValue.TIMESTAMP,
+        });
         S.answerSent = true;
         await drainPendingSrvCands();
       } catch (e) {
@@ -648,7 +857,6 @@ await S.sessionRef.update({
       } finally { S.negotiating = false; }
     }
 
-    // Server ICE candidates
     for (const [key, cand] of Object.entries(data.sc || {})) {
       if (S.seenSrvCands.has(key)) continue;
       S.seenSrvCands.add(key);
@@ -743,6 +951,7 @@ function cleanup(doShowSplash) {
   S.iceState   = 'idle';
   S.ctrlState  = 'none';
   S.audioState = 'wait';
+  S.kbdVisible = false;
 
   el.audioBtn.classList.remove('show');
   el.overlay.classList.remove('show');
@@ -752,21 +961,13 @@ function cleanup(doShowSplash) {
   el.btnClose.disabled = true;
   document.title = 'Remote Browser';
   updateStatus();
-
   showSplash();
 }
 
-/* ══════════ Navigate ════════════════════════════════════════════════
-   If the data channel is open, navigate purely via WebRTC.
-   Only fall back to starting a new session if not connected.
-════════════════════════════════════════════════════════════════════ */
+/* ══════════ Navigate ════════════════════════════════════════════════ */
 function navigate(url) {
-  // if url is https://home.voidbase.uk change it to https://olibot1109.github.io/home/
-  if (url === 'https://home.voidbase.uk') {
-    url = 'https://olibot1109.github.io/home/';
-  }
+  if (url === 'https://home.voidbase.uk') url = 'https://olibot1109.github.io/home/';
   if (url && !/^https?:\/\//i.test(url) && !url.startsWith('//')) {
-    // Treat bare strings as Google searches unless they look like a hostname
     url = /\.\w{2,}(\b|$)/.test(url) ? 'https://' + url : 'https://www.google.com/search?q=' + encodeURIComponent(url);
   }
   if (send({ type: 'navigate', url })) {
@@ -780,52 +981,31 @@ function navigate(url) {
 
 function pushHistory(url) {
   if (!url) return;
-
   if (url_history[history_index] === url) return;
-
   url_history = url_history.slice(0, history_index + 1);
-
   url_history.push(url);
   history_index = url_history.length - 1;
-
   updateNavButtons();
 }
 
 function updateNavButtons() {
   el.btnBack.disabled = history_index <= 0;
-  el.btnFwd.disabled = history_index >= url_history.length - 1;
+  el.btnFwd.disabled  = history_index >= url_history.length - 1;
 }
 
 el.btnBack.addEventListener('click', () => {
   if (history_index <= 0) return;
-
   history_index--;
-
   const url = url_history[history_index];
-
-  el.urlInput.value = url;
-  updateLock(url);
-  uSet('lastUrl', url);
-
-  navigate(url);
-
-  updateNavButtons();
+  el.urlInput.value = url; updateLock(url); uSet('lastUrl', url);
+  navigate(url); updateNavButtons();
 });
-
 el.btnFwd.addEventListener('click', () => {
   if (history_index >= url_history.length - 1) return;
-
   history_index++;
-
   const url = url_history[history_index];
-
-  el.urlInput.value = url;
-  updateLock(url);
-  uSet('lastUrl', url);
-
-  navigate(url);
-
-  updateNavButtons();
+  el.urlInput.value = url; updateLock(url); uSet('lastUrl', url);
+  navigate(url); updateNavButtons();
 });
 
 /* ══════════ Input forwarding ════════════════════════════════════════ */
@@ -845,25 +1025,39 @@ el.video.addEventListener('pointerup', ev => {
   if (c) send({ type:'mouse', action:'up', button:btnName(ev), buttons:0, clickCount:ev.detail||1, x:c.x, y:c.y });
   try { el.video.releasePointerCapture(ev.pointerId); } catch {}
 });
+
+// Throttle pointermove — iPads generate very high frequency events
+let _movePending = false;
 el.video.addEventListener('pointermove', ev => {
   if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
-  const c = remoteCoords(ev);
-  if (c) send({ type:'mouse', action:'move', button:'none', buttons:ev.buttons, clickCount:0, x:c.x, y:c.y });
+  if (_movePending) return;
+  _movePending = true;
+  requestAnimationFrame(() => {
+    _movePending = false;
+    const c = remoteCoords(ev);
+    if (c) send({ type:'mouse', action:'move', button:'none', buttons:ev.buttons, clickCount:0, x:c.x, y:c.y });
+  });
 });
 el.video.addEventListener('pointercancel', ev => {
   try { el.video.releasePointerCapture(ev.pointerId); } catch {}
+  _lastTouchX = null; _lastTouchY = null;
 });
+
+// Desktop wheel (non-iOS)
 el.video.addEventListener('wheel', ev => {
   ev.preventDefault();
   const c = remoteCoords(ev);
   if (c) send({ type:'mouse', action:'wheel', button:'none', deltaX:ev.deltaX, deltaY:ev.deltaY, x:c.x, y:c.y });
 }, { passive: false });
 
+// Desktop keyboard (non-iOS / hardware keyboard on iPad)
 function isTyping(t) { const tag=(t?.tagName||'').toLowerCase(); return tag==='input'||tag==='textarea'||t?.isContentEditable; }
 
 window.addEventListener('keydown', ev => {
   if (!S.sessionId) return;
-  if (isTyping(ev.target)) return;
+  // Allow URL bar to be typed in
+  if (isTyping(ev.target) && ev.target !== el.kbdTrigger) return;
+  if (ev.target === el.kbdTrigger) return; // handled by kbdTrigger listener above
   if (ev.key === 'Escape') { ev.preventDefault(); el.video.blur(); return; }
   if (ev.key === 'F5') { ev.preventDefault(); send({ type:'reload' }); return; }
   ev.preventDefault();
@@ -872,6 +1066,7 @@ window.addEventListener('keydown', ev => {
 });
 window.addEventListener('keyup', ev => {
   if (!S.sessionId || isTyping(ev.target)) return;
+  if (ev.target === el.kbdTrigger) return;
   ev.preventDefault();
   send(keyPayload(ev, 'up'));
 });
@@ -880,17 +1075,14 @@ window.addEventListener('keyup', ev => {
 el.urlInput.addEventListener('keydown', ev => {
   if (ev.key !== 'Enter') return;
   ev.preventDefault();
+  el.urlInput.blur(); // dismiss iOS keyboard
   navigate(el.urlInput.value.trim() || DEFAULT_URL);
 });
 el.btnRel.addEventListener('click', () => send({ type: 'reload' }));
-el.btnClose.addEventListener('click', () => {
-  stopSession().catch(e => log('stop error:', e.message));
-});
+el.btnClose.addEventListener('click', () => stopSession().catch(e => log('stop error:', e.message)));
 
 document.querySelectorAll('.quick-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    startSession(btn.dataset.url).catch(e => toast(e.message, 'err'));
-  });
+  btn.addEventListener('click', () => startSession(btn.dataset.url).catch(e => toast(e.message, 'err')));
 });
 
 /* ══════════ Unload cleanup ════════════════════════════════════════ */
@@ -898,8 +1090,19 @@ window.addEventListener('beforeunload', () => {
   if (S.sessionRef) {
     try {
       S.sessionRef.update({
-        status: 'stopped',
-        stoppedAt: Date.now(),
+        status: 'stopped', stoppedAt: Date.now(),
+        offer: null, answer: null, cc: null, sc: null,
+      });
+    } catch {}
+  }
+});
+
+// iOS: pagehide fires more reliably than beforeunload
+window.addEventListener('pagehide', () => {
+  if (S.sessionRef) {
+    try {
+      S.sessionRef.update({
+        status: 'stopped', stoppedAt: Date.now(),
         offer: null, answer: null, cc: null, sc: null,
       });
     } catch {}
@@ -927,7 +1130,7 @@ S.authReady = new Promise(resolve => {
   });
 });
 
-log('boot');
+log('boot — iPad-compatible build');
 })();
 </script>
 <script src="/lib/fps.js"></script>
