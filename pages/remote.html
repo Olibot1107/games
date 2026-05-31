@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Math Practice</title>
+  <title>Remote Browser</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap');
 
@@ -544,6 +544,8 @@ function setupPC() {
       updateStatus();
       toast('Connected!', 'ok');
       send({ type: 'ping' });
+      // WebRTC is up — kill the API poll, everything goes over data channel now
+      if (S.sessionPollTimer) { clearInterval(S.sessionPollTimer); S.sessionPollTimer = null; }
     };
     ev.channel.onclose   = () => { S.ctrlState = 'closed'; updateStatus(); };
     ev.channel.onmessage = ev2 => {
@@ -702,20 +704,22 @@ async function startSession(url) {
 async function stopSession() {
   if (!S.sessionId) return;
   const id = S.sessionId;
+
+  // If data channel is open, tell the host over WebRTC — no API call needed
+  if (S.ctrl && S.ctrl.readyState === 'open') {
+    send({ type: 'closeTab' });
+    cleanup();
+    return;
+  }
+
+  // Not yet connected — use API to mark stopped so the host picks it up
   cleanup();
   try {
     await api.put(`/sessions/${id}`, {
-      status:     'stopped',
-      stoppedAt:  Date.now(),
-      stopReason: 'client-close',
-      offer:      null,
-      answer:     null,
-      cc:         {},
-      sc:         {},
+      status: 'stopped', stoppedAt: Date.now(), stopReason: 'client-close',
+      offer: null, answer: null, cc: {}, sc: {},
     });
-    setTimeout(async () => {
-      try { await api.delete(`/sessions/${id}`); } catch {}
-    }, 600);
+    setTimeout(async () => { try { await api.delete(`/sessions/${id}`); } catch {} }, 600);
   } catch {}
 }
 
@@ -877,9 +881,11 @@ document.querySelectorAll('.quick-btn').forEach(btn => {
 
 /* ══════════ Unload cleanup ══════════════════════════════════════════ */
 window.addEventListener('beforeunload', () => {
-  if (S.sessionId) {
+  if (!S.sessionId) return;
+  // If data channel open, host will detect disconnect via WebRTC connection state
+  // Only beacon if we never got a data channel (still in signaling phase)
+  if (!S.ctrl || S.ctrl.readyState !== 'open') {
     try {
-      // Best-effort beacon — won't block page close
       const body = JSON.stringify({
         status: 'stopped', stoppedAt: Date.now(),
         offer: null, answer: null, cc: {}, sc: {},
