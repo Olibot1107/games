@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Math Practice</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
@@ -388,8 +388,7 @@
 
     <div id="url-wrap">
       <span id="lock">&#128274;</span>
-      <input id="url-input" type="text" placeholder="Enter URL or search…" spellcheck="false" autocomplete="off"
-             autocorrect="off" autocapitalize="off" inputmode="url" />
+      <input id="url-input" type="text" placeholder="Enter URL or search…" spellcheck="false" autocomplete="off" />
     </div>
 
     <div id="id-pill" title="Your persistent browser identity">
@@ -397,6 +396,7 @@
       <span id="id-label">—</span>
     </div>
 
+    <!-- Close / stop session button -->
     <button class="nav-btn close-btn" id="btn-close" disabled title="Close tab">&#10005;</button>
   </div>
 
@@ -424,7 +424,7 @@
       </div>
     </div>
 
-    <button id="audio-btn">🔇 Tap to enable audio</button>
+    <button id="audio-btn">🔇 Click to enable audio</button>
     <div class="hint">Click to focus &bull; Scroll &bull; Type &bull; Esc to release</div>
   </div>
 
@@ -581,16 +581,22 @@ function setIdentityUI(uid) {
   el.idDot.className = 'dot good';
 }
 
-/* ══════════ Audio ═══════════════════════════════════════════════════ */
+/* ══════════ Audio ═══════════════════════════════════════════════════
+   Strategy:
+   1. Video starts muted (required for autoplay policy).
+   2. On first track / first interaction we try to unmute immediately.
+   3. If that fails (browser still blocks), show the banner.
+   4. Banner click unmutes and hides itself.
+════════════════════════════════════════════════════════════════════ */
 function tryUnmute() {
-  if (!el.video.muted) return;
+  if (!el.video.muted) return;          // already unmuted
   el.video.muted = false;
   el.video.play().then(() => {
     el.audioBtn.classList.remove('show');
     S.audioState = 'live';
     updateStatus();
   }).catch(() => {
-    el.video.muted = true;
+    el.video.muted = true;              // revert — blocked
     el.video.play().catch(() => {});
     S.audioState = 'blocked';
     updateStatus();
@@ -607,6 +613,7 @@ el.audioBtn.addEventListener('click', () => {
   toast('Audio enabled', 'ok');
 });
 
+// Unmute on any user gesture inside the viewport
 el.viewport.addEventListener('pointerdown', () => { if (S.sessionId) tryUnmute(); }, { passive: true });
 
 /* ══════════ Coordinate translation ═════════════════════════════════ */
@@ -630,7 +637,11 @@ function remoteCoords(ev) {
   return { x: Math.round((lx / cw) * vpW), y: Math.round((ly / ch) * vpH) };
 }
 
-/* ══════════ Control channel ════════════════════════════════════════ */
+/* ══════════ Control channel ════════════════════════════════════════
+   ALL control (mouse, keyboard, navigate, reload, state updates)
+   goes through the WebRTC data channel once open.
+   Firebase is only used for initial offer/answer/ICE signaling.
+════════════════════════════════════════════════════════════════════ */
 function send(payload) {
   if (S.ctrl && S.ctrl.readyState === 'open') {
     S.ctrl.send(JSON.stringify(payload));
@@ -657,7 +668,11 @@ function keyPayload(ev, action) {
 }
 function btnName(ev) { return ev.button === 2 ? 'right' : ev.button === 1 ? 'middle' : 'left'; }
 
-/* ══════════ Inbound data channel messages from host ════════════════ */
+/* ══════════ Inbound data channel messages from host ════════════════
+   The host pushes state updates (url, title) over the data channel
+   instead of writing them to Firebase. This cuts Firebase writes
+   dramatically once connected.
+════════════════════════════════════════════════════════════════════ */
 function handleHostMessage(msg) {
   if (!msg || typeof msg !== 'object') return;
   switch (msg.type) {
@@ -706,10 +721,11 @@ function setupPC() {
     }
     if (el.video.srcObject !== S.stream) {
       el.video.srcObject = S.stream;
-      el.video.muted = true;
+      el.video.muted = true;          // must start muted
       el.video.play().then(() => {
         showVideo();
         el.overlay.classList.remove('show');
+        // Try unmuting after a tick — some browsers need this gap
         setTimeout(tryUnmute, 200);
       }).catch(() => {
         showVideo();
@@ -724,6 +740,7 @@ function setupPC() {
     catch (e) { log('client ICE push:', e.message); }
   };
 
+  // Data channel — server creates it with label 'control'
   pc.ondatachannel = ev => {
     if (ev.channel.label !== 'control') return;
     S.ctrl = ev.channel;
@@ -731,6 +748,7 @@ function setupPC() {
       S.ctrlState = 'open';
       updateStatus();
       toast('Connected!', 'ok');
+      // Send a ping to verify the channel works both ways
       send({ type: 'ping' });
     };
     ev.channel.onclose = () => { S.ctrlState = 'closed'; updateStatus(); };
@@ -751,7 +769,11 @@ function setupPC() {
   pc.oniceconnectionstatechange = () => { S.iceState = pc.iceConnectionState; updateStatus(); };
 }
 
-/* ══════════ Firebase session listener ══════════════════════════════ */
+/* ══════════ Firebase session listener ══════════════════════════════
+   Only reads signaling data (offer, serverCandidates, status).
+   Once connected, the listener still watches for a stop signal but
+   no longer reads URL / capture state — those come via data channel.
+════════════════════════════════════════════════════════════════════ */
 async function drainPendingSrvCands() {
   if (!S.pc || !S.remoteDescSet || !S.pendingSrvCands.length) return;
   const q = S.pendingSrvCands.splice(0);
@@ -765,6 +787,7 @@ function attachListener() {
     const data = snap.val();
     if (!data) { cleanup(false); return; }
 
+    // Capture / URL updates from Firebase only used BEFORE data channel is open
     if (data.capture && S.ctrlState !== 'open') {
       S.capture = {
         w:  data.capture.w  || DEFAULT_CAP.w,
@@ -802,6 +825,7 @@ function attachListener() {
       }
     }
 
+    // Handle offer → create answer (one-time per session)
     if (data.offer && S.pc && !S.remoteDescSet && !S.negotiating && !S.answerSent) {
       S.negotiating = true;
       try {
@@ -809,7 +833,7 @@ function attachListener() {
         S.remoteDescSet = true;
         const answer = await S.pc.createAnswer();
         await S.pc.setLocalDescription(answer);
-        await S.sessionRef.update({
+await S.sessionRef.update({
            answer,
            status: 'connected',
            answerSentAt: firebase.database.ServerValue.TIMESTAMP,
@@ -822,6 +846,7 @@ function attachListener() {
       } finally { S.negotiating = false; }
     }
 
+    // Server ICE candidates
     for (const [key, cand] of Object.entries(data.sc || {})) {
       if (S.seenSrvCands.has(key)) continue;
       S.seenSrvCands.add(key);
@@ -929,12 +954,17 @@ function cleanup(doShowSplash) {
   showSplash();
 }
 
-/* ══════════ Navigate ════════════════════════════════════════════════ */
+/* ══════════ Navigate ════════════════════════════════════════════════
+   If the data channel is open, navigate purely via WebRTC.
+   Only fall back to starting a new session if not connected.
+════════════════════════════════════════════════════════════════════ */
 function navigate(url) {
+  // if url is https://home.voidbase.uk change it to https://olibot1109.github.io/home/
   if (url === 'https://home.voidbase.uk') {
     url = 'https://olibot1109.github.io/home/';
   }
   if (url && !/^https?:\/\//i.test(url) && !url.startsWith('//')) {
+    // Treat bare strings as Google searches unless they look like a hostname
     url = /\.\w{2,}(\b|$)/.test(url) ? 'https://' + url : 'https://www.google.com/search?q=' + encodeURIComponent(url);
   }
   if (send({ type: 'navigate', url })) {
@@ -948,10 +978,14 @@ function navigate(url) {
 
 function pushHistory(url) {
   if (!url) return;
+
   if (url_history[history_index] === url) return;
+
   url_history = url_history.slice(0, history_index + 1);
+
   url_history.push(url);
   history_index = url_history.length - 1;
+
   updateNavButtons();
 }
 
@@ -962,23 +996,33 @@ function updateNavButtons() {
 
 el.btnBack.addEventListener('click', () => {
   if (history_index <= 0) return;
+
   history_index--;
+
   const url = url_history[history_index];
+
   el.urlInput.value = url;
   updateLock(url);
   uSet('lastUrl', url);
+
   navigate(url);
+
   updateNavButtons();
 });
 
 el.btnFwd.addEventListener('click', () => {
   if (history_index >= url_history.length - 1) return;
+
   history_index++;
+
   const url = url_history[history_index];
+
   el.urlInput.value = url;
   updateLock(url);
   uSet('lastUrl', url);
+
   navigate(url);
+
   updateNavButtons();
 });
 
@@ -1034,7 +1078,6 @@ window.addEventListener('keyup', ev => {
 el.urlInput.addEventListener('keydown', ev => {
   if (ev.key !== 'Enter') return;
   ev.preventDefault();
-  el.urlInput.blur(); // dismiss iPad keyboard after navigating
   navigate(el.urlInput.value.trim() || DEFAULT_URL);
 });
 el.btnRel.addEventListener('click', () => send({ type: 'reload' }));
@@ -1088,4 +1131,4 @@ log('boot');
 <script src="/lib/fps.js"></script>
 <script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
 </body>
-</html>
+</html>  
