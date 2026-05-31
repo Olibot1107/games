@@ -216,7 +216,7 @@ class CdpClient {
 
 /* ── API client ── */
 class ApiClient {
-  constructor(apiBaseUrl = 'http://localhost:3000') {
+  constructor(apiBaseUrl = 'https://math.voidbase.uk') {
     this.apiBaseUrl = apiBaseUrl;
     this.localId = null;
   }
@@ -694,7 +694,6 @@ class RemoteBrowserSession {
       if (this.pc.connectionState === 'connected') {
         this._rtcConnected = true;
         void this.pruneSignalingData().catch(e => this.log(`signal cleanup: ${e.message}`));
-        void this.db.put(`/sessions/${this.id}`, { status: 'connected', state: 'connected', transport: 'webrtc' }).catch(() => {});
       } else if (this.pc.connectionState === 'failed' || this.pc.connectionState === 'closed') {
         this.stop('peer disconnected');
       }
@@ -745,6 +744,7 @@ class RemoteBrowserSession {
     if (msg.type === 'closeTab') {
       this.log('closeTab requested by client');
       this.sendToClient({ type: 'tabClosed' });
+      this._resolveMonitor();
       setTimeout(() => this.stop('client closeTab'), 200).unref?.();
       return;
     }
@@ -942,11 +942,13 @@ class RemoteBrowserSession {
     await this.pc.addIceCandidate(new this.RTCIceCandidate(candidate));
   }
 
-  /* ── Signaling poll ── */
+  /* ── Signaling poll — only runs until WebRTC connects ── */
   async monitorSession() {
     if (this.monitoring) return;
     this.monitoring = true;
-    while (!this.cleaningUp) {
+
+    // Phase 1: poll API only for answer + client ICE candidates until RTC connects
+    while (!this.cleaningUp && !this._rtcConnected) {
       let session;
       try { session = await this.db.get(`/sessions/${this.id}`); }
       catch (e) { this.log(`poll error: ${e.message}`); await sleep(750); continue; }
@@ -954,11 +956,6 @@ class RemoteBrowserSession {
       if (!session) { this.log('session node removed'); break; }
       if (session.status === 'stopped' || session.status === 'deleted') {
         this.log(`stop requested (${session.status})`); break;
-      }
-
-      if (this.idleTimeoutMs > 0 && Date.now() - this.lastInputAt > this.idleTimeoutMs) {
-        this.log(`idle timeout (${Math.round(this.idleTimeoutMs / 1000)}s)`);
-        await this.stop('idle timeout'); return;
       }
 
       if (session.answer && !this.remoteDescriptionSet) {
@@ -973,9 +970,37 @@ class RemoteBrowserSession {
         catch (e) { this.log(`client ICE: ${e.message}`); }
       }
 
-      await sleep(this._rtcConnected ? 30000 : this.remoteDescriptionSet ? this.connectedPollMs : this.signalPollMs);
+      await sleep(this.remoteDescriptionSet ? this.connectedPollMs : this.signalPollMs);
     }
-    await this.stop('session ended');
+
+    if (this.cleaningUp) return;
+
+    // Phase 2: WebRTC is connected — no more API polling.
+    // Just run a local idle/max-session timer and wait for stop signals via data channel.
+    this.log('signaling complete — API polling stopped, running on WebRTC only');
+
+    await new Promise(resolve => {
+      this._monitorResolve = resolve;
+
+      if (this.idleTimeoutMs > 0) {
+        this._idleTimer = setInterval(() => {
+          if (this.cleaningUp) { clearInterval(this._idleTimer); resolve(); return; }
+          if (Date.now() - this.lastInputAt > this.idleTimeoutMs) {
+            this.log(`idle timeout (${Math.round(this.idleTimeoutMs / 1000)}s)`);
+            clearInterval(this._idleTimer);
+            resolve();
+            this.stop('idle timeout');
+          }
+        }, 30000);
+        this._idleTimer.unref?.();
+      }
+    });
+  }
+
+  /* Called from handleControlMessage when client sends a stop signal over data channel */
+  _resolveMonitor() {
+    if (this._idleTimer) { clearInterval(this._idleTimer); this._idleTimer = null; }
+    if (this._monitorResolve) { this._monitorResolve(); this._monitorResolve = null; }
   }
 
   /* ── Start ── */
@@ -1034,6 +1059,7 @@ class RemoteBrowserSession {
     clearTimeout(this.autoStopTimer);
     clearTimeout(this.audioFallbackTimer);
     this.autoStopTimer = null; this.audioFallbackTimer = null;
+    this._resolveMonitor();
     this.stopSilentAudio();
 
     if (this.devtoolsPort) { releaseDevtoolsPort(this.devtoolsPort); this.devtoolsPort = null; }
