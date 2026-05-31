@@ -3,10 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Math Practice</title>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <title>Remote Browser</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap');
 
@@ -198,7 +195,6 @@
       <span id="id-label">—</span>
     </div>
 
-    <!-- Close / stop session button -->
     <button class="nav-btn close-btn" id="btn-close" disabled title="Close tab">&#10005;</button>
   </div>
 
@@ -247,28 +243,37 @@
 <script>
 (() => {
 'use strict';
+
 let url_history = [];
 let history_index = -1;
-/* ══════════ Firebase init ══════════════════════════════════════════════ */
-const FIREBASE_CONFIG = {
-  apiKey:            'AIzaSyA4BYjOa__uKZjOBvS5p_uMxmJ6AMsKcpg',
-  authDomain:        'chat1-6cc2e.firebaseapp.com',
-  databaseURL:       'https://chat1-6cc2e-default-rtdb.firebaseio.com',
-  projectId:         'chat1-6cc2e',
-  storageBucket:     'chat1-6cc2e.firebasestorage.app',
-  messagingSenderId: '771765903902',
-  appId:             '1:771765903902:web:a6fb2e71b059c20ba7840f',
+
+/* ══════════ API client ═════════════════════════════════════════════ */
+const API_BASE = window.location.origin;  // same origin as the Express server
+
+async function apiReq(method, path, body) {
+  const url = `${API_BASE}/api${path.startsWith('/') ? path : '/' + path}`;
+  const r = await fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d?.error || `API ${method} ${r.status}`);
+  return d.data !== undefined ? d.data : d;
+}
+
+const api = {
+  get:    (p)    => apiReq('GET',    p),
+  post:   (p, b) => apiReq('POST',   p, b),
+  put:    (p, b) => apiReq('PUT',    p, b),
+  delete: (p)    => apiReq('DELETE', p),
 };
-firebase.initializeApp(FIREBASE_CONFIG);
-const db   = firebase.database();
-const auth = firebase.auth();
 
-const SESSION_ROOT  = 'remoteBrowser/sessions';
-const DEFAULT_URL   = 'https://home.voidbase.uk';
-const DEFAULT_CAP   = { w:1920, h:1080, fps:30, vw:1920, vh:1080 };
-
-/* ══════════ Persistent identity ════════════════════════════════════════ */
+/* ══════════ Persistent identity ════════════════════════════════════ */
 const IDENTITY_KEY = '__rb_identity';
+const DEFAULT_URL  = 'https://home.voidbase.uk';
+const DEFAULT_CAP  = { w: 1920, h: 1080, fps: 30, vw: 1920, vh: 1080 };
+
 function getStoredIdentity() {
   try { return JSON.parse(localStorage.getItem(IDENTITY_KEY) || 'null'); } catch { return null; }
 }
@@ -311,7 +316,7 @@ const el = {
   viewport: $('viewport'),
 };
 
-/* ══════════ Toast / log ═════════════════════════════════════════════ */
+/* ══════════ Toast / log ══════════════════════════════════════════════ */
 function toast(msg, type = 'info') {
   const t = document.createElement('div');
   t.className = `toast ${type}`;
@@ -321,29 +326,27 @@ function toast(msg, type = 'info') {
 }
 function log(...args) { console.log('[rb]', ...args); }
 
-/* ══════════ Session state ══════════════════════════════════════════ */
+/* ══════════ Session state ═══════════════════════════════════════════ */
 const S = {
-  uid:           null,
-  sessionId:     null,
-  sessionRef:    null,
-  sessionSub:    null,
-  pc:            null,
-  ctrl:          null,
-  stream:        null,
-  capture:       { ...DEFAULT_CAP },
-  connState:     'idle',
-  iceState:      'idle',
-  ctrlState:     'none',
-  audioState:    'wait',
-  remoteDescSet: false,
-  negotiating:   false,
-  answerSent:    false,
-  seenSrvCands:  new Set(),
+  uid:             null,
+  sessionId:       null,
+  sessionPollTimer: null,
+  pc:              null,
+  ctrl:            null,
+  stream:          null,
+  capture:         { ...DEFAULT_CAP },
+  connState:       'idle',
+  iceState:        'idle',
+  ctrlState:       'none',
+  audioState:      'wait',
+  remoteDescSet:   false,
+  negotiating:     false,
+  answerSent:      false,
+  seenSrvCands:    new Set(),
   pendingSrvCands: [],
-  authReady:     null,
 };
 
-/* ══════════ UI helpers ══════════════════════════════════════════════ */
+/* ══════════ UI helpers ═══════════════════════════════════════════════ */
 function setOverlay(title, msg, show) {
   el.ovTitle.textContent = title;
   el.ovMsg.textContent   = msg;
@@ -362,13 +365,17 @@ function showSplash() {
 }
 function updateStatus() {
   const conn = S.connState;
-  el.sDot.className = 's-dot' + (conn === 'connected' ? ' good' : conn === 'failed' || conn === 'closed' ? ' bad' : conn !== 'idle' ? ' warn' : '');
-  el.sText.textContent = conn;
-  el.pIce.textContent  = 'ICE ' + S.iceState;
-  el.pCtrl.textContent = 'ctrl ' + S.ctrlState;
+  el.sDot.className = 's-dot' + (
+    conn === 'connected'                        ? ' good' :
+    conn === 'failed' || conn === 'closed'      ? ' bad'  :
+    conn !== 'idle'                             ? ' warn' : ''
+  );
+  el.sText.textContent  = conn;
+  el.pIce.textContent   = 'ICE '   + S.iceState;
+  el.pCtrl.textContent  = 'ctrl '  + S.ctrlState;
   el.pAudio.textContent = 'audio ' + S.audioState;
   const c = S.capture;
-  el.pRes.textContent  = c.w + '×' + c.h;
+  el.pRes.textContent   = c.w + '×' + c.h;
   const ctrlOpen = S.ctrl && S.ctrl.readyState === 'open';
   el.btnRel.disabled   = !ctrlOpen;
   el.btnClose.disabled = !S.sessionId;
@@ -383,22 +390,16 @@ function setIdentityUI(uid) {
   el.idDot.className = 'dot good';
 }
 
-/* ══════════ Audio ═══════════════════════════════════════════════════
-   Strategy:
-   1. Video starts muted (required for autoplay policy).
-   2. On first track / first interaction we try to unmute immediately.
-   3. If that fails (browser still blocks), show the banner.
-   4. Banner click unmutes and hides itself.
-════════════════════════════════════════════════════════════════════ */
+/* ══════════ Audio ════════════════════════════════════════════════════ */
 function tryUnmute() {
-  if (!el.video.muted) return;          // already unmuted
+  if (!el.video.muted) return;
   el.video.muted = false;
   el.video.play().then(() => {
     el.audioBtn.classList.remove('show');
     S.audioState = 'live';
     updateStatus();
   }).catch(() => {
-    el.video.muted = true;              // revert — blocked
+    el.video.muted = true;
     el.video.play().catch(() => {});
     S.audioState = 'blocked';
     updateStatus();
@@ -415,16 +416,15 @@ el.audioBtn.addEventListener('click', () => {
   toast('Audio enabled', 'ok');
 });
 
-// Unmute on any user gesture inside the viewport
 el.viewport.addEventListener('pointerdown', () => { if (S.sessionId) tryUnmute(); }, { passive: true });
 
-/* ══════════ Coordinate translation ═════════════════════════════════ */
+/* ══════════ Coordinate translation ══════════════════════════════════ */
 function remoteCoords(ev) {
-  const r   = el.video.getBoundingClientRect();
+  const r = el.video.getBoundingClientRect();
   if (!r.width || !r.height) return null;
   const c   = S.capture;
-  const fw  = c.w || DEFAULT_CAP.w;
-  const fh  = c.h || DEFAULT_CAP.h;
+  const fw  = c.w  || DEFAULT_CAP.w;
+  const fh  = c.h  || DEFAULT_CAP.h;
   const vpW = c.vw || fw;
   const vpH = c.vh || fh;
   const sc  = Math.min(r.width / fw, r.height / fh);
@@ -439,11 +439,7 @@ function remoteCoords(ev) {
   return { x: Math.round((lx / cw) * vpW), y: Math.round((ly / ch) * vpH) };
 }
 
-/* ══════════ Control channel ════════════════════════════════════════
-   ALL control (mouse, keyboard, navigate, reload, state updates)
-   goes through the WebRTC data channel once open.
-   Firebase is only used for initial offer/answer/ICE signaling.
-════════════════════════════════════════════════════════════════════ */
+/* ══════════ Control channel ═════════════════════════════════════════ */
 function send(payload) {
   if (S.ctrl && S.ctrl.readyState === 'open') {
     S.ctrl.send(JSON.stringify(payload));
@@ -470,11 +466,7 @@ function keyPayload(ev, action) {
 }
 function btnName(ev) { return ev.button === 2 ? 'right' : ev.button === 1 ? 'middle' : 'left'; }
 
-/* ══════════ Inbound data channel messages from host ════════════════
-   The host pushes state updates (url, title) over the data channel
-   instead of writing them to Firebase. This cuts Firebase writes
-   dramatically once connected.
-════════════════════════════════════════════════════════════════════ */
+/* ══════════ Inbound data channel messages ═══════════════════════════ */
 function handleHostMessage(msg) {
   if (!msg || typeof msg !== 'object') return;
   switch (msg.type) {
@@ -489,11 +481,11 @@ function handleHostMessage(msg) {
     case 'captureInfo':
       if (msg.capture) {
         S.capture = {
-          w:  msg.capture.w  || DEFAULT_CAP.w,
-          h:  msg.capture.h || DEFAULT_CAP.h,
+          w:   msg.capture.w   || DEFAULT_CAP.w,
+          h:   msg.capture.h   || DEFAULT_CAP.h,
           fps: msg.capture.fps || DEFAULT_CAP.fps,
           vw:  msg.capture.vw  || msg.capture.width  || DEFAULT_CAP.vw,
-          vh:  msg.capture.vh || msg.capture.height || DEFAULT_CAP.vh,
+          vh:  msg.capture.vh  || msg.capture.height || DEFAULT_CAP.vh,
         };
         updateStatus();
       }
@@ -508,26 +500,24 @@ function handleHostMessage(msg) {
   }
 }
 
-/* ══════════ WebRTC peer connection ════════════════════════════════ */
+/* ══════════ WebRTC peer connection ══════════════════════════════════ */
 function setupPC() {
-  const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  const pc = new RTCPeerConnection({
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  });
   S.pc     = pc;
   S.stream = new MediaStream();
 
   pc.ontrack = ev => {
     const track = ev.track;
     if (track && !S.stream.getTracks().some(t => t.id === track.id)) S.stream.addTrack(track);
-    if (track?.kind === 'audio') {
-      S.audioState = 'live';
-      updateStatus();
-    }
+    if (track?.kind === 'audio') { S.audioState = 'live'; updateStatus(); }
     if (el.video.srcObject !== S.stream) {
       el.video.srcObject = S.stream;
-      el.video.muted = true;          // must start muted
+      el.video.muted = true;
       el.video.play().then(() => {
         showVideo();
         el.overlay.classList.remove('show');
-        // Try unmuting after a tick — some browsers need this gap
         setTimeout(tryUnmute, 200);
       }).catch(() => {
         showVideo();
@@ -537,23 +527,25 @@ function setupPC() {
   };
 
   pc.onicecandidate = async ev => {
-    if (!ev.candidate || !S.sessionRef) return;
-    try { await S.sessionRef.child('cc').push(ev.candidate.toJSON()); }
-    catch (e) { log('client ICE push:', e.message); }
+    if (!ev.candidate || !S.sessionId) return;
+    try {
+      await api.post(`/sessions/${S.sessionId}/candidates/client`, {
+        key: crypto.randomUUID(),
+        candidate: ev.candidate.toJSON(),
+      });
+    } catch (e) { log('client ICE push:', e.message); }
   };
 
-  // Data channel — server creates it with label 'control'
   pc.ondatachannel = ev => {
     if (ev.channel.label !== 'control') return;
     S.ctrl = ev.channel;
-    ev.channel.onopen  = () => {
+    ev.channel.onopen = () => {
       S.ctrlState = 'open';
       updateStatus();
       toast('Connected!', 'ok');
-      // Send a ping to verify the channel works both ways
       send({ type: 'ping' });
     };
-    ev.channel.onclose = () => { S.ctrlState = 'closed'; updateStatus(); };
+    ev.channel.onclose   = () => { S.ctrlState = 'closed'; updateStatus(); };
     ev.channel.onmessage = ev2 => {
       try { handleHostMessage(JSON.parse(ev2.data)); } catch {}
     };
@@ -564,18 +556,14 @@ function setupPC() {
     updateStatus();
     if (S.connState === 'failed' || S.connState === 'closed') {
       toast('Connection lost', 'err');
-      cleanup(false);
+      cleanup();
     }
   };
 
   pc.oniceconnectionstatechange = () => { S.iceState = pc.iceConnectionState; updateStatus(); };
 }
 
-/* ══════════ Firebase session listener ══════════════════════════════
-   Only reads signaling data (offer, serverCandidates, status).
-   Once connected, the listener still watches for a stop signal but
-   no longer reads URL / capture state — those come via data channel.
-════════════════════════════════════════════════════════════════════ */
+/* ══════════ Drain pending server candidates ═════════════════════════ */
 async function drainPendingSrvCands() {
   if (!S.pc || !S.remoteDescSet || !S.pendingSrvCands.length) return;
   const q = S.pendingSrvCands.splice(0);
@@ -584,100 +572,108 @@ async function drainPendingSrvCands() {
   }
 }
 
+/* ══════════ Session polling (replaces Firebase listener) ════════════ */
 function attachListener() {
-  S.sessionSub = S.sessionRef.on('value', async snap => {
-    const data = snap.val();
-    if (!data) { cleanup(false); return; }
+  if (S.sessionPollTimer) return;
 
-    // Capture / URL updates from Firebase only used BEFORE data channel is open
-    if (data.capture && S.ctrlState !== 'open') {
-      S.capture = {
-        w:  data.capture.w  || DEFAULT_CAP.w,
-        h:  data.capture.h || DEFAULT_CAP.h,
-        fps: data.capture.fps || DEFAULT_CAP.fps,
-        vw:  data.capture.vw  || data.capture.width  || DEFAULT_CAP.vw,
-        vh:  data.capture.vh || data.capture.height || DEFAULT_CAP.vh,
-      };
-      updateStatus();
-    }
-    if (data.url && S.ctrlState !== 'open') {
-      el.urlInput.value = data.url;
-      updateLock(data.url);
-    }
+  async function pollSession() {
+    if (!S.sessionId) return;
+    try {
+      const data = await api.get(`/sessions/${S.sessionId}`);
+      if (!data) { cleanup(); return; }
 
-    const waiting = ['pending','launch','wait-answer','offer-ready'].includes(data.status);
-    if (data.status) {
-      const labels = {
-        pending:          ['Waiting for host', 'Remote browser is starting…'],
-        launch:         ['Launching', 'Browser is starting on remote host'],
-        'wait-answer':    ['Negotiating', 'Setting up WebRTC connection'],
-        'offer-ready':    ['Negotiating', 'Waiting for answer from host'],
-        connected:        ['Connected', 'Receiving video stream'],
-        stopped:        ['Stopped', 'Session ended'],
-        error:            ['Error', 'Remote host encountered an error'],
-      };
-      const [title, msg] = labels[data.status] || [data.status, ''];
-      if (waiting) setOverlay(title, msg, true);
-      else if (data.status === 'connected') el.overlay.classList.remove('show');
-      else if (['stopped','deleted','error'].includes(data.status)) {
-        setOverlay(title, msg, true);
-        toast('Session ' + data.status, data.status === 'error' ? 'err' : 'info');
-        cleanup(false);
-        return;
+      // Update capture info while not yet connected via data channel
+      if (data.capture && S.ctrlState !== 'open') {
+        S.capture = {
+          w:   data.capture.w   || DEFAULT_CAP.w,
+          h:   data.capture.h   || DEFAULT_CAP.h,
+          fps: data.capture.fps || DEFAULT_CAP.fps,
+          vw:  data.capture.vw  || data.capture.width  || DEFAULT_CAP.vw,
+          vh:  data.capture.vh  || data.capture.height || DEFAULT_CAP.vh,
+        };
+        updateStatus();
       }
-    }
+      if (data.url && S.ctrlState !== 'open') {
+        el.urlInput.value = data.url;
+        updateLock(data.url);
+      }
 
-    // Handle offer → create answer (one-time per session)
-    if (data.offer && S.pc && !S.remoteDescSet && !S.negotiating && !S.answerSent) {
-      S.negotiating = true;
-      try {
-        await S.pc.setRemoteDescription(data.offer);
-        S.remoteDescSet = true;
-        const answer = await S.pc.createAnswer();
-        await S.pc.setLocalDescription(answer);
-await S.sessionRef.update({
-           answer,
-           status: 'connected',
-           answerSentAt: firebase.database.ServerValue.TIMESTAMP,
-         });
-        S.answerSent = true;
-        await drainPendingSrvCands();
-      } catch (e) {
-        log('answer error:', e.message);
-        toast('Connection setup failed', 'err');
-      } finally { S.negotiating = false; }
-    }
+      // Status display
+      if (data.status) {
+        const labels = {
+          pending:        ['Waiting for host',  'Remote browser is starting…'],
+          launch:         ['Launching',          'Browser is starting on remote host'],
+          'wait-answer':  ['Negotiating',        'Setting up WebRTC connection'],
+          'offer-ready':  ['Negotiating',        'Waiting for answer from host'],
+          connected:      ['Connected',          'Receiving video stream'],
+          stopped:        ['Stopped',            'Session ended'],
+          error:          ['Error',              'Remote host encountered an error'],
+        };
+        const waiting = ['pending', 'launch', 'wait-answer', 'offer-ready'].includes(data.status);
+        const [title, msg] = labels[data.status] || [data.status, ''];
+        if (waiting) setOverlay(title, msg, true);
+        else if (data.status === 'connected') el.overlay.classList.remove('show');
+        else if (['stopped', 'deleted', 'error'].includes(data.status)) {
+          setOverlay(title, msg, true);
+          toast('Session ' + data.status, data.status === 'error' ? 'err' : 'info');
+          cleanup();
+          return;
+        }
+      }
 
-    // Server ICE candidates
-    for (const [key, cand] of Object.entries(data.sc || {})) {
-      if (S.seenSrvCands.has(key)) continue;
-      S.seenSrvCands.add(key);
-      if (!S.remoteDescSet) { S.pendingSrvCands.push(cand); continue; }
-      try { await S.pc.addIceCandidate(cand); } catch (e) { log('srv ICE:', e.message); }
+      // Handle offer → create answer
+      if (data.offer && S.pc && !S.remoteDescSet && !S.negotiating && !S.answerSent) {
+        S.negotiating = true;
+        try {
+          await S.pc.setRemoteDescription(data.offer);
+          S.remoteDescSet = true;
+          const answer = await S.pc.createAnswer();
+          await S.pc.setLocalDescription(answer);
+          await api.put(`/sessions/${S.sessionId}/answer`, { answer });
+          S.answerSent = true;
+          await drainPendingSrvCands();
+        } catch (e) {
+          log('answer error:', e.message);
+          toast('Connection setup failed', 'err');
+        } finally { S.negotiating = false; }
+      }
+
+      // Drain server ICE candidates (stored as sc on the session)
+      for (const [key, cand] of Object.entries(data.sc || {})) {
+        if (S.seenSrvCands.has(key)) continue;
+        S.seenSrvCands.add(key);
+        if (!cand) continue;
+        if (!S.remoteDescSet) { S.pendingSrvCands.push(cand); continue; }
+        try { await S.pc.addIceCandidate(cand); } catch (e) { log('srv ICE:', e.message); }
+      }
+    } catch (e) {
+      log('poll error:', e.message);
     }
-  });
+  }
+
+  S.sessionPollTimer = setInterval(pollSession, 750);
+  // Run immediately too
+  pollSession();
 }
 
-/* ══════════ Start / stop session ═══════════════════════════════════ */
+/* ══════════ Start session ═══════════════════════════════════════════ */
 async function startSession(url) {
-  await S.authReady;
-  if (!auth.currentUser) throw new Error('Not authenticated');
   if (S.sessionId) await stopSession();
 
   url = (url || DEFAULT_URL).trim() || DEFAULT_URL;
   const sessionId = crypto.randomUUID();
 
-  S.sessionId        = sessionId;
-  S.remoteDescSet    = false;
-  S.negotiating      = false;
-  S.answerSent       = false;
-  S.seenSrvCands     = new Set();
-  S.pendingSrvCands  = [];
-  S.connState        = 'connecting';
-  S.iceState         = 'idle';
-  S.ctrlState        = 'none';
-  S.audioState       = 'wait';
-  S.capture          = { ...DEFAULT_CAP };
+  S.sessionId      = sessionId;
+  S.remoteDescSet  = false;
+  S.negotiating    = false;
+  S.answerSent     = false;
+  S.seenSrvCands   = new Set();
+  S.pendingSrvCands = [];
+  S.connState      = 'connecting';
+  S.iceState       = 'idle';
+  S.ctrlState      = 'none';
+  S.audioState     = 'wait';
+  S.capture        = { ...DEFAULT_CAP };
 
   el.urlInput.value = url;
   updateLock(url);
@@ -686,16 +682,12 @@ async function startSession(url) {
 
   setupPC();
 
-  S.sessionRef = db.ref(`${SESSION_ROOT}/${sessionId}`);
-  attachListener();
-
-  await S.sessionRef.set({
-    id: sessionId, url,
-    requestedBy: auth.currentUser.uid,
-    status: 'pending',
-    createdAt: firebase.database.ServerValue.TIMESTAMP,
+  await api.post('/sessions', {
+    id: sessionId,
+    url,
+    requestedBy: S.uid,
     client: {
-      uid: auth.currentUser.uid,
+      uid: S.uid,
       userAgent: navigator.userAgent,
       viewport: { width: innerWidth, height: innerHeight },
     },
@@ -703,52 +695,56 @@ async function startSession(url) {
 
   uSet('lastUrl', url);
   toast('Session started', 'ok');
+  attachListener();
 }
 
+/* ══════════ Stop session ════════════════════════════════════════════ */
 async function stopSession() {
   if (!S.sessionId) return;
-  const ref = S.sessionRef;
-  const id  = S.sessionId;
-  cleanup(false);
-  if (ref) {
-    try {
-      await ref.update({
-        status: 'stopped',
-        stoppedAt: firebase.database.ServerValue.TIMESTAMP,
-        stopReason: 'client-close',
-        offer: null, answer: null, cc: null, sc: null,
-      });
-    } catch {}
+  const id = S.sessionId;
+  cleanup();
+  try {
+    await api.put(`/sessions/${id}`, {
+      status:     'stopped',
+      stoppedAt:  Date.now(),
+      stopReason: 'client-close',
+      offer:      null,
+      answer:     null,
+      cc:         {},
+      sc:         {},
+    });
     setTimeout(async () => {
-      const writes = {};
-      writes[`${SESSION_ROOT}/${id}`] = null;
-      writes[`remoteBrowser/signaling/${id}`] = null;
-      try { await db.ref().update(writes); } catch {}
+      try { await api.delete(`/sessions/${id}`); } catch {}
     }, 600);
-  }
+  } catch {}
 }
 
-function cleanup(doShowSplash) {
-  if (S.sessionSub && S.sessionRef) {
-    try { S.sessionRef.off('value', S.sessionSub); } catch {}
-    S.sessionSub = null;
+/* ══════════ Cleanup ════════════════════════════════════════════════ */
+function cleanup() {
+  // Stop the poll timer
+  if (S.sessionPollTimer) {
+    clearInterval(S.sessionPollTimer);
+    S.sessionPollTimer = null;
   }
-  if (S.ctrl) { try { S.ctrl.close(); } catch {} S.ctrl = null; }
-  if (S.pc)   { try { S.pc.close();   } catch {} S.pc   = null; }
-  if (S.stream) { S.stream.getTracks().forEach(t => { try { t.stop(); } catch {} }); S.stream = null; }
 
-  S.sessionId = null;
-  S.sessionRef = null;
-  S.connState  = 'idle';
-  S.iceState   = 'idle';
-  S.ctrlState  = 'none';
-  S.audioState = 'wait';
+  if (S.ctrl)   { try { S.ctrl.close();  } catch {} S.ctrl   = null; }
+  if (S.pc)     { try { S.pc.close();    } catch {} S.pc     = null; }
+  if (S.stream) {
+    S.stream.getTracks().forEach(t => { try { t.stop(); } catch {} });
+    S.stream = null;
+  }
+
+  S.sessionId   = null;
+  S.connState   = 'idle';
+  S.iceState    = 'idle';
+  S.ctrlState   = 'none';
+  S.audioState  = 'wait';
 
   el.audioBtn.classList.remove('show');
   el.overlay.classList.remove('show');
   el.video.srcObject = null;
-  el.video.muted = true;
-  el.btnRel.disabled  = true;
+  el.video.muted     = true;
+  el.btnRel.disabled   = true;
   el.btnClose.disabled = true;
   document.title = 'Remote Browser';
   updateStatus();
@@ -756,18 +752,15 @@ function cleanup(doShowSplash) {
   showSplash();
 }
 
-/* ══════════ Navigate ════════════════════════════════════════════════
-   If the data channel is open, navigate purely via WebRTC.
-   Only fall back to starting a new session if not connected.
-════════════════════════════════════════════════════════════════════ */
+/* ══════════ Navigate ════════════════════════════════════════════════ */
 function navigate(url) {
-  // if url is https://home.voidbase.uk change it to https://olibot1109.github.io/home/
   if (url === 'https://home.voidbase.uk') {
     url = 'https://olibot1109.github.io/home/';
   }
   if (url && !/^https?:\/\//i.test(url) && !url.startsWith('//')) {
-    // Treat bare strings as Google searches unless they look like a hostname
-    url = /\.\w{2,}(\b|$)/.test(url) ? 'https://' + url : 'https://www.google.com/search?q=' + encodeURIComponent(url);
+    url = /\.\w{2,}(\b|$)/.test(url)
+      ? 'https://' + url
+      : 'https://www.google.com/search?q=' + encodeURIComponent(url);
   }
   if (send({ type: 'navigate', url })) {
     el.urlInput.value = url;
@@ -780,51 +773,37 @@ function navigate(url) {
 
 function pushHistory(url) {
   if (!url) return;
-
   if (url_history[history_index] === url) return;
-
   url_history = url_history.slice(0, history_index + 1);
-
   url_history.push(url);
   history_index = url_history.length - 1;
-
   updateNavButtons();
 }
 
 function updateNavButtons() {
   el.btnBack.disabled = history_index <= 0;
-  el.btnFwd.disabled = history_index >= url_history.length - 1;
+  el.btnFwd.disabled  = history_index >= url_history.length - 1;
 }
 
 el.btnBack.addEventListener('click', () => {
   if (history_index <= 0) return;
-
   history_index--;
-
   const url = url_history[history_index];
-
   el.urlInput.value = url;
   updateLock(url);
   uSet('lastUrl', url);
-
   navigate(url);
-
   updateNavButtons();
 });
 
 el.btnFwd.addEventListener('click', () => {
   if (history_index >= url_history.length - 1) return;
-
   history_index++;
-
   const url = url_history[history_index];
-
   el.urlInput.value = url;
   updateLock(url);
   uSet('lastUrl', url);
-
   navigate(url);
-
   updateNavButtons();
 });
 
@@ -832,23 +811,23 @@ el.btnFwd.addEventListener('click', () => {
 el.video.addEventListener('contextmenu', ev => ev.preventDefault());
 
 el.video.addEventListener('pointerdown', ev => {
-  if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
+  if (!['mouse', 'pen', 'touch'].includes(ev.pointerType)) return;
   ev.preventDefault();
   focusRemote();
   try { el.video.setPointerCapture(ev.pointerId); } catch {}
   const c = remoteCoords(ev);
-  if (c) send({ type:'mouse', action:'down', button:btnName(ev), buttons:ev.buttons, clickCount:ev.detail||1, x:c.x, y:c.y });
+  if (c) send({ type: 'mouse', action: 'down', button: btnName(ev), buttons: ev.buttons, clickCount: ev.detail || 1, x: c.x, y: c.y });
 });
 el.video.addEventListener('pointerup', ev => {
-  if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
+  if (!['mouse', 'pen', 'touch'].includes(ev.pointerType)) return;
   const c = remoteCoords(ev);
-  if (c) send({ type:'mouse', action:'up', button:btnName(ev), buttons:0, clickCount:ev.detail||1, x:c.x, y:c.y });
+  if (c) send({ type: 'mouse', action: 'up', button: btnName(ev), buttons: 0, clickCount: ev.detail || 1, x: c.x, y: c.y });
   try { el.video.releasePointerCapture(ev.pointerId); } catch {}
 });
 el.video.addEventListener('pointermove', ev => {
-  if (!['mouse','pen','touch'].includes(ev.pointerType)) return;
+  if (!['mouse', 'pen', 'touch'].includes(ev.pointerType)) return;
   const c = remoteCoords(ev);
-  if (c) send({ type:'mouse', action:'move', button:'none', buttons:ev.buttons, clickCount:0, x:c.x, y:c.y });
+  if (c) send({ type: 'mouse', action: 'move', button: 'none', buttons: ev.buttons, clickCount: 0, x: c.x, y: c.y });
 });
 el.video.addEventListener('pointercancel', ev => {
   try { el.video.releasePointerCapture(ev.pointerId); } catch {}
@@ -856,16 +835,19 @@ el.video.addEventListener('pointercancel', ev => {
 el.video.addEventListener('wheel', ev => {
   ev.preventDefault();
   const c = remoteCoords(ev);
-  if (c) send({ type:'mouse', action:'wheel', button:'none', deltaX:ev.deltaX, deltaY:ev.deltaY, x:c.x, y:c.y });
+  if (c) send({ type: 'mouse', action: 'wheel', button: 'none', deltaX: ev.deltaX, deltaY: ev.deltaY, x: c.x, y: c.y });
 }, { passive: false });
 
-function isTyping(t) { const tag=(t?.tagName||'').toLowerCase(); return tag==='input'||tag==='textarea'||t?.isContentEditable; }
+function isTyping(t) {
+  const tag = (t?.tagName || '').toLowerCase();
+  return tag === 'input' || tag === 'textarea' || t?.isContentEditable;
+}
 
 window.addEventListener('keydown', ev => {
   if (!S.sessionId) return;
   if (isTyping(ev.target)) return;
   if (ev.key === 'Escape') { ev.preventDefault(); el.video.blur(); return; }
-  if (ev.key === 'F5') { ev.preventDefault(); send({ type:'reload' }); return; }
+  if (ev.key === 'F5')     { ev.preventDefault(); send({ type: 'reload' }); return; }
   ev.preventDefault();
   focusRemote();
   send(keyPayload(ev, 'down'));
@@ -876,7 +858,7 @@ window.addEventListener('keyup', ev => {
   send(keyPayload(ev, 'up'));
 });
 
-/* ══════════ Chrome controls ════════════════════════════════════════ */
+/* ══════════ Chrome controls ═════════════════════════════════════════ */
 el.urlInput.addEventListener('keydown', ev => {
   if (ev.key !== 'Enter') return;
   ev.preventDefault();
@@ -893,39 +875,37 @@ document.querySelectorAll('.quick-btn').forEach(btn => {
   });
 });
 
-/* ══════════ Unload cleanup ════════════════════════════════════════ */
+/* ══════════ Unload cleanup ══════════════════════════════════════════ */
 window.addEventListener('beforeunload', () => {
-  if (S.sessionRef) {
+  if (S.sessionId) {
     try {
-      S.sessionRef.update({
-        status: 'stopped',
-        stoppedAt: Date.now(),
-        offer: null, answer: null, cc: null, sc: null,
+      // Best-effort beacon — won't block page close
+      const body = JSON.stringify({
+        status: 'stopped', stoppedAt: Date.now(),
+        offer: null, answer: null, cc: {}, sc: {},
       });
+      navigator.sendBeacon(`${API_BASE}/api/sessions/${S.sessionId}`, new Blob([body], { type: 'application/json' }));
     } catch {}
   }
 });
 
-/* ══════════ Auth & boot ════════════════════════════════════════════ */
-S.authReady = new Promise(resolve => {
-  auth.onAuthStateChanged(async user => {
-    if (user) {
-      _uid = user.uid;
-      const stored = getStoredIdentity();
-      if (!stored || stored.uid !== user.uid) setStoredIdentity(user.uid);
-      setIdentityUI(user.uid);
-      S.uid = user.uid;
-      log('identity ready:', user.uid.slice(0,8));
-      const lastUrl = uGet('lastUrl', null);
-      if (lastUrl) { el.urlInput.value = lastUrl; updateLock(lastUrl); }
-      resolve();
-    }
-  });
-  auth.signInAnonymously().catch(e => {
-    toast('Auth error: ' + e.message, 'err');
-    log('auth error:', e.message);
-  });
-});
+/* ══════════ Boot: generate/restore local identity ═══════════════════
+   No Firebase auth — just a UUID stored in localStorage.
+════════════════════════════════════════════════════════════════════ */
+(function boot() {
+  const stored = getStoredIdentity();
+  if (stored?.uid) {
+    _uid = stored.uid;
+  } else {
+    _uid = crypto.randomUUID();
+    setStoredIdentity(_uid);
+  }
+  S.uid = _uid;
+  setIdentityUI(_uid);
+  log('identity ready:', _uid.slice(0, 8));
+  const lastUrl = uGet('lastUrl', null);
+  if (lastUrl) { el.urlInput.value = lastUrl; updateLock(lastUrl); }
+})();
 
 log('boot');
 })();

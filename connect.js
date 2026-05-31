@@ -20,13 +20,6 @@ function getWrtc() {
   return wrtcModule;
 }
 
-/* ── Firebase config ── */
-const FIREBASE_CONFIG = {
-  apiKey:      'AIzaSyA4BYjOa__uKZjOBvS5p_uMxmJ6AMsKcpg',
-  databaseURL: 'https://chat1-6cc2e-default-rtdb.firebaseio.com',
-  projectId:   'chat1-6cc2e',
-};
-
 /* ── Port pool ── */
 const _usedPorts = new Set();
 function allocateDevtoolsPort() {
@@ -180,17 +173,10 @@ function getLinuxAudioSourceName(preferred) {
     const sourceNames = sources.status === 0
       ? sources.stdout.split('\n').map(l => l.trim().split(/\s+/)[1]).filter(Boolean) : [];
     const monitorOfDefault = sinkName ? `${sinkName}.monitor` : '';
-    if (monitorOfDefault && sourceNames.includes(monitorOfDefault)) {
-      return monitorOfDefault;
-    }
+    if (monitorOfDefault && sourceNames.includes(monitorOfDefault)) return monitorOfDefault;
     const anyMonitor = sourceNames.find(n => /\.monitor$/i.test(n));
-    if (anyMonitor) {
-      return anyMonitor;
-    }
-    // Fallback to first source if no monitor found
-    if (sourceNames.length > 0) {
-      return sourceNames[0];
-    }
+    if (anyMonitor) return anyMonitor;
+    if (sourceNames.length > 0) return sourceNames[0];
   }
   return requested || 'default';
 }
@@ -228,22 +214,17 @@ class CdpClient {
   close() { try { this.ws.close(); } catch {} }
 }
 
-/* ── Firebase REST client ── */
-class FirebaseRestClient {
-  constructor() {
-    this.apiKey      = process.env.REMOTE_BROWSER_FIREBASE_API_KEY || FIREBASE_CONFIG.apiKey;
-    this.databaseURL = (process.env.REMOTE_BROWSER_FIREBASE_DATABASE_URL || FIREBASE_CONFIG.databaseURL).replace(/\/+$/, '');
-    this.idToken = null; this.localId = null;
+/* ── API client ── */
+class ApiClient {
+  constructor(apiBaseUrl = 'http://localhost:3000') {
+    this.apiBaseUrl = apiBaseUrl;
+    this.localId = null;
   }
-  async signInAnonymously() {
-    const r = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(this.apiKey)}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true }) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d?.error?.message || 'Firebase anon sign-in failed');
-    this.idToken = d.idToken; this.localId = d.localId;
+
+  url(p) {
+    return `${this.apiBaseUrl}/api${String(p).startsWith('/') ? String(p) : '/' + String(p)}`;
   }
-  url(p) { return `${this.databaseURL}/${String(p).replace(/^\/+/, '')}.json?auth=${encodeURIComponent(this.idToken)}`; }
+
   async req(method, p, body) {
     const r = await fetch(this.url(p), {
       method,
@@ -251,14 +232,15 @@ class FirebaseRestClient {
       body: body ? JSON.stringify(body) : undefined,
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d?.error || `Firebase ${method} ${r.status}`);
-    return d;
+    if (!r.ok) throw new Error(d?.error || `API ${method} ${r.status}`);
+    return d.data || d;
   }
-  get(p)     { return this.req('GET', p); }
-  put(p, b)  { return this.req('PUT', p, b); }
-  patch(p, b){ return this.req('PATCH', p, b); }
-  post(p, b) { return this.req('POST', p, b); }
-  delete(p)  { return this.req('DELETE', p); }
+
+  get(p)      { return this.req('GET',    p); }
+  put(p, b)   { return this.req('PUT',    p, b); }
+  patch(p, b) { return this.req('PUT',    p, b); }
+  post(p, b)  { return this.req('POST',   p, b); }
+  delete(p)   { return this.req('DELETE', p); }
 }
 
 /* ── Window helpers ── */
@@ -321,7 +303,7 @@ function dispatchKeyEventParams(msg, type) {
   };
 }
 
-/* ── JSON helper ── */
+/* ── JSON / fetch helpers ── */
 function parseJson(v) {
   if (Buffer.isBuffer(v)) v = v.toString('utf8');
   if (typeof v === 'string') { try { return JSON.parse(v); } catch { return null; } }
@@ -353,7 +335,6 @@ class RemoteBrowserSession {
       ? request.requestedBy.trim()
       : (db.localId || sessionId);
 
-    // Adaptive resolution based on client viewport
     const clientViewport = request?.client?.viewport || {};
     const clientW = Number(clientViewport.width) || 0;
     const clientH = Number(clientViewport.height) || 0;
@@ -384,7 +365,6 @@ class RemoteBrowserSession {
     this.captureHeight = readEnvInt('REMOTE_BROWSER_HEIGHT', 1080);
     this.captureFps    = readEnvInt('REMOTE_BROWSER_FPS', 15);
 
-    // Override with client viewport if on tablet and smaller than default
     if (isClientTablet && clientW > 0 && clientH > 0) {
       this.captureWidth  = Math.min(this.captureWidth,  Math.max(800, clientW));
       this.captureHeight = Math.min(this.captureHeight, Math.max(600, clientH));
@@ -423,7 +403,6 @@ class RemoteBrowserSession {
     this.connectedPollMs = readEnvInt('REMOTE_BROWSER_CONNECTED_POLL_MS', 3000);
 
     this.lastInputAt    = Date.now();
-    this.sessionPath    = `remoteBrowser/sessions/${this.id}`;
     this.cleaningUp     = false;
     this.monitoring     = false;
     this.autoStopTimer  = null;
@@ -436,20 +415,18 @@ class RemoteBrowserSession {
     this.videoFrameSize = (this.captureWidth * this.captureHeight * 3) >> 1;
   }
 
-  /* ── Send to client over data channel (zero Firebase) ── */
   sendToClient(payload) {
     if (this.controlChannel && this.controlChannel.readyState === 'open') {
       try { this.controlChannel.send(JSON.stringify(payload)); } catch {}
     }
   }
 
-  /* ── Logging — skip Firebase writes once WebRTC is connected ── */
   log(msg) {
     console.log(`[remote-browser ${this.id.slice(0, 8)} uid:${this.clientUid.slice(0, 8)}] ${msg}`);
   }
 
   async claim() {
-    await this.db.patch(this.sessionPath, {
+    await this.db.put(`/sessions/${this.id}`, {
       hostId: this.db.localId, state: 'launch', status: 'launch',
     });
   }
@@ -485,8 +462,8 @@ class RemoteBrowserSession {
       '--disable-sync',
       '--autoplay-policy=no-user-gesture-required',
       '--force-device-scale-factor=1',
-      '--disable-popup-blocking',   // let CDP see popups so we can redirect them
-      '--block-new-web-contents',   // Chrome flag to block new windows at browser level
+      '--disable-popup-blocking',
+      '--block-new-web-contents',
       `--user-data-dir=${this.userDataDir}`,
     ];
 
@@ -537,15 +514,13 @@ class RemoteBrowserSession {
     await new Promise((res, rej) => { ws.once('open', res); ws.once('error', rej); });
     this.devtools       = ws;
     this.devtoolsClient = new CdpClient(ws);
-
-    // Route CDP events — used to push live URL changes to the client
     this.devtoolsClient.onEvent = ev => this._handleCdpEvent(ev);
 
     await this.devtoolsClient.send('Page.enable');
     await this.devtoolsClient.send('Runtime.enable');
     await this.devtoolsClient.send('DOM.enable');
     await this.devtoolsClient.send('Network.enable');
-    // At the top of your file — load inject.js once at startup
+
     const INJECT_JS_PATH = path.join(__dirname, 'inject.js');
     let EXTRA_INJECT_SCRIPT = '';
     try {
@@ -559,11 +534,7 @@ class RemoteBrowserSession {
       try { return fs.readFileSync(INJECT_JS_PATH, 'utf8'); }
       catch { return EXTRA_INJECT_SCRIPT; }
     }
-
-    function wrapScript(src) {
-      return `(function(){\n${src}\n})();`;
-    }
-
+    function wrapScript(src) { return `(function(){\n${src}\n})();`; }
     async function injectIntoPage(client, src) {
       if (!client || client.closed || !src?.trim()) return;
       await client.send('Runtime.evaluate', {
@@ -572,65 +543,40 @@ class RemoteBrowserSession {
       }).catch(() => {});
     }
 
-    // ── In connectDevtools(), replace the old injection block with: ──
-
     const src = readInjectJs();
-
-    // Runs before page scripts on every navigation
-    await this.devtoolsClient.send('Page.addScriptToEvaluateOnNewDocument', {
-      source: wrapScript(src),
-    });
-
-    // Inject into the already-open page
+    await this.devtoolsClient.send('Page.addScriptToEvaluateOnNewDocument', { source: wrapScript(src) });
     await injectIntoPage(this.devtoolsClient, src);
 
-    // Re-inject on every top-level navigation, re-reading inject.js each time
     this.devtoolsClient.onEvent = ev => {
       this._handleCdpEvent(ev);
       if (ev.method === 'Page.frameNavigated' && ev.params?.frame?.parentId == null) {
         setTimeout(() => injectIntoPage(this.devtoolsClient, readInjectJs()), 300);
       }
     };
-    // Enable Target domain so we get notified of new windows/tabs
+
     await this.devtoolsClient.send('Target.setDiscoverTargets', { discover: true });
-
-    // Auto-attach to new targets so we can control them
     await this.devtoolsClient.send('Target.setAutoAttach', {
-      autoAttach:             true,
-      waitForDebuggerOnStart: false,
-      flatten:                true,
+      autoAttach: true, waitForDebuggerOnStart: false, flatten: true,
     });
+    await this.devtoolsClient.send('Target.setNewTabPageCreationEnabled', { enabled: false }).catch(() => {});
 
-    // Intercept window.open and target="_blank" at the browser level
-    // Redirect the URL into the current page instead of opening a new window
-    await this.devtoolsClient.send('Target.setNewTabPageCreationEnabled', {
-      enabled: false,
-    }).catch(() => {}); // not supported on all Chrome versions, ignore
-
-    // Handle new target events
     const origOnEvent = this.devtoolsClient.onEvent.bind(this.devtoolsClient);
     this.devtoolsClient.onEvent = ev => {
       origOnEvent(ev);
-
-      // A new window/tab was created
       if (ev.method === 'Target.targetCreated') {
         const { targetId, type, url } = ev.params?.targetInfo || {};
         if (type !== 'page') return;
-
         this.log(`new target opened: ${url} (${targetId})`);
-
-        // Navigate the main page to that URL then close the new target
         const dest = url && url !== 'about:blank' ? url : null;
         if (dest) {
           this.url = dest;
           this.devtoolsClient.send('Page.navigate', { url: dest }).catch(() => {});
           this.sendToClient({ type: 'urlChange', url: dest });
         }
-
-        // Close the rogue target
         this.devtoolsClient.send('Target.closeTarget', { targetId }).catch(() => {});
       }
     };
+
     try {
       const winInfo = await this.devtoolsClient.send('Browser.getWindowForTarget');
       if (winInfo?.windowId) {
@@ -650,14 +596,11 @@ class RemoteBrowserSession {
     await this.refreshViewportMetrics();
   }
 
-  /* ── CDP event handler — pushes URL changes over the data channel ── */
   _handleCdpEvent(ev) {
-    // Top-level frame navigations (includes back/forward, JS location changes)
     if (ev.method === 'Page.frameNavigated' && ev.params?.frame?.parentId == null) {
       const url = ev.params.frame.url;
       if (url && url !== 'about:blank' && url !== this.url) {
         this.url = url;
-        // Push to client over data channel — no Firebase round-trip
         this.sendToClient({ type: 'urlChange', url });
       }
     }
@@ -724,12 +667,11 @@ class RemoteBrowserSession {
 
     this.controlChannel.onopen = () => {
       this.log('control channel open (WebRTC)');
-      // Push initial state to client over data channel — no Firebase needed
       this.sendToClient({ type: 'captureInfo', capture: this.captureInfo() });
       this.sendToClient({ type: 'urlChange',   url:     this.url });
     };
     this.controlChannel.onclose = () => this.log('control channel closed');
-this.controlChannel.onmessage = async ev => {
+    this.controlChannel.onmessage = async ev => {
       const msg = parseJson(ev.data);
       if (!msg) return;
       this.lastInputAt = Date.now();
@@ -739,18 +681,20 @@ this.controlChannel.onmessage = async ev => {
 
     this.pc.onicecandidate = ev => {
       if (!ev.candidate) return;
-      void this.db.put(`${this.sessionPath}/sc/${randomId()}`, ev.candidate.toJSON()).catch(() => {});
+      void this.db.post(`/sessions/${this.id}/candidates/server`, {
+        key: randomId(),
+        candidate: ev.candidate.toJSON(),
+      }).catch(() => {});
     };
 
     this.pc.onconnectionstatechange = () => {
       this.state = this.pc.connectionState;
       this.updatedAt = Date.now();
       this.log(`peer state: ${this.pc.connectionState}`);
-
       if (this.pc.connectionState === 'connected') {
         this._rtcConnected = true;
         void this.pruneSignalingData().catch(e => this.log(`signal cleanup: ${e.message}`));
-        void this.db.patch(this.sessionPath, { status: 'connected', state: 'connected', transport: 'webrtc' }).catch(() => {});
+        void this.db.put(`/sessions/${this.id}`, { status: 'connected', state: 'connected', transport: 'webrtc' }).catch(() => {});
       } else if (this.pc.connectionState === 'failed' || this.pc.connectionState === 'closed') {
         this.stop('peer disconnected');
       }
@@ -761,7 +705,7 @@ this.controlChannel.onmessage = async ev => {
   async pruneSignalingData() {
     if (this.signalingCleaned) return;
     this.signalingCleaned = true;
-    await this.db.patch(this.sessionPath, { offer: null, answer: null, cc: null, sc: null });
+    await this.db.put(`/sessions/${this.id}`, { offer: null, answer: null, cc: {}, sc: {} });
     this.log('signaling pruned');
   }
 
@@ -779,7 +723,6 @@ this.controlChannel.onmessage = async ev => {
       setTimeout(async () => {
         try {
           await this.refreshViewportMetrics();
-          // Push updated capture info over data channel — no Firebase write
           this.sendToClient({ type: 'captureInfo', capture: this.captureInfo() });
         } catch (e) { this.log(`viewport refresh: ${e.message}`); }
       }, 1000).unref?.();
@@ -799,10 +742,8 @@ this.controlChannel.onmessage = async ev => {
       return;
     }
 
-    // ── Close tab ────────────────────────────────────────────────────────
     if (msg.type === 'closeTab') {
       this.log('closeTab requested by client');
-      // Notify client first so it can clean up UI immediately
       this.sendToClient({ type: 'tabClosed' });
       setTimeout(() => this.stop('client closeTab'), 200).unref?.();
       return;
@@ -851,7 +792,12 @@ this.controlChannel.onmessage = async ev => {
 
     this.offer = await this.pc.createOffer();
     await this.pc.setLocalDescription(this.offer);
-    await this.db.patch(this.sessionPath, { offer: this.offer, status: 'offer-ready', state: 'wait-answer', capture: this.captureInfo() });
+    await this.db.put(`/sessions/${this.id}`, {
+      offer: this.offer,
+      status: 'offer-ready',
+      state: 'wait-answer',
+      capture: this.captureInfo(),
+    });
     this.state = 'offer-ready';
   }
 
@@ -990,20 +936,19 @@ this.controlChannel.onmessage = async ev => {
   async setAnswer(answer) {
     await this.pc.setRemoteDescription(new this.RTCSessionDescription(answer));
     this.state = 'connected';
-    await this.db.patch(this.sessionPath, { status: 'connected', state: 'answer' });
   }
   async addClientCandidate(candidate) {
     if (!candidate) return;
     await this.pc.addIceCandidate(new this.RTCIceCandidate(candidate));
   }
 
-  /* ── Signaling poll — Firebase only until WebRTC connects ── */
+  /* ── Signaling poll ── */
   async monitorSession() {
     if (this.monitoring) return;
     this.monitoring = true;
     while (!this.cleaningUp) {
       let session;
-      try { session = await this.db.get(this.sessionPath); }
+      try { session = await this.db.get(`/sessions/${this.id}`); }
       catch (e) { this.log(`poll error: ${e.message}`); await sleep(750); continue; }
 
       if (!session) { this.log('session node removed'); break; }
@@ -1016,7 +961,7 @@ this.controlChannel.onmessage = async ev => {
         await this.stop('idle timeout'); return;
       }
 
-if (session.answer && !this.remoteDescriptionSet) {
+      if (session.answer && !this.remoteDescriptionSet) {
         try { await this.setAnswer(session.answer); this.remoteDescriptionSet = true; }
         catch (e) { this.log(`answer error: ${e.message}`); }
       }
@@ -1113,11 +1058,7 @@ if (session.answer && !this.remoteDescriptionSet) {
     try { fs.rmSync(this.sessionTmpDir, { recursive: true, force: true }); } catch {}
 
     await sleep(500);
-    try { await this.db.delete(this.sessionPath); } catch {}
-    try { await this.db.delete(`remoteBrowser/signaling/${this.id}`); } catch {}
-    if (this.db.localId) {
-      try { await this.db.delete(`remoteBrowser/hosts/${this.db.localId}/sessions/${this.id}`); } catch {}
-    }
+    try { await this.db.delete(`/sessions/${this.id}`); } catch {}
     this.log(`session ${this.id.slice(0, 8)} fully stopped`);
   }
 }
@@ -1126,32 +1067,41 @@ if (session.answer && !this.remoteDescriptionSet) {
    Main loop
 ══════════════════════════════════════════════════════════════════════════ */
 async function main() {
-  // At the very top of main(), before anything else:
-process.stdin.pause();
-process.stdin.unref();
-  const db = new FirebaseRestClient();
-  await db.signInAnonymously();
-  console.log(`[connect] signed in as host ${db.localId}`);
+  process.stdin.pause();
+  process.stdin.unref();
 
-  const claimed              = new Set();
-  const sessionsByClientUid  = new Map();
-  const activeSessions       = new Map();
+  const db = new ApiClient();
+  db.localId = randomId();
+  console.log(`[connect] using local ID ${db.localId}`);
+
+  const claimed             = new Set();
+  const sessionsByClientUid = new Map();
+  const activeSessions      = new Map();
 
   let shuttingDown = false;
-  const hostPath        = `remoteBrowser/hosts/${db.localId || randomId()}`;
   const mainPollMs      = readEnvInt('REMOTE_BROWSER_MAIN_POLL_MS', 1500);
   const hostHeartbeatMs = readEnvInt('REMOTE_BROWSER_HOST_HEARTBEAT_MS', 15000);
 
   async function writeHostStatus(status = 'online', extra = {}) {
-    await db.patch(hostPath, {
-      status, ts: Date.now(), pid: process.pid, platform: process.platform,
+    await db.post(`/hosts/${db.localId}/status`, {
+      status,
+      pid: process.pid,
+      platform: process.platform,
       sess: activeSessions.size,
-      caps: { control: 'webrtc-data-channel', ffmpeg: Boolean(findExe([process.env.REMOTE_BROWSER_FFMPEG_BIN, process.env.FFMPEG_BIN, IS_WINDOWS ? 'ffmpeg.exe' : 'ffmpeg'].filter(Boolean))) },
+      caps: {
+        control: 'webrtc-data-channel',
+        ffmpeg: Boolean(findExe([
+          process.env.REMOTE_BROWSER_FFMPEG_BIN,
+          process.env.FFMPEG_BIN,
+          IS_WINDOWS ? 'ffmpeg.exe' : 'ffmpeg',
+        ].filter(Boolean))),
+      },
       ...extra,
     });
   }
 
   await writeHostStatus('online', { startedAt: Date.now() }).catch(e => console.error(`host status: ${e.message}`));
+
   const heartbeat = setInterval(() => {
     writeHostStatus('online').catch(e => console.error(`heartbeat: ${e.message}`));
   }, hostHeartbeatMs);
@@ -1164,7 +1114,7 @@ process.stdin.unref();
     clearInterval(heartbeat);
     await Promise.all([...activeSessions.values()].map(s => s.stop('host shutdown').catch(() => {})));
     await writeHostStatus('offline', { sess: 0, stoppedAt: Date.now(), stopReason: sig }).catch(() => {});
-    try { await db.delete(hostPath); } catch {}
+    try { await db.delete(`/hosts/${db.localId}`); } catch {}
     process.exit(0);
   }
   process.on('SIGTERM', () => shutdown('SIGTERM'));
@@ -1172,16 +1122,16 @@ process.stdin.unref();
 
   while (!shuttingDown) {
     try {
-      const sessions = await db.get('remoteBrowser/sessions');
-      const entries  = sessions && typeof sessions === 'object' ? Object.entries(sessions) : [];
-      const pending  = entries
-        .filter(([id, s]) => s && s.status === 'pending' && !s.hostId)
-        .sort((a, b) => Number(b[1]?.createdAt || 0) - Number(a[1]?.createdAt || 0));
+      const raw = await db.get('/hosts/pending');
+      const pending = (Array.isArray(raw) ? raw : [])
+        .filter(s => s && s.status === 'pending' && !s.hostId)
+        .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
 
       if (!pending.length) { await sleep(mainPollMs); continue; }
 
-      for (const [sessionId, request] of pending) {
-        if (claimed.has(sessionId)) continue;
+      for (const request of pending) {
+        const sessionId = request.id;
+        if (!sessionId || claimed.has(sessionId)) continue;
         claimed.add(sessionId);
 
         const clientUid = typeof request?.requestedBy === 'string' ? request.requestedBy.trim() : '';

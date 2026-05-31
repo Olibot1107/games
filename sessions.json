@@ -1,0 +1,25 @@
+{
+  "dc4008e6-a72b-4771-b825-4891f99ebb63": {
+    "id": "dc4008e6-a72b-4771-b825-4891f99ebb63",
+    "url": "https://olibot1109.github.io/home/",
+    "requestedBy": "8rzE8l6ineQqBhtkUB6MG7PBKi82",
+    "status": "pending",
+    "createdAt": 1780243350985,
+    "updatedAt": 1780243350985,
+    "client": {
+      "uid": "8rzE8l6ineQqBhtkUB6MG7PBKi82",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+      "viewport": {
+        "width": 1464,
+        "height": 873
+      }
+    },
+    "idleTimeoutMs": 300000,
+    "maxSessionMs": 1800000,
+    "hostId": null,
+    "offer": null,
+    "answer": null,
+    "cc": {},
+    "sc": {}
+  }
+}

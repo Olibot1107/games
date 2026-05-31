@@ -14,6 +14,8 @@ const COMMENTS_FILE = path.join(ROOT_DIR, 'comments.json');
 const PLAYS_FILE = path.join(ROOT_DIR, 'plays.json');
 const DATA_FILE = path.join(ROOT_DIR, 'data.json');
 const SOUNDS_FILE = path.join(ROOT_DIR, 'sounds.json');
+const SESSIONS_FILE = path.join(ROOT_DIR, 'sessions.json');
+const HOSTS_FILE = path.join(ROOT_DIR, 'hosts.json');
 
 const RESOURCE_KEY = Buffer.from('games-shell-v1');
 
@@ -209,6 +211,59 @@ function createCommentUploadFilename(originalName) {
     return `${Date.now()}-${crypto.randomUUID()}${ext}`;
 }
 
+function getSessions() {
+    return readJsonFile(SESSIONS_FILE, {});
+}
+
+function writeSessions(sessions) {
+    writeJsonFile(SESSIONS_FILE, sessions);
+}
+
+function getOrCreateSession(sessionId, defaultSession) {
+    const sessions = getSessions();
+    if (!sessions[sessionId]) {
+        sessions[sessionId] = defaultSession;
+        writeSessions(sessions);
+    }
+    return sessions[sessionId];
+}
+
+function updateSession(sessionId, updates) {
+    const sessions = getSessions();
+    sessions[sessionId] = { ...sessions[sessionId], ...updates, updatedAt: Date.now() };
+    writeSessions(sessions);
+}
+
+function deleteSession(sessionId) {
+    const sessions = getSessions();
+    delete sessions[sessionId];
+    writeSessions(sessions);
+}
+
+function getHosts() {
+    return readJsonFile(HOSTS_FILE, {});
+}
+
+function writeHosts(hosts) {
+    writeJsonFile(HOSTS_FILE, hosts);
+}
+
+function getHost(hostId) {
+    return getHosts()[hostId];
+}
+
+function updateHost(hostId, updates) {
+    const hosts = getHosts();
+    hosts[hostId] = { ...hosts[hostId], ...updates };
+    writeHosts(hosts);
+}
+
+function deleteHost(hostId) {
+    const hosts = getHosts();
+    delete hosts[hostId];
+    writeHosts(hosts);
+}
+
 module.exports = {
     COMMENTS_FILE,
     COMMENTS_UPLOAD_DIR,
@@ -223,6 +278,8 @@ module.exports = {
     UPLOADS_DIR,
     MEDIA_CACHE_DIR,
     VOTES_FILE,
+    SESSIONS_FILE,
+    HOSTS_FILE,
     colors,
     createCommentUploadFilename,
     ensureBaseDirs,
@@ -243,5 +300,15 @@ module.exports = {
     writeJsonFile,
     writePlays,
     writeVotes,
+    getSessions,
+    writeSessions,
+    getOrCreateSession,
+    updateSession,
+    deleteSession,
+    getHosts,
+    writeHosts,
+    getHost,
+    updateHost,
+    deleteHost,
     xorBufferFast,
 };
