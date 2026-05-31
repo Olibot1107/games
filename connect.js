@@ -180,9 +180,17 @@ function getLinuxAudioSourceName(preferred) {
     const sourceNames = sources.status === 0
       ? sources.stdout.split('\n').map(l => l.trim().split(/\s+/)[1]).filter(Boolean) : [];
     const monitorOfDefault = sinkName ? `${sinkName}.monitor` : '';
-    if (monitorOfDefault && sourceNames.includes(monitorOfDefault)) return monitorOfDefault;
+    if (monitorOfDefault && sourceNames.includes(monitorOfDefault)) {
+      return monitorOfDefault;
+    }
     const anyMonitor = sourceNames.find(n => /\.monitor$/i.test(n));
-    if (anyMonitor) return anyMonitor;
+    if (anyMonitor) {
+      return anyMonitor;
+    }
+    // Fallback to first source if no monitor found
+    if (sourceNames.length > 0) {
+      return sourceNames[0];
+    }
   }
   return requested || 'default';
 }
@@ -345,6 +353,12 @@ class RemoteBrowserSession {
       ? request.requestedBy.trim()
       : (db.localId || sessionId);
 
+    // Adaptive resolution based on client viewport
+    const clientViewport = request?.client?.viewport || {};
+    const clientW = Number(clientViewport.width) || 0;
+    const clientH = Number(clientViewport.height) || 0;
+    const isClientTablet = Boolean(request?.client?.isTablet);
+
     this.userDataDir   = path.join(os.homedir(), '.remote-browser-profiles', this.clientUid);
     this.sessionTmpDir = path.join(os.tmpdir(), 'remote-browser-sessions', sessionId);
 
@@ -369,6 +383,14 @@ class RemoteBrowserSession {
     this.captureWidth  = readEnvInt('REMOTE_BROWSER_WIDTH',  1920);
     this.captureHeight = readEnvInt('REMOTE_BROWSER_HEIGHT', 1080);
     this.captureFps    = readEnvInt('REMOTE_BROWSER_FPS', 15);
+
+    // Override with client viewport if on tablet and smaller than default
+    if (isClientTablet && clientW > 0 && clientH > 0) {
+      this.captureWidth  = Math.min(this.captureWidth,  Math.max(800, clientW));
+      this.captureHeight = Math.min(this.captureHeight, Math.max(600, clientH));
+      this.log(`adaptive resolution for tablet: ${this.captureWidth}x${this.captureHeight}`);
+    }
+
     this.viewportWidth  = this.captureWidth;
     this.viewportHeight = this.captureHeight;
     this._updateFrameSize();
@@ -907,7 +929,7 @@ this.controlChannel.onmessage = async ev => {
       const sourceName = getLinuxAudioSourceName(this.audioSourceName);
       this.audioSourceName = sourceName;
       args.push('-f', 'pulse', '-i', sourceName, '-ac', '2', '-ar', '48000', '-sample_fmt', 's16');
-      this.log(`audio: pulse "${sourceName}"`);
+      this.log(`audio: pulse source "${sourceName}"`);
     }
     args.push('-f', 's16le', 'pipe:1');
 
@@ -941,7 +963,7 @@ this.controlChannel.onmessage = async ev => {
             numberOfFrames: this.audioSamplesPerFrame,
           });
           this.audioFramesPushed++;
-          if (this.audioFramesPushed === 1) this.log('audio: receiving samples');
+          if (this.audioFramesPushed === 1) this.log('audio: receiving samples ✓');
         } catch (e) { this.log(`audio frame: ${e.message}`); }
       }
     });
