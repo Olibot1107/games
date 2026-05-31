@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Math Practice</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
@@ -41,9 +41,6 @@
     body.is-tablet {
       --button-size: 44px;
       --chrome-height: 52px;
-    }
-    body.is-ipad #chrome {
-      display: none;
     }
     body.is-tablet #chrome { min-height: 52px; padding: 10px 12px; }
     body.is-tablet .nav-btn { width: 44px; height: 44px; font-size: 15px; }
@@ -276,21 +273,15 @@ let url_history = [];
 let history_index = -1;
 
 // Device detection
-const deviceInfo = (() => {
+const isTablet = (() => {
   const ua = navigator.userAgent;
   const isIpad = /iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const isAndroid = /Android.*Tablet|Android.*Pad/.test(ua);
-  const isTablet = isIpad || isAndroid || /Tablet|iPad|Android/i.test(ua);
-  return { isTablet, isIpad };
+  return isIpad || isAndroid || /Tablet|iPad|Android/i.test(ua);
 })();
-const isTablet = deviceInfo.isTablet;
-const isIpad = deviceInfo.isIpad;
 
 if (isTablet) {
   document.body.classList.add('is-tablet');
-}
-if (isIpad) {
-  document.body.classList.add('is-ipad');
 }
 /* ══════════ Firebase init ══════════════════════════════════════════════ */
 const FIREBASE_CONFIG = {
@@ -1028,6 +1019,26 @@ S.authReady = new Promise(resolve => {
 
 log('boot');
 })();
+
+function goFullscreen() {
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+  if (req) req.call(el).catch(() => {});
+}
+
+// Must be triggered by a user gesture — auto-call on first tap/click anywhere
+document.addEventListener('pointerdown', goFullscreen, { once: true });
+
+// Re-enter if user accidentally exits (e.g. hits esc)
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    // small delay so it doesn't feel jarring
+    setTimeout(goFullscreen, 800);
+  }
+});
+document.addEventListener('webkitfullscreenchange', () => {
+  if (!document.webkitFullscreenElement) setTimeout(goFullscreen, 800);
+});
 </script>
 <script src="/lib/fps.js"></script>
 <script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
