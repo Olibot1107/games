@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Math Practice</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
@@ -41,6 +41,9 @@
     body.is-tablet {
       --button-size: 44px;
       --chrome-height: 52px;
+    }
+    body.is-ipad #chrome {
+      display: none;
     }
     body.is-tablet #chrome { min-height: 52px; padding: 10px 12px; }
     body.is-tablet .nav-btn { width: 44px; height: 44px; font-size: 15px; }
@@ -273,15 +276,21 @@ let url_history = [];
 let history_index = -1;
 
 // Device detection
-const isTablet = (() => {
+const deviceInfo = (() => {
   const ua = navigator.userAgent;
   const isIpad = /iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const isAndroid = /Android.*Tablet|Android.*Pad/.test(ua);
-  return isIpad || isAndroid || /Tablet|iPad|Android/i.test(ua);
+  const isTablet = isIpad || isAndroid || /Tablet|iPad|Android/i.test(ua);
+  return { isTablet, isIpad };
 })();
+const isTablet = deviceInfo.isTablet;
+const isIpad = deviceInfo.isIpad;
 
 if (isTablet) {
   document.body.classList.add('is-tablet');
+}
+if (isIpad) {
+  document.body.classList.add('is-ipad');
 }
 /* ══════════ Firebase init ══════════════════════════════════════════════ */
 const FIREBASE_CONFIG = {
