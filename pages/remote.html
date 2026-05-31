@@ -317,7 +317,7 @@
     </div>
 
     <!-- Hidden input that tricks iOS into showing the keyboard -->
-    <input id="kbd-trigger" type="text" aria-hidden="true" tabindex="-1" readonly />
+    <input id="kbd-trigger" type="text" aria-hidden="true" tabindex="-1" />
 
     <video id="video" autoplay playsinline muted tabindex="0" style="display:none"></video>
 
@@ -525,8 +525,6 @@ el.kbdBtn.addEventListener('click', () => {
     el.kbdTrigger.blur();
     S.kbdVisible = false;
   } else {
-    // Must not be readonly to trigger keyboard; briefly make it editable
-    el.kbdTrigger.removeAttribute('readonly');
     el.kbdTrigger.focus();
     S.kbdVisible = true;
   }
@@ -534,46 +532,50 @@ el.kbdBtn.addEventListener('click', () => {
 
 el.kbdTrigger.addEventListener('blur', () => { S.kbdVisible = false; });
 
-// Forward keystrokes from the hidden input
+// Forward keystrokes from the hidden input — stop propagation so
+// the global window keydown handler doesn't also fire
 el.kbdTrigger.addEventListener('keydown', ev => {
+  ev.stopPropagation();
   if (!S.sessionId) return;
   if (ev.key === 'Escape') { el.kbdTrigger.blur(); return; }
   ev.preventDefault();
   send(keyPayload(ev, 'down'));
 });
 el.kbdTrigger.addEventListener('keyup', ev => {
+  ev.stopPropagation();
   if (!S.sessionId) return;
   ev.preventDefault();
   send(keyPayload(ev, 'up'));
 });
 
-// Handle text input from virtual keyboard (compositionend / input events)
-// iOS often fires 'input' instead of key events for printable characters
+// iOS virtual keyboard fires 'input' for printable chars
 el.kbdTrigger.addEventListener('input', ev => {
+  ev.stopPropagation();
   if (!S.sessionId) return;
   const val = el.kbdTrigger.value;
   if (!val) return;
-  // Send each character as a key event
   for (const ch of val) {
     send({ type: 'key', action: 'down', key: ch, code: '', text: ch,
            altKey:false, ctrlKey:false, metaKey:false, shiftKey:false, repeat:false, isKeypad:false });
     send({ type: 'key', action: 'up',   key: ch, code: '', text: ch,
            altKey:false, ctrlKey:false, metaKey:false, shiftKey:false, repeat:false, isKeypad:false });
   }
-  // Clear the input so subsequent characters are always the delta
   el.kbdTrigger.value = '';
 });
 
-// Backspace from virtual keyboard often fires as 'deleteContentBackward'
+// Backspace and Enter from iOS virtual keyboard
 el.kbdTrigger.addEventListener('beforeinput', ev => {
+  ev.stopPropagation();
   if (!S.sessionId) return;
   if (ev.inputType === 'deleteContentBackward') {
+    ev.preventDefault();
     send({ type: 'key', action: 'down', key: 'Backspace', code: 'Backspace', text: '',
            altKey:false, ctrlKey:false, metaKey:false, shiftKey:false, repeat:false, isKeypad:false });
     send({ type: 'key', action: 'up', key: 'Backspace', code: 'Backspace', text: '',
            altKey:false, ctrlKey:false, metaKey:false, shiftKey:false, repeat:false, isKeypad:false });
   }
   if (ev.inputType === 'insertLineBreak') {
+    ev.preventDefault();
     send({ type: 'key', action: 'down', key: 'Enter', code: 'Enter', text: '',
            altKey:false, ctrlKey:false, metaKey:false, shiftKey:false, repeat:false, isKeypad:false });
     send({ type: 'key', action: 'up', key: 'Enter', code: 'Enter', text: '',
@@ -1055,9 +1057,7 @@ function isTyping(t) { const tag=(t?.tagName||'').toLowerCase(); return tag==='i
 
 window.addEventListener('keydown', ev => {
   if (!S.sessionId) return;
-  // Allow URL bar to be typed in
-  if (isTyping(ev.target) && ev.target !== el.kbdTrigger) return;
-  if (ev.target === el.kbdTrigger) return; // handled by kbdTrigger listener above
+  if (isTyping(ev.target)) return;
   if (ev.key === 'Escape') { ev.preventDefault(); el.video.blur(); return; }
   if (ev.key === 'F5') { ev.preventDefault(); send({ type:'reload' }); return; }
   ev.preventDefault();
@@ -1066,7 +1066,6 @@ window.addEventListener('keydown', ev => {
 });
 window.addEventListener('keyup', ev => {
   if (!S.sessionId || isTyping(ev.target)) return;
-  if (ev.target === el.kbdTrigger) return;
   ev.preventDefault();
   send(keyPayload(ev, 'up'));
 });
