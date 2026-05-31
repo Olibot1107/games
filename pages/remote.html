@@ -517,7 +517,7 @@ function send(payload) {
 function focusRemote() {
   el.video.focus();
   send({ type: 'focus' });
-  tryUnmute();
+  attemptAudioUnmute();
 }
 
 function keyPayload(ev, action) {
