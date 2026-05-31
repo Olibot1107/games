@@ -508,23 +508,36 @@ function setupPC() {
   S.pc     = pc;
   S.stream = new MediaStream();
 
-  pc.ontrack = ev => {
-    const track = ev.track;
-    if (track && !S.stream.getTracks().some(t => t.id === track.id)) S.stream.addTrack(track);
-    if (track?.kind === 'audio') { S.audioState = 'live'; updateStatus(); }
-    if (el.video.srcObject !== S.stream) {
-      el.video.srcObject = S.stream;
-      el.video.muted = true;
-      el.video.play().then(() => {
-        showVideo();
-        el.overlay.classList.remove('show');
+pc.ontrack = ev => {
+  const track = ev.track;
+
+  if (track && !S.stream.getTracks().some(t => t.id === track.id)) {
+    S.stream.addTrack(track);
+  }
+
+  if (track?.kind === 'audio') {
+    S.audioState = 'live';
+    updateStatus();
+  }
+
+  if (el.video.srcObject !== S.stream) {
+    el.video.srcObject = S.stream;
+
+    // Hide overlay immediately once stream arrives
+    showVideo();
+    el.overlay.classList.remove('show');
+
+    el.video.muted = true;
+
+    el.video.play()
+      .then(() => {
         setTimeout(tryUnmute, 200);
-      }).catch(() => {
-        showVideo();
-        el.overlay.classList.remove('show');
+      })
+      .catch(() => {
+        // Safari may block autoplay until user interaction
       });
-    }
-  };
+  }
+};
 
   pc.onicecandidate = async ev => {
     if (!ev.candidate || !S.sessionId) return;
@@ -556,6 +569,9 @@ function setupPC() {
   pc.onconnectionstatechange = () => {
     S.connState = pc.connectionState;
     updateStatus();
+    if (pc.connectionState === 'connected') {
+  el.overlay.classList.remove('show');
+}
     if (S.connState === 'failed' || S.connState === 'closed') {
       toast('Connection lost', 'err');
       cleanup();
