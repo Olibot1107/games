@@ -201,57 +201,11 @@
 </div>
 
 <!-- Debug -->
-<div id="debug-panel" class="bg-black text-green-400 text-xs p-3 rounded max-h-60 overflow-y-auto">
+<div id="debug-panel" class="bg-black text-blue-400 text-xs p-3 rounded max-h-60 overflow-y-auto">
 [Debug logs]
 </div>
 <script src="htmlindex.js"></script>
 <script src="/lib/fps.js"></script>
-<script>
-  const frames = ['⠼', '⠴', '⠦', '⠧', '⠇', '⠏', '⠋', '⠙', '⠹', '⠸'];
-
-(function () {
-  const overlay = document.createElement('div');
-  overlay.id = 'site-loader';
-
-  overlay.innerHTML = `<div id="site-loader-spinner">${frames[0]}</div>`;
-
-  Object.assign(overlay.style, {
-    position: 'fixed',
-    inset: '0',
-    background: 'url(/imgs/art.jpeg) no-repeat center center fixed',
-    color: 'black',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: '999999',
-    fontSize: '48px',
-    fontFamily: 'monospace',
-    opacity: '1',
-    transition: 'opacity 0.35s ease'
-  });
-
-  document.body.appendChild(overlay);
-
-  const spinner = overlay.querySelector('#site-loader-spinner');
-
-  let i = 0;
-  const interval = setInterval(() => {
-    spinner.textContent = frames[i];
-    i = (i + 1) % frames.length;
-  }, 80);
-
-  // Force visible for 5s
-  setTimeout(() => {
-    clearInterval(interval);
-
-    overlay.style.opacity = '0';
-
-    setTimeout(() => {
-      overlay.remove();
-    }, 350);
-  }, 3000);
-})();
-</script>
 </body>
 </html>
 
