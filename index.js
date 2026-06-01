@@ -19,7 +19,6 @@ const {
 const { registerMediaRoutes } = require('./server/mediaRoutes');
 const { registerResourceRoutes, setupMathRepo } = require('./server/resourceRoutes');
 const { registerSocialRoutes } = require('./server/socialRoutes');
-const remoteRoutes = require('./server/remoteRoutes');
 
 const app = express();
 const PORT = 3000;
@@ -253,7 +252,6 @@ app.use((req, res, next) => {
 registerResourceRoutes(app);
 registerMediaRoutes(app);
 registerSocialRoutes(app);
-app.use('/api', remoteRoutes);
 
 app.use(async (req, res, next) => {
     if (req.method !== 'GET') return next();

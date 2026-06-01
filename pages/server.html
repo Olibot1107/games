@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Server Cluster Monitor</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#0f1117;color:#d6d9df;min-height:100vh}
+.topbar{position:sticky;top:0;z-index:10;background:#0f1117;border-bottom:1px solid #1e2130;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.topbar h1{font-size:16px;font-weight:500;color:#e8eaf0}
+.topbar-sub{font-size:12px;color:#6b7280;margin-top:2px}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+.pill{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid;display:flex;align-items:center;gap:5px}
+.pill.online{background:#052e16;color:#4ade80;border-color:#166534}
+.pill.crashed{background:#2d0a0a;color:#f87171;border-color:#7f1d1d}
+.pill.busy{background:#2d2006;color:#fbbf24;border-color:#78350f}
+.pill.neutral{background:#1a1d27;color:#8b95a8;border-color:#2d3148}
+.filters{display:flex;gap:6px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid #1e2130}
+.filt{font-size:12px;padding:4px 12px;border-radius:999px;border:1px solid #2a2d3d;cursor:pointer;background:transparent;color:#8b95a8;transition:all .15s}
+.filt.active,.filt:hover{background:#1e2130;color:#d6d9df;border-color:#3d4260}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;padding:16px 20px}
+.card{background:#131722;border:1px solid #1e2537;border-radius:12px;padding:14px;transition:border-color .2s;border-left-width:3px}
+.card:hover{border-color:#2d3a52}
+.card.online{border-left-color:#22c55e}
+.card.shutdown{border-left-color:#f87171;opacity:.85}
+.card.pulling{border-left-color:#60a5fa}
+.card.rebooting{border-left-color:#fbbf24}
+.card.updating{border-left-color:#f59e0b}
+.card.queued{border-left-color:#4b5563}
+.card.crashed{border-left-color:#ef4444;opacity:.6;background:#1a0d0d}
+.card.primary{border-left-color:#a78bfa}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.card-name{font-size:13px;font-weight:500;color:#e2e6f0}
+.card-role{font-size:11px;color:#4b5563;margin-top:2px}
+.badge{font-size:10px;padding:2px 8px;border-radius:999px;white-space:nowrap;border:1px solid;font-weight:500;letter-spacing:.02em}
+.badge.online{background:#052e16;color:#4ade80;border-color:#166534}
+.badge.shutdown{background:#2d0a0a;color:#f87171;border-color:#7f1d1d}
+.badge.pulling{background:#0a1929;color:#60a5fa;border-color:#1e3a5f}
+.badge.rebooting{background:#2d1f00;color:#fbbf24;border-color:#78350f}
+.badge.updating{background:#2d1f00;color:#f59e0b;border-color:#78350f}
+.badge.queued{background:#1a1d27;color:#8b95a8;border-color:#2d3148}
+.badge.crashed{background:#3d0a0a;color:#f87171;border-color:#7f1d1d}
+.badge.primary{background:#1e1040;color:#a78bfa;border-color:#4c1d95}
+.stats-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.stat{font-size:11px;color:#6b7280;font-family:ui-monospace,monospace}
+.bar-wrap{display:flex;gap:8px;align-items:center;margin-top:7px}
+.bar-label{font-size:10px;color:#4b5563;width:28px;font-family:ui-monospace,monospace}
+.bar-bg{flex:1;height:3px;background:#1e2537;border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;transition:width .6s ease}
+.bar-fill.cpu{background:#3b82f6}
+.bar-fill.disk{background:#f59e0b}
+.note{font-size:11px;color:#4b5563;margin-top:8px}
+.crash-msg{font-size:12px;color:#7f1d1d;margin-top:4px;font-family:ui-monospace,monospace;letter-spacing:.02em}
+.empty{grid-column:1/-1;text-align:center;padding:3rem;color:#4b5563;font-size:14px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div>
+    <h1>Server cluster · <span id="total-count"></span> nodes</h1>
+    <div class="topbar-sub">Info: at 9 they will all update at the same time so do not worry</div>
+  </div>
+  <div class="pills" id="pills"></div>
+</div>
+
+<div class="filters" id="filters"></div>
+<div class="grid" id="grid"></div>
+
+<script>
+const CYCLE = 120;
+const UPDATE_HOUR = 9;
+
+const ROLE_GROUPS = [
+  {prefix:'File Node',  count:1,   role:'Primary storage'},
+  {prefix:'Enc',        count:10,  role:'Encryption node'},
+  {prefix:'Compute',    count:418, role:'Compute node'},
+];
+
+const servers = [];
+let idx = 0;
+
+for(const g of ROLE_GROUPS){
+  for(let n=0;n<g.count;n++){
+    const label = g.count===1 ? g.prefix : `${g.prefix}-${String(n+1).padStart(3,'0')}`;
+    servers.push({name:label, role:g.role, offset:idx*17, index:idx});
+    idx++;
+  }
+}
+
+const TOTAL = servers.length;
+document.getElementById('total-count').textContent = TOTAL;
+
+const LABELS = {
+  primary:'Primary',
+  running:'Online',
+  shutdown:'Shutdown',
+  pulling:'Pulling',
+  rebooting:'Rebooting',
+  updating:'Updating',
+  queued:'Queued',
+  crashed:'Crashed'
+};
+
+function fmt(s){
+  return s==null ? '—' : `${Math.floor(s/60)}m ${String(s%60).padStart(2,'0')}s`;
+}
+
+function state(now, o, i, name){
+
+  // LOCK FILE NODE
+  if(name.startsWith('File Node')){
+    return ['primary', null];
+  }
+
+  if(Math.sin((now/84)+(o*11))>0.994){
+    return ['crashed', null];
+  }
+
+  const d = new Date(now*1000);
+
+  if(d.getHours()===UPDATE_HOUR){
+    const seq = Math.floor((now%900)/4);
+    if(i===0) return ['primary',null];
+    if(i<=seq) return ['updating',null];
+    return ['queued',null];
+  }
+
+  const t = (now+o) % CYCLE;
+  const r1 = CYCLE*0.70;
+  const r2 = CYCLE*0.78;
+  const r3 = CYCLE*0.86;
+
+  if(t<r1) return ['running', Math.floor(r1-t)];
+  if(t<r2) return ['shutdown', Math.floor(r2-t)];
+  if(t<r3) return ['pulling', null];
+  return ['rebooting', null];
+}
+
+function load(now,o){
+  return Math.floor((Math.sin((now+o)/24)+1)*12+4);
+}
+
+function disk(now,o){
+  const b=Math.sin(o*12.9898)*43758.5453;
+  const s=Math.abs(b-Math.floor(b));
+  const drift=(Math.sin((now/120)+o)+1)*2;
+  return Math.floor(Math.max(20,Math.min(92,35+s*45+drift)));
+}
+
+function netIn(now,o){
+  return Math.floor((Math.sin((now+o)/11)+1)*40+5);
+}
+
+function netOut(now,o){
+  return Math.floor((Math.cos((now+o)/14)+1)*30+5);
+}
+
+function phaseClass(p){
+  return p==='running' ? 'online' : p==='primary' ? 'primary' : p;
+}
+
+let activeFilter='all';
+
+const filterBar=document.getElementById('filters');
+const gridEl=document.getElementById('grid');
+const pillsEl=document.getElementById('pills');
+
+filterBar.innerHTML =
+  ['all','online','shutdown','pulling','rebooting','updating','queued','crashed']
+  .map(f=>`<button class="filt${f==='all'?' active':''}" data-f="${f}">
+  ${f==='all'?'All statuses':LABELS[f]||f}</button>`).join('');
+
+filterBar.onclick=e=>{
+  const b=e.target.closest('[data-f]');
+  if(!b)return;
+  activeFilter=b.dataset.f;
+  document.querySelectorAll('.filt')
+    .forEach(x=>x.classList.toggle('active',x.dataset.f===activeFilter));
+  render();
+};
+
+let lastNow=-1;
+
+function render(){
+  const now=Math.floor(Date.now()/1000);
+  if(now===lastNow)return;
+  lastNow=now;
+
+  const counts={};
+
+  const cards=servers.map((s,i)=>{
+    const [phase,countdown]=state(now,s.offset,i,s.name);
+    const pc=phaseClass(phase);
+
+    counts[pc]=(counts[pc]||0)+1;
+
+    if(activeFilter!=='all' &&
+      pc!==activeFilter &&
+      !(activeFilter==='online'&&pc==='primary')) return null;
+
+    if(phase==='crashed'){
+      return `<div class="card crashed">
+        <div class="card-head">
+          <div>
+            <div class="card-name">${s.name}</div>
+            <div class="card-role">${s.role}</div>
+          </div>
+          <span class="badge crashed">Crashed</span>
+        </div>
+        <div class="crash-msg">Node unreachable</div>
+      </div>`;
+    }
+
+    const l=load(now,s.offset);
+    const dsk=disk(now,s.offset);
+    const ni=netIn(now,s.offset);
+    const no=netOut(now,s.offset);
+
+    let note='';
+    if(phase==='pulling')note='Validating checksums';
+    else if(phase==='rebooting')note='Restoring services';
+    else if(phase==='shutdown')note=countdown?`Back in ${fmt(countdown)}`:'Draining connections';
+    else if(phase==='updating')note='Forced rollout in progress';
+    else if(phase==='queued')note='Waiting for update window';
+    else if(phase==='running'&&countdown)note=`Next cycle in ${fmt(countdown)}`;
+
+    return `<div class="card ${pc}">
+      <div class="card-head">
+        <div>
+          <div class="card-name">${s.name}</div>
+          <div class="card-role">${s.role}</div>
+        </div>
+        <span class="badge ${pc}">${LABELS[phase]}</span>
+      </div>
+
+      <div class="stats-row">
+        <span class="stat">CPU ${l}%</span>
+        <span class="stat">DISK ${dsk}%</span>
+        <span class="stat">↑${ni} ↓${no} MB/s</span>
+      </div>
+
+      <div class="bar-wrap">
+        <span class="bar-label">CPU</span>
+        <div class="bar-bg"><div class="bar-fill cpu" style="width:${l}%"></div></div>
+      </div>
+
+      <div class="bar-wrap">
+        <span class="bar-label">DISK</span>
+        <div class="bar-bg"><div class="bar-fill disk" style="width:${dsk}%"></div></div>
+      </div>
+
+      ${note?`<div class="note">${note}</div>`:''}
+    </div>`;
+  }).filter(Boolean);
+
+  gridEl.innerHTML = cards.length
+    ? cards.join('')
+    : `<div class="empty">No nodes match this filter.</div>`;
+
+  const on=(counts.online||0)+(counts.primary||0);
+  const cr=counts.crashed||0;
+  const busy=(counts.pulling||0)+(counts.rebooting||0)+(counts.updating||0)+(counts.shutdown||0)+(counts.queued||0);
+
+  pillsEl.innerHTML =
+    `<span class="pill online">✓ ${on} online</span>`+
+    (cr?`<span class="pill crashed">△ ${cr} crashed</span>`:'')+
+    (busy?`<span class="pill busy">↻ ${busy} in transition</span>`:'')+
+    `<span class="pill neutral">${TOTAL} total</span>`;
+}
+
+render();
+setInterval(render,1000);
+</script>
+</body>
+</html>
