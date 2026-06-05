@@ -3,6 +3,12 @@ const health = require('express-ping');
 const fs = require('fs');
 const path = require('path');
 const cookieParser = require('cookie-parser');
+const { spawn } = require('child_process');
+
+spawn('node', ['uploads/gen.js'], {
+    stdio: 'inherit',
+    shell: true
+});
 
 const {
     PUBLIC_DIR,
@@ -19,6 +25,7 @@ const {
 const { registerMediaRoutes } = require('./server/mediaRoutes');
 const { registerResourceRoutes, setupMathRepo } = require('./server/resourceRoutes');
 const { registerSocialRoutes } = require('./server/socialRoutes');
+
 
 const app = express();
 const PORT = 3000;
