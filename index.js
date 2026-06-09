@@ -4,12 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const { spawn } = require('child_process');
-
-spawn('node', ['uploads/gen.js'], {
-    stdio: 'inherit',
-    shell: true
-});
-
 const {
     PUBLIC_DIR,
     DATA_FILE,
