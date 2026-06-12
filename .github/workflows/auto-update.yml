@@ -27,6 +27,9 @@ jobs:
       
       - name: Run title.js
         run: node auto/title.js
+      
+      - name: Run thumbnails.js
+        run: node auto/thumbnails.js
 
       - name: Run npm i
         run: npm i

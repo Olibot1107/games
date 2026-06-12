@@ -8,7 +8,6 @@ const {
     PUBLIC_DIR,
     DATA_FILE,
     RESOURCE_KEY,
-    MEDIA_CACHE_DIR,
     colors,
     logError,
     logInfo,
@@ -24,167 +23,6 @@ const { registerSocialRoutes } = require('./server/socialRoutes');
 const app = express();
 const PORT = 3000;
 const DEBUG = process.env.DEBUG === 'true'; // run with: DEBUG=true node index.js
-// ====== XOR-encrypted Soundboard data endpoint ======
-const SOUNDS_DATA_KEY = Buffer.from('soundboard-key-v1');
-
-function xorBuffer(buffer) {
-    const out = Buffer.allocUnsafe(buffer.length);
-    const keyLen = SOUNDS_DATA_KEY.length;
-    let i = 0;
-    while (i < buffer.length - 15) {
-        out[i]     = buffer[i]     ^ SOUNDS_DATA_KEY[i % keyLen];
-        out[i + 1] = buffer[i + 1] ^ SOUNDS_DATA_KEY[(i + 1) % keyLen];
-        out[i + 2] = buffer[i + 2] ^ SOUNDS_DATA_KEY[(i + 2) % keyLen];
-        out[i + 3] = buffer[i + 3] ^ SOUNDS_DATA_KEY[(i + 3) % keyLen];
-        out[i + 4] = buffer[i + 4] ^ SOUNDS_DATA_KEY[(i + 4) % keyLen];
-        out[i + 5] = buffer[i + 5] ^ SOUNDS_DATA_KEY[(i + 5) % keyLen];
-        out[i + 6] = buffer[i + 6] ^ SOUNDS_DATA_KEY[(i + 6) % keyLen];
-        out[i + 7] = buffer[i + 7] ^ SOUNDS_DATA_KEY[(i + 7) % keyLen];
-        out[i + 8] = buffer[i + 8] ^ SOUNDS_DATA_KEY[(i + 8) % keyLen];
-        out[i + 9] = buffer[i + 9] ^ SOUNDS_DATA_KEY[(i + 9) % keyLen];
-        out[i + 10]= buffer[i + 10]^ SOUNDS_DATA_KEY[(i +10) % keyLen];
-        out[i + 11]= buffer[i + 11]^ SOUNDS_DATA_KEY[(i +11) % keyLen];
-        out[i + 12]= buffer[i + 12]^ SOUNDS_DATA_KEY[(i +12) % keyLen];
-        out[i + 13]= buffer[i + 13]^ SOUNDS_DATA_KEY[(i +13) % keyLen];
-        out[i + 14]= buffer[i + 14]^ SOUNDS_DATA_KEY[(i +14) % keyLen];
-        out[i + 15]= buffer[i + 15]^ SOUNDS_DATA_KEY[(i +15) % keyLen];
-        i += 16;
-    }
-    while (i < buffer.length) {
-        out[i] = buffer[i] ^ SOUNDS_DATA_KEY[i % keyLen];
-        i++;
-    }
-    return out;
-}
-
-/** XOR-encode a plain JSON string (same key on both sides → XOR === decryption). */
-function xorEncode(unencodedJson) {
-    return xorBuffer(Buffer.from(unencodedJson)).toString('base64');
-}
-
-const SOUNDS_PAGE_SIZE = 8;
-
-function getAllSounds() {
-    try {
-        const data = JSON.parse(fs.readFileSync('sounds.json', 'utf8'));
-        return data.sounds || (Array.isArray(data) ? data : []);
-    } catch {
-        return [];
-    }
-}
-
-/** GET /media/sounds — returns XOR-encoded sound list (encrypted in transit). */
-app.get('/media/sounds', async (req, res) => {
-    try {
-        const search = (req.query.search  || '').trim().toLowerCase();
-        const page   = parseInt(req.query.page || '1', 10)  || 1;
-
-        let sounds = getAllSounds();
-
-        // Client asks for "unencrypted" count/results at the wrapper level;
-        // individual sound objects inside `results` are XOR-encoded by the client.
-        const allCount = sounds.length;
-
-        // Filter by search query (min 2 chars)
-        let filtered = sounds;
-        if (search.length >= 2) {
-            filtered = sounds.filter(s =>
-                String(s.name  || '').toLowerCase().includes(search) ||
-                String(s.description || '').toLowerCase().includes(search)
-            );
-        }
-
-        const total  = filtered.length;
-        const offset = (page - 1) * SOUNDS_PAGE_SIZE;
-        const pageData = filtered.slice(offset, offset + SOUNDS_PAGE_SIZE);
-
-        // ---- XOR-encode every sound object individually ----------------
-        // This follows the same pattern as /api/resource (XOR at rest / in transit).
-        // The client in sound.html ships with the matching xorBuffer (same key).
-        const encoded = pageData.map(s => xorEncode(JSON.stringify(s)));
-
-        const body = JSON.stringify({ count: total, results: encoded });
-        res.set('Content-Type', 'application/json; charset=utf-8');
-        res.set('Content-Length', Buffer.byteLength(body));
-        res.send(body);
-    } catch (err) {
-        console.error('Soundboard error:', err);
-        res.status(500).json({ error: 'Failed to fetch sounds' });
-    }
-});
-
-/** Map remote URL → cache file path for media files (sounds + images). */
-const MEDIA_CACHE = new Map();
-
-function getCachePath(filename) {
-    return path.join(MEDIA_CACHE_DIR, filename);
-}
-
-async function ensureCached(filename, remoteUrl, contentType) {
-    const cachedPath = getCachePath(filename);
-
-    // Hit from local cache — fast path
-    if (fs.existsSync(cachedPath)) {
-        return cachedPath;
-    }
-
-    // Fetch from remote and write to cache
-    let response;
-    try {
-        response = await fetch(remoteUrl);
-    } catch (err) {
-        throw new Error(`Network error fetching ${filename}: ${err.message}`);
-    }
-
-    if (!response.ok) {
-        throw new Error(`Remote ${response.status} for ${filename} at ${remoteUrl}`);
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    fs.writeFileSync(cachedPath, buffer);
-    return cachedPath;
-}
-
-app.get('/media/sounds/:filename', async (req, res) => {
-  try {
-    const { filename } = req.params;
-    const remoteUrl = `https://www.myinstants.com/media/sounds/${filename}`;
-    const cachedPath = await ensureCached(filename, remoteUrl, 'audio/mpeg');
-
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.sendFile(cachedPath);
-  } catch (err) {
-    console.error('Failed to serve sound:', err.message);
-    res.status(502).send('Sound not available');
-  }
-});
-app.get('/media/images/:filename', async (req, res) => {
-  try {
-    const { filename } = req.params;
-    const ext = path.extname(filename).toLowerCase();
-    const mimeType = ({
-      '.png':  'image/png',
-      '.jpg':  'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.gif':  'image/gif',
-      '.webp': 'image/webp',
-    })[ext] || 'image/png';
-
-    const remoteUrl = `https://www.myinstants.com/media/instants_images/${filename}`;
-    const cachedPath = await ensureCached(filename, remoteUrl, mimeType);
-
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.sendFile(cachedPath);
-  } catch (err) {
-    console.error('Failed to serve image:', err.message);
-    res.status(502).send('Image not available');
-  }
-});
 
 app.use(express.raw({ type: ['application/json', 'application/vnd.api+json', 'text/plain'], limit: '90mb' }));
 app.use(cookieParser());
@@ -253,6 +91,12 @@ app.use((req, res, next) => {
 registerResourceRoutes(app);
 registerMediaRoutes(app);
 registerSocialRoutes(app);
+
+app.use('/thumbnails', express.static(path.join(PUBLIC_DIR, 'thumbnails'), {
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    etag: true,
+    lastModified: true,
+}));
 
 app.use(async (req, res, next) => {
     if (req.method !== 'GET') return next();

@@ -5,9 +5,7 @@ const crypto = require('crypto');
 const ROOT_DIR = path.join(__dirname, '..');
 const PUBLIC_DIR = ROOT_DIR;
 const UPLOADS_DIR = path.join(ROOT_DIR, 'uploads');
-const PHOTO_UPLOAD_DIR = path.join(UPLOADS_DIR, 'photos');
 const COMMENTS_UPLOAD_DIR = path.join(UPLOADS_DIR, 'comments');
-const MEDIA_CACHE_DIR = path.join(ROOT_DIR, 'media-cache');
 
 const VOTES_FILE = path.join(ROOT_DIR, 'votes.json');
 const COMMENTS_FILE = path.join(ROOT_DIR, 'comments.json');
@@ -63,9 +61,7 @@ function ensureDir(dir) {
 
 function ensureBaseDirs() {
     ensureDir(UPLOADS_DIR);
-    ensureDir(PHOTO_UPLOAD_DIR);
     ensureDir(COMMENTS_UPLOAD_DIR);
-    ensureDir(MEDIA_CACHE_DIR);
 }
 
 function logInfo(msg) {
@@ -269,14 +265,12 @@ module.exports = {
     COMMENTS_UPLOAD_DIR,
     COLORS: colors,
     COMMENTS_DIR: COMMENTS_UPLOAD_DIR,
-    PHOTO_UPLOAD_DIR,
     PLAYS_FILE,
     PUBLIC_DIR,
     DATA_FILE,
     RESOURCE_KEY,
     SOUNDS_FILE,
     UPLOADS_DIR,
-    MEDIA_CACHE_DIR,
     VOTES_FILE,
     SESSIONS_FILE,
     HOSTS_FILE,

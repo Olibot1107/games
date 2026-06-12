@@ -24,6 +24,35 @@ const resourceJsonInflight = new Map();
 const plainJsonCache = new Map();
 const plainJsonInflight = new Map();
 
+// ── Thumbnail localStorage cache ─────────────────────────────────────────────
+const THUMB_PREFIX = 'th2_';
+const THUMB_MAX_DIM = 160;
+const THUMB_QUALITY = 0.72;
+
+function thumbKey(gameName) {
+    return THUMB_PREFIX + gameName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 80);
+}
+
+function loadThumb(gameName) {
+    try { return localStorage.getItem(thumbKey(gameName)); } catch { return null; }
+}
+
+function saveThumb(gameName, imgEl) {
+    try {
+        const iw = imgEl.naturalWidth  || THUMB_MAX_DIM;
+        const ih = imgEl.naturalHeight || THUMB_MAX_DIM;
+        const scale = Math.min(1, THUMB_MAX_DIM / Math.max(iw, ih));
+        const c = document.createElement('canvas');
+        c.width  = Math.round(iw * scale);
+        c.height = Math.round(ih * scale);
+        c.getContext('2d').drawImage(imgEl, 0, 0, c.width, c.height);
+        const data = c.toDataURL('image/jpeg', THUMB_QUALITY);
+        localStorage.setItem(thumbKey(gameName), data);
+    } catch (e) {
+        // QuotaExceededError or tainted canvas — silently skip
+    }
+}
+
 // UID
 if(!localStorage.getItem('uid')){
     localStorage.setItem('uid', Math.random().toString(36).slice(2));
@@ -32,7 +61,28 @@ const uid = localStorage.getItem('uid');
 const clientId = getClientId();
 
 let userPlayTime = {};
-try { userPlayTime = JSON.parse(getCookie('playTime') || '{}'); } catch(e){}
+try {
+    // migrate from old cookie storage → localStorage
+    const cookieVal = getCookie('playTime');
+    if (cookieVal) {
+        const migrated = JSON.parse(cookieVal);
+        localStorage.setItem('userPlayTime', JSON.stringify(migrated));
+        setCookie('playTime', '', -1);
+    }
+    userPlayTime = JSON.parse(localStorage.getItem('userPlayTime') || '{}');
+} catch(e) {}
+
+function savePlayTime() {
+    try { localStorage.setItem('userPlayTime', JSON.stringify(userPlayTime)); } catch(e) {}
+}
+
+function formatPlaytime(secs) {
+    if (!secs || secs < 60) return secs > 0 ? '< 1m' : null;
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    return `${m}m`;
+}
 
 // Check for reload from game (tracks play duration)
 if (performance.getEntriesByType('navigation')[0].type === 'reload' && document.referrer) {
@@ -46,7 +96,7 @@ if (performance.getEntriesByType('navigation')[0].type === 'reload' && document.
             if (duration > 0) {
                 if (!userPlayTime[game]) userPlayTime[game] = 0;
                 userPlayTime[game] += duration;
-                setCookie('playTime', JSON.stringify(userPlayTime));
+                savePlayTime();
             }
             setCookie('playStart_' + game, '', -1);
             
@@ -248,7 +298,17 @@ function getClientId(){
 }
 
 function log(msg){
-    if(debugPanel) debugPanel.textContent += "\n" + msg;
+    if(!debugPanel) return;
+    debugPanel.classList.remove('hidden');
+    debugPanel.textContent += "\n" + msg;
+}
+
+// Debounced render — batches rapid successive calls into one DOM update
+let _renderPending = false;
+function scheduleRender() {
+    if (_renderPending) return;
+    _renderPending = true;
+    setTimeout(() => { _renderPending = false; renderGames(); }, 0);
 }
 
 // ================= FAVORITES =================
@@ -269,117 +329,218 @@ function toggleFavorite(game){
     
 function renderFavorites(){
     if(!favoritesList) return;
-
+    const section = document.getElementById('favorites-section');
     favoritesList.innerHTML = '';
 
-    if(favorites.length === 0){
-        favoritesList.innerHTML = '<li class="italic text-gray-500">No favorites yet.</li>';
+    // sort favorites by playtime desc
+    const sorted = [...favorites].sort((a, b) => (userPlayTime[b] || 0) - (userPlayTime[a] || 0));
+
+    if(sorted.length === 0){
+        if(section) section.classList.add('hidden');
         return;
     }
+    if(section) section.classList.remove('hidden');
 
-    favorites.forEach(f=>{
-        const li = document.createElement('li');
-        li.className = "flex justify-between";
-
-        // Find the actual game object
+    sorted.forEach(f => {
         const gameData = allGames.find(g => g.name === f);
-
-        // Fallback to good if somehow missing
         const category = gameData ? gameData.category : 'good';
+        const secs = userPlayTime[f] || 0;
+        const timeStr = formatPlaytime(secs);
+        const displayName = toTitleCase(f);
+        const href = `/${category}/${f}/index.html`;
 
-        const a = document.createElement('a');
-        a.textContent = f;
-        a.href = `/${category}/${f}/index.html`;
-        a.className = "text-blue-500 hover:underline";
+        const card = document.createElement('div');
+        card.style.cssText = 'position:relative;width:130px;flex-shrink:0;border-radius:12px;overflow:hidden;cursor:pointer;background:rgba(30,10,2,0.85);border:1px solid rgba(251,146,60,0.18);transition:transform 0.15s,border-color 0.15s,box-shadow 0.15s;';
+        card.onmouseover = () => { card.style.transform = 'translateY(-3px)'; card.style.borderColor = 'rgba(251,146,60,0.55)'; card.style.boxShadow = '0 6px 20px rgba(251,146,60,0.12)'; };
+        card.onmouseout  = () => { card.style.transform = ''; card.style.borderColor = 'rgba(251,146,60,0.18)'; card.style.boxShadow = ''; };
+        card.onclick = () => { window.location.href = href; };
 
-        const btn = document.createElement('button');
-        btn.textContent = '★';
-        btn.className = "text-yellow-400";
-        btn.onclick = () => toggleFavorite(f);
+        // thumbnail
+        const imgWrap = document.createElement('div');
+        imgWrap.style.cssText = 'width:100%;height:78px;overflow:hidden;background:#120600;';
+        const img = document.createElement('img');
+        img.alt = displayName;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 0.3s;';
+        const cached = loadThumb(f);
+        if (cached) { img.src = cached; img.style.opacity = '1'; }
+        else {
+            img.onload = () => { img.style.opacity = '1'; saveThumb(f, img); };
+            img.onerror = () => {};
+            img.src = `/thumbnails/${f.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 80)}.jpg`;
+        }
+        imgWrap.appendChild(img);
+        card.appendChild(imgWrap);
 
-        li.append(a, btn);
-        favoritesList.appendChild(li);
+        // name + playtime
+        const info = document.createElement('div');
+        info.style.cssText = 'padding:6px 8px 7px;';
+        const nameEl = document.createElement('div');
+        nameEl.textContent = displayName;
+        nameEl.style.cssText = 'font-size:11px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;';
+        info.appendChild(nameEl);
+        if (timeStr) {
+            const timeEl = document.createElement('div');
+            timeEl.style.cssText = 'font-size:10px;color:rgba(251,146,60,0.75);margin-top:2px;display:flex;align-items:center;gap:4px;';
+            const clockSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`;
+            timeEl.innerHTML = clockSvg + timeStr;
+            info.appendChild(timeEl);
+        } else {
+            const neverEl = document.createElement('div');
+            neverEl.textContent = 'Not played yet';
+            neverEl.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.2);margin-top:2px;';
+            info.appendChild(neverEl);
+        }
+        card.appendChild(info);
+
+        // remove button — X in top-right corner
+        const removeBtn = document.createElement('button');
+        removeBtn.title = 'Remove from favorites';
+        removeBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:9px;height:9px"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
+        removeBtn.style.cssText = 'position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.60);border:1px solid rgba(255,255,255,0.12);border-radius:999px;width:20px;height:20px;color:rgba(255,255,255,0.7);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:all 0.15s;';
+        removeBtn.onmouseover = () => { removeBtn.style.background = 'rgba(239,68,68,0.75)'; removeBtn.style.color = '#fff'; };
+        removeBtn.onmouseout  = () => { removeBtn.style.background = 'rgba(0,0,0,0.60)'; removeBtn.style.color = 'rgba(255,255,255,0.7)'; };
+        removeBtn.onclick = (e) => { e.stopPropagation(); toggleFavorite(f); };
+        card.appendChild(removeBtn);
+
+        favoritesList.appendChild(card);
     });
 }
 
-// ================= GAME ITEM =================
+// ================= GAME COLOR =================
+function gameColor(name) {
+    let hash = 5381;
+    for (let i = 0; i < name.length; i++) {
+        hash = (((hash << 5) + hash) ^ name.charCodeAt(i)) | 0;
+    }
+    return `hsl(${Math.abs(hash) % 360}, 40%, 25%)`;
+}
+
+function toTitleCase(str) {
+    return str
+        .replace(/[-_.]+/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase())
+        .trim();
+}
+
+// ================= GAME ITEM (card) =================
 function createGameItem(game, votes){
+    const isFav = favorites.includes(game.name);
+    const displayName = toTitleCase(game.name);
+    const href = `/${game.category}/${game.name}/index.html`;
+    const commentCount = commentData[game.name]?.count || 0;
+    const playCount = playData[game.name] || 0;
+    const userSecs = userPlayTime[game.name] || 0;
+
     const li = document.createElement('li');
-    li.className = "flex justify-between items-center p-2 bg-gray-50 rounded hover:bg-gray-100";
+    li.className = 'game-card';
+    li.style.backgroundColor = gameColor(game.name);
+    li.title = displayName;
 
-    const left = document.createElement('div');
-    left.className = "flex gap-2 items-center";
+    // Shimmer — visible while image is loading
+    const shimmer = document.createElement('div');
+    shimmer.className = 'card-shimmer';
+    li.appendChild(shimmer);
 
-    const fav = document.createElement('button');
-    fav.textContent = favorites.includes(game.name) ? '★' : '☆';
-    fav.className = "text-yellow-400";
-    fav.onclick = () => toggleFavorite(game.name);
+    const img = document.createElement('img');
+    img.alt = displayName;
+    img.loading = 'lazy';
+    img.className = 'absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-500';
 
-    const link = document.createElement('a');
-    link.textContent = game.name;
-    link.href = `/${game.category}/${game.name}/index.html`;
-    link.className = "text-blue-500 hover:underline";
-    link.onclick = (event) => {
-        event.preventDefault();
-        incrementPlayAndNavigate(game, link.href);
+    const cached = loadThumb(game.name);
+    if (cached) {
+        img.src = cached;
+        img.style.opacity = '1';
+        shimmer.remove();
+    } else {
+        img.onload = () => {
+            img.style.opacity = '1';
+            shimmer.remove();
+            saveThumb(game.name, img);
+        };
+        img.onerror = () => { img.remove(); shimmer.remove(); };
+        img.src = `/thumbnails/${game.name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 80)}.jpg`;
+    }
+    li.appendChild(img);
+
+    // ── Top bar — always visible vote buttons ─────────────────────────────
+    const topBar = document.createElement('div');
+    topBar.className = 'absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-1.5 pt-1.5';
+
+    const PILL = 'display:inline-flex;align-items:center;gap:3px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s;backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.18);';
+
+    const mkVoteBtn = (svg, active, activeBg, activeBorder, cb) => {
+        const b = document.createElement('button');
+        b.style.cssText = PILL + (active
+            ? `background:${activeBg};border-color:${activeBorder};color:#fff;`
+            : 'background:rgba(0,0,0,0.60);color:#fff;');
+        b.innerHTML = svg;
+        b.onmouseover = () => { if (!active) b.style.background = 'rgba(0,0,0,0.80)'; };
+        b.onmouseout  = () => { if (!active) b.style.background = 'rgba(0,0,0,0.60)'; };
+        b.onclick = (e) => { e.stopPropagation(); cb(); };
+        return b;
     };
 
-    left.append(fav, link);
+    const upSvg   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:11px;height:11px"><path d="M12 19V5M5 12l7-7 7 7"/></svg>${votes.up}`;
+    const downSvg = `${votes.down}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:11px;height:11px"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>`;
 
-    const right = document.createElement('div');
-    right.className = "flex gap-2 items-center";
+    const upBtn   = mkVoteBtn(upSvg,   votes.userVote === 'up',   'rgba(34,197,94,0.85)',  'rgba(34,197,94,0.6)',  () => sendVote(game.name, 'up'));
+    const downBtn = mkVoteBtn(downSvg, votes.userVote === 'down', 'rgba(239,68,68,0.85)',  'rgba(239,68,68,0.6)',  () => sendVote(game.name, 'down'));
 
-    const up = document.createElement('button');
-    const down = document.createElement('button');
-    const neutralBtn = document.createElement('button');
-    const commentBtn = document.createElement('button');
+    const topLeft = document.createElement('div');
+    topLeft.style.cssText = 'display:flex;gap:4px';
+    topLeft.append(upBtn, downBtn);
 
-    up.textContent = '👍';
-    down.textContent = '👎';
-    neutralBtn.textContent = '✌️';
-    neutralBtn.title = 'No liking';
-    const commentCount = commentData[game.name]?.count || 0;
-    commentBtn.textContent = `💬 ${commentCount}`;
-    commentBtn.title = `${commentCount} comment${commentCount === 1 ? '' : 's'}`;
+    // Favorite star — top-right
+    const favBtn = document.createElement('button');
+    favBtn.style.cssText = PILL + `font-size:13px;padding:3px 7px;${isFav ? 'background:rgba(0,0,0,0.60);color:#facc15;border-color:rgba(250,204,21,0.5);' : 'background:rgba(0,0,0,0.60);color:rgba(255,255,255,0.75);'}`;
+    favBtn.textContent = isFav ? '★' : '☆';
+    favBtn.title = isFav ? 'Remove favorite' : 'Add to favorites';
+    favBtn.onmouseover = () => { favBtn.style.color = '#facc15'; favBtn.style.borderColor = 'rgba(250,204,21,0.5)'; };
+    favBtn.onmouseout  = () => { favBtn.style.color = isFav ? '#facc15' : 'rgba(255,255,255,0.75)'; favBtn.style.borderColor = isFav ? 'rgba(250,204,21,0.5)' : 'rgba(255,255,255,0.18)'; };
+    favBtn.onclick = (e) => { e.stopPropagation(); toggleFavorite(game.name); };
 
-    up.className = "bg-green-200 px-2 rounded";
-    down.className = "bg-red-200 px-2 rounded";
-    neutralBtn.className = "bg-slate-100 px-2 rounded text-slate-700";
-    commentBtn.className = "bg-blue-100 px-2 rounded text-slate-700";
+    topBar.append(topLeft, favBtn);
+    li.appendChild(topBar);
 
-    if(votes.userVote==='up') up.classList.add('ring-2','ring-green-500');
-    if(votes.userVote==='down') down.classList.add('ring-2','ring-red-500');
-    if(votes.userVote===null) neutralBtn.classList.add('ring-2','ring-slate-400');
+    // ── Bottom bar — name + action buttons ───────────────────────────────
+    const nameBar = document.createElement('div');
+    nameBar.className = 'absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-2 pt-5 pb-1.5 flex items-end gap-1';
 
-    up.onclick = () => sendVote(game.name,'up');
-    down.onclick = () => sendVote(game.name,'down');
-    neutralBtn.onclick = () => sendVote(game.name,'none');
-    commentBtn.onclick = () => openCommentPanel(game.name);
+    // name + optional playtime
+    const nameGroup = document.createElement('div');
+    nameGroup.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:0;';
+    const nameTxt = document.createElement('span');
+    nameTxt.className = 'text-[11px] text-white font-semibold truncate leading-tight';
+    nameTxt.textContent = displayName;
+    nameGroup.appendChild(nameTxt);
+    const ptStr = formatPlaytime(userSecs);
+    if (ptStr) {
+        const ptEl = document.createElement('span');
+        ptEl.style.cssText = 'font-size:9px;color:rgba(251,146,60,0.75);line-height:1.2;white-space:nowrap;display:flex;align-items:center;gap:2px;';
+        ptEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:8px;height:8px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>${ptStr}`;
+        nameGroup.appendChild(ptEl);
+    }
+    nameBar.appendChild(nameGroup);
 
-    const playCountBtn = document.createElement('button');
-    playCountBtn.type = 'button';
-    playCountBtn.className = 'bg-slate-100 px-2 rounded text-slate-700';
-    playCountBtn.textContent = `🎮 ${playData[game.name] || 0}`;
-    playCountBtn.title = `Played ${playData[game.name] || 0} time${(playData[game.name] || 0) === 1 ? '' : 's'}`;
-    playCountBtn.onclick = () => openPlayModal(game.name);
+    const mkActionBtn = (svg, cb) => {
+        const b = document.createElement('button');
+        b.style.cssText = 'background:rgba(0,0,0,0.55);border:1px solid rgba(255,255,255,0.15);border-radius:999px;cursor:pointer;padding:4px 6px;color:rgba(255,255,255,0.85);transition:all 0.15s;flex-shrink:0;line-height:1;display:inline-flex;align-items:center;backdrop-filter:blur(4px);';
+        b.innerHTML = svg;
+        b.onmouseover = () => { b.style.background = 'rgba(0,0,0,0.80)'; b.style.color = '#fff'; };
+        b.onmouseout  = () => { b.style.background = 'rgba(0,0,0,0.55)'; b.style.color = 'rgba(255,255,255,0.85)'; };
+        b.onclick = (e) => { e.stopPropagation(); cb(); };
+        return b;
+    };
 
-    const userTimeBtn = document.createElement('button');
-    userTimeBtn.type = 'button';
-    userTimeBtn.className = 'bg-purple-100 px-2 rounded text-purple-700';
-    const userSecs = userPlayTime[game.name] || 0;
-    const userMins = Math.floor(userSecs / 60);
-    const userHrs = Math.floor(userMins / 60);
-    userTimeBtn.textContent = userHrs > 0 ? `⏱ ${userHrs}h ${userMins % 60}m ${userSecs % 60}s` : userMins > 0 ? `⏱ ${userMins}m ${userSecs % 60}s` : `⏱ ${userSecs}s`;
-    userTimeBtn.title = `Your total play time: ${userHrs}h ${userMins % 60}m ${userSecs % 60}s`;
+    const commentSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+    const playsSvg   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`;
 
-    const count = document.createElement('div');
-    count.innerHTML = `
-        <span class="text-green-600">${votes.up}</span> 👍 
-        <span class="text-red-600">${votes.down}</span> 👎
-    `;
-
-    right.append(up, down, neutralBtn, commentBtn, count, playCountBtn, userTimeBtn);
-    li.append(left, right);
+    nameBar.append(
+        mkActionBtn(commentSvg, () => openCommentPanel(game.name)),
+        mkActionBtn(playsSvg,   () => openPlayModal(game.name))
+    );
+    li.appendChild(nameBar);
+    li.onclick = () => incrementPlayAndNavigate(game, href);
 
     return li;
 }
@@ -411,7 +572,7 @@ function renderGames(){
     gamesList.innerHTML = '';
 
     if(filtered.length===0){
-        gamesList.innerHTML = '<li>No games found</li>';
+        gamesList.innerHTML = '<li class="col-span-full text-white/25 text-center py-12 text-sm">No games found</li>';
         return;
     }
 
@@ -449,7 +610,7 @@ function fetchVotes(){
             };
         });
 
-        renderGames();
+        scheduleRender();
         log('votes loaded');
     })
     .catch(e=>log(e.message));
@@ -463,7 +624,7 @@ function fetchCommentCounts(){
         Object.entries(comments).forEach(([game, list]) => {
             commentData[game] = { count: Array.isArray(list) ? list.length : 0 };
         });
-        renderGames();
+        scheduleRender();
     })
     .catch(e=>{
         log('Comment counts error: ' + e.message);
@@ -484,7 +645,7 @@ function fetchPlayCounts(){
             }
         });
         playData = counts;
-        renderGames();
+        scheduleRender();
     })
     .catch(e=>{
         log('Play counts error: ' + e.message);
@@ -552,9 +713,9 @@ function loadPlayDetails(game){
 
         rows.forEach(([id, count]) => {
             const item = document.createElement('div');
-            item.className = 'p-3 border rounded-lg bg-slate-50 mb-2';
+            item.className = 'p-3 border border-white/10 rounded-lg bg-white/5 mb-2';
             item.innerHTML = `
-                <div class="flex items-center justify-between text-sm text-slate-700">
+                <div class="flex items-center justify-between text-sm text-white/70">
                     <span>${escapeHtml(id)}</span>
                     <span>${count} time${count === 1 ? '' : 's'}</span>
                 </div>
@@ -822,13 +983,13 @@ function startReplyComment(parentId, commentElement) {
         parentComment = comments.find(c => c.id === parentId);
         
         const replyInput = document.createElement('div');
-        replyInput.className = 'mt-3 ml-6 p-3 border-l-4 border-green-400 rounded bg-green-50';
+        replyInput.className = 'mt-3 ml-6 p-3 border-l-4 border-green-500 rounded bg-white/5';
         
         let parentPreview = '';
         if (parentComment) {
             const parentAuthor = parentComment.uid === uid ? 'You' : (parentComment.author || 'Guest');
             const textPreview = parentComment.text.slice(0, 50) + (parentComment.text.length > 50 ? '...' : '');
-            parentPreview = `<div class="text-xs text-slate-600 mb-2 bg-white p-2 rounded border-l-2 border-green-400"><strong>Replying to ${escapeHtml(parentAuthor)}:</strong> ${escapeHtml(textPreview)}</div>`;
+            parentPreview = `<div class="text-xs text-white/50 mb-2 bg-white/10 p-2 rounded border-l-2 border-green-500"><strong>Replying to ${escapeHtml(parentAuthor)}:</strong> ${escapeHtml(textPreview)}</div>`;
         }
         
         replyInput.innerHTML = `
@@ -964,19 +1125,19 @@ function createCommentElement(comment, replies = []) {
     const isOwnComment = comment.uid === uid;
     const isReply = comment.parentId && typeof comment.parentId === 'string';
     const item = document.createElement('div');
-    item.className = 'p-3 border rounded-lg bg-slate-50 mb-3';
+    item.className = 'p-3 border border-white/10 rounded-lg bg-white/5 mb-3';
 
     const header = document.createElement('div');
-    header.className = 'flex items-start justify-between gap-2 text-xs text-slate-500 mb-2';
+    header.className = 'flex items-start justify-between gap-2 text-xs text-white/40 mb-2';
 
     const authorTime = document.createElement('div');
     authorTime.className = 'space-x-2 flex items-center';
     const voteCount = comment.votes ? Object.values(comment.votes).filter(v => v === 'up').length : 0;
     authorTime.innerHTML = `
-        <span class="font-semibold text-slate-700">${escapeHtml(isOwnComment ? 'You' : (comment.author || 'Guest'))}</span>
+        <span class="font-semibold text-white/80">${escapeHtml(isOwnComment ? 'You' : (comment.author || 'Guest'))}</span>
         <span>${timeAgo(comment.ts)}</span>
-        ${comment.edited ? '<span class="text-slate-400">(edited)</span>' : ''}
-        <span class="text-slate-600">👍 ${voteCount}</span>
+        ${comment.edited ? '<span class="text-white/30">(edited)</span>' : ''}
+        <span class="text-white/40">👍 ${voteCount}</span>
     `;
 
     const actions = document.createElement('div');
@@ -986,7 +1147,7 @@ function createCommentElement(comment, replies = []) {
     const upvoteBtn = document.createElement('button');
     const userVote = comment.votes && comment.votes[uid];
     upvoteBtn.textContent = userVote === 'up' ? '👍' : '🤍';
-    upvoteBtn.className = userVote === 'up' ? 'text-blue-500 text-xs hover:underline font-bold' : 'text-slate-400 text-xs hover:text-blue-500';
+    upvoteBtn.className = userVote === 'up' ? 'text-green-400 text-xs hover:underline font-bold' : 'text-white/30 text-xs hover:text-green-400';
     upvoteBtn.onclick = () => voteComment(currentCommentGame, comment.id, uid);
     actions.appendChild(upvoteBtn);
 
@@ -1017,7 +1178,7 @@ function createCommentElement(comment, replies = []) {
     header.appendChild(actions);
 
     const textDiv = document.createElement('div');
-    textDiv.className = 'text-sm text-slate-800 mb-2';
+    textDiv.className = 'text-sm text-white/80 mb-2';
     textDiv.textContent = comment.text;
 
     // Add images if any
@@ -1035,7 +1196,7 @@ function createCommentElement(comment, replies = []) {
             img.alt = 'Comment image';
             img.onerror = () => {
                 img.replaceWith(Object.assign(document.createElement('div'), {
-                    className: 'max-w-32 max-h-32 rounded border bg-slate-100 text-slate-500 text-[11px] flex items-center justify-center px-2 py-1',
+                    className: 'max-w-32 max-h-32 rounded border border-white/10 bg-white/5 text-white/40 text-[11px] flex items-center justify-center px-2 py-1',
                     textContent: 'Image unavailable'
                 }));
             };
@@ -1056,7 +1217,7 @@ function createCommentElement(comment, replies = []) {
 
         replies.forEach(reply => {
             const replyElement = createCommentElement(reply, []); // Replies don't have nested replies for now
-            replyElement.className = 'p-2 border rounded bg-slate-100';
+            replyElement.className = 'p-2 border border-white/10 rounded bg-white/5';
             repliesContainer.appendChild(replyElement);
         });
 
@@ -1096,7 +1257,7 @@ function submitComment(parentId = null, retryCount = 0, pendingImageUrls = null)
             if (imageUrls.length === 0 && selectedImages.length > 0) {
                 submitButton.textContent = 'Uploading...';
                 feedback.textContent = 'Uploading images...';
-                feedback.className = 'text-xs text-slate-500';
+                feedback.className = 'text-xs text-white/40';
                 imageUrls = await uploadCommentImages(selectedImages, (percent) => {
                     feedback.textContent = createUploadProgressLabel('Uploading images', percent);
                 });
@@ -1313,7 +1474,7 @@ function updateCommentInputHint(length) {
     if (!commentsHint) return;
     const remaining = COMMENT_MAX_LENGTH - length;
     commentsHint.textContent = `${remaining} characters remaining`;
-    commentsHint.className = remaining < 0 ? 'text-xs text-red-500' : 'text-xs text-slate-500';
+    commentsHint.className = remaining < 0 ? 'text-xs text-red-400' : 'text-xs text-white/30';
 }
 
 function handleImageSelection(event) {
@@ -1348,6 +1509,11 @@ function handleImageSelection(event) {
     if (rejected.length > 0) {
         alert(rejected.join('\n'));
     }
+}
+
+function removeImage(index) {
+    selectedImages.splice(index, 1);
+    updateImagePreview();
 }
 
 function updateImagePreview() {

@@ -2,17 +2,17 @@ const fs = require('fs');
 const path = require('path');
 
 // ================= SCRIPTS =================
-const FPS_SCRIPT = `<script src="/lib/fps.js"></script>`;
+const STATUSBAR_SCRIPT = `<script src="/lib/statusbar.js"></script>`;
+const CLIENT_SCRIPT    = `<script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>`;
 
-const CLIENT_SCRIPT = `<script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>`;
-
-// old fps paths to remove
-const OLD_FPS_PATTERNS = [
+// scripts to strip from game pages
+const REMOVE_PATTERNS = [
   '/fps.js',
   './fps.js',
   'fps.js',
   'lib/fps.js',
-  './lib/fps.js'
+  './lib/fps.js',
+  '/lib/fps.js',
 ];
 
 // ================= COLORS =================
@@ -52,22 +52,21 @@ function processFile(fullPath) {
     let updated = data;
     let changed = false;
 
-    // remove old fps scripts
-    OLD_FPS_PATTERNS.forEach(old => {
-      const regex = new RegExp(`<script\\s+src=["']${escapeReg(old)}["']><\\/script>`, 'g');
-
+    // remove fps + statusbar from game pages
+    REMOVE_PATTERNS.forEach(old => {
+      const regex = new RegExp(`\\s*<script\\s+src=["']${escapeReg(old)}["']><\\/script>`, 'g');
       if (regex.test(updated)) {
         updated = updated.replace(regex, '');
-        log(`Removed old FPS: ${old}`, 'yellow');
+        log(`Removed: ${old}`, 'yellow');
         changed = true;
       }
     });
 
-    // inject FPS
-    const beforeFPS = updated;
-    updated = injectScript(updated, FPS_SCRIPT);
-    if (beforeFPS !== updated) {
-      log(`Injected FPS -> /lib/fps.js`, 'green');
+    // inject statusbar
+    const beforeSB = updated;
+    updated = injectScript(updated, STATUSBAR_SCRIPT);
+    if (beforeSB !== updated) {
+      log(`Injected statusbar -> /lib/statusbar.js`, 'green');
       changed = true;
     }
 

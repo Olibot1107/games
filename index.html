@@ -3,240 +3,463 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Math Practice</title>
+<title>Paper Stars</title>
 <link rel="icon" type="image/png" href="/imgs/image.png">
+<link rel="preconnect" href="https://cdn.tailwindcss.com">
+<link rel="preconnect" href="https://api.open-meteo.com">
 <script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    background: #0a0500;
+    min-height: 100vh;
+  }
+
+  /* Animated wave canvas fixed behind everything */
+  #wave-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 65vh;
+    pointer-events: none;
+    z-index: 0;
+    will-change: contents;
+  }
+
+  /* Fade the wave into the dark bg */
+  #wave-fade {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 65vh;
+    background: linear-gradient(to bottom, rgba(10,5,0,0) 30%, #0a0500 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Nav — one blur layer covers all chips */
+  nav {
+    background: rgba(10, 5, 0, 0.78);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(251, 146, 60, 0.07);
+  }
+
+  /* Nav pill chips — no individual blur */
+  .nav-chip {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(55, 22, 5, 0.55);
+    border: 1px solid rgba(251, 146, 60, 0.18);
+    border-radius: 999px;
+    padding: 5px 14px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .nav-chip:hover {
+    background: rgba(80, 35, 5, 0.70);
+    border-color: rgba(251, 146, 60, 0.35);
+  }
+  .nav-chip svg { width: 14px; height: 14px; opacity: 0.75; }
+
+  /* Game card */
+  .game-card {
+    aspect-ratio: 1 / 1;
+    border-radius: 14px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.14s ease, box-shadow 0.14s ease;
+    content-visibility: auto;
+    contain-intrinsic-size: 0 180px;
+  }
+  .game-card:hover {
+    transform: translateY(-5px) scale(1.03);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.75);
+    will-change: transform;
+  }
+
+  /* Shimmer — opacity pulse instead of background-position (GPU composited, no repaint) */
+  .card-shimmer {
+    position: absolute; inset: 0;
+    background: rgba(255,255,255,0.05);
+    animation: shimmer-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes shimmer-pulse {
+    0%, 100% { opacity: 0.5; }
+    50%       { opacity: 1; }
+  }
+
+  /* Search input */
+  #search {
+    background: none;
+    border: none;
+    outline: none;
+    color: rgba(255,255,255,0.75);
+    font-size: 13px;
+    width: 170px;
+  }
+  #search::placeholder { color: rgba(255,255,255,0.28); }
+
+</style>
 </head>
 
-<body class="font-sans bg-[url('./imgs/art.jpeg')] bg-repeat bg-center text-gray-800 p-5 max-w-screen-lg mx-auto">
+<body class="font-sans text-white select-none">
 
-<!-- Header -->
-<header class="text-center mb-8 pb-5 border-b border-gray-300 bg-white rounded-lg p-5 shadow">
-  <div class="flex items-center justify-center gap-3">
-    <img src="imgs/image.png" alt="Paper Stars" class="w-10 h-10 rounded-xl object-cover shadow-sm">
-    <h1 class="text-3xl font-bold text-slate-800">Paper Stars</h1>
-    <img src="imgs/image.png" alt="Paper Stars" class="w-10 h-10 rounded-xl object-cover shadow-sm">
-  </div>
-</header>
+<!-- Wave background -->
+<canvas id="wave-canvas"></canvas>
+<div id="wave-fade"></div>
 
-<!-- Announcements -->
-<div class="flex items-center p-4 mb-6 text-sm text-green-800 border border-green-300 rounded-lg bg-green-50 shadow-md" role="alert">
-  <svg class="shrink-0 inline w-4 h-4 mr-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-    <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9 13.5l-3-3 1.5-1.5L9 10.5l3.5-3.5L14 8.5 9 13.5Z"/>
-  </svg>
-  <div>
-    <span class="font-medium">Update</span>
-    added witch-heart sonic.exe pizza-tower jelly-drift gemetrydashlight and bergentruck
-  </div>
-</div>
-
-<div class="w-full bg-white border border-slate-200 rounded-xl px-6 py-4 shadow-sm mb-6 text-center">
-  <h2 class="text-sm font-medium text-slate-600 uppercase tracking-wide mb-2">
-    Countdown
-  </h2>
-
-  <p class="text-lg font-semibold text-purple-600">
-    Voidium turns 1 year old in <span id="voidium-countdown">...</span>
-  </p>
-</div>
-
-<div class="w-full bg-white border border-slate-200 rounded-xl px-6 py-4 shadow-sm flex items-center justify-between mb-6">
-   <div class="flex items-center gap-3">
-     <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-
-     <div class="flex items-center gap-2">
-       <span class="text-sm text-slate-500 uppercase tracking-wide">
-         Current Version
-       </span>
-
-       <span class="text-slate-300">•</span>
-
-       <h2 class="text-lg font-semibold text-slate-800">
-         9.2.1.5
-       </h2>
-     </div>
-   </div>
-
-   <span class="text-sm text-slate-400">
-     Stable Release
-   </span>
- </div>
-<div class="w-full bg-white border border-slate-200 rounded-xl px-6 py-5 shadow-sm mb-6 space-y-4">
-
-  <!-- Header -->
-  <div class="flex items-center justify-between">
-    <h2 class="text-sm font-medium text-slate-600 uppercase tracking-wide">
-      How much data has the website handled since launch?
-    </h2>
-  </div>
-
-  <!-- Stats -->
-  <div class="flex flex-col gap-2">
-    <h2 id="data-count" class="text-2xl font-bold text-blue-600">
-      Loading...
-    </h2>
-
-    <h2 id="requests-count" class="text-2xl font-bold text-green-600">
-      Loading...
-    </h2>
-  </div>
-</div>
-
-<div class="bg-white rounded-lg p-5 mb-6 shadow">
-  <h2 class="text-xl font-semibold mb-3 text-slate-800">Tools</h2>
-    <br>
-  <a href="/pages/sound.html" class="text-blue-600 hover:underline">
-    Sound Board
+<!-- Fixed Top Nav -->
+<nav class="fixed top-0 left-0 right-0 z-50 flex items-center px-6 h-16">
+  <!-- Logo — left -->
+  <a href="/" class="flex items-center gap-2 shrink-0 absolute left-5">
+    <img src="/imgs/image.png" alt="Paper Stars" class="w-6 h-6 rounded-lg object-cover">
+    <span class="font-bold text-white text-sm hidden sm:inline">Paper Stars</span>
   </a>
-<br>
-    <a href="/pages/video.html" class="text-blue-600 hover:underline">
-    Video
-  </a>
-<br>
-    <a href="/pages/chat.html" class="text-blue-600 hover:underline">
-    Chat
-  </a>
-  <br>
-    <a href="/pages/server.html" class="text-blue-600 hover:underline">
-    Server Info
-    </a>
-</div>
 
+  <!-- Chips + search — centered -->
+  <div class="flex items-center gap-2 mx-auto">
+    <!-- Clock -->
+    <div class="nav-chip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+      <span id="nav-time">--:--</span>
+    </div>
 
-<!-- <div class="bg-white rounded-lg p-5 mb-6 shadow">
-  <h2 class="text-xl font-semibold mb-3">Guide</h2>
-  <div class="mb-4">
-    <h3 class="font-medium">How do I full screen?</h3>
-    <p class="text-sm text-gray-700">Press `</p>
-    <p class="text-sm text-gray-700">To exit full screen press `</p>
+    <!-- Weather -->
+    <div class="nav-chip" id="nav-weather-chip" style="display:none">
+      <span id="nav-weather-dot" style="width:7px;height:7px;border-radius:50%;background:#facc15;display:inline-block;flex-shrink:0"></span>
+      <span id="nav-weather">--°F</span>
+    </div>
+
+    <!-- Ping -->
+    <div class="nav-chip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/>
+      </svg>
+      <span id="nav-ping">-- ms</span>
+    </div>
+
+    <!-- Battery -->
+    <div class="nav-chip" id="nav-battery-chip" style="display:none">
+      <svg id="nav-battery-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:22px;height:22px">
+        <rect x="2" y="7" width="18" height="11" rx="2"/>
+        <path d="M20 11h2v3h-2"/>
+        <rect id="nav-battery-fill" x="3" y="8.5" width="16" height="8" rx="1" fill="#fb923c" stroke="none"/>
+      </svg>
+      <span id="nav-battery">--%</span>
+    </div>
+
+    <!-- Search -->
+    <div class="nav-chip" style="padding:4px 12px;gap:6px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px;opacity:0.5;flex-shrink:0">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input id="search" type="text" placeholder="search games"
+        style="background:none;border:none;outline:none;color:rgba(255,255,255,0.75);font-size:13px;width:170px;">
+    </div>
   </div>
+</nav>
 
-  <div>
-    <h3 class="font-medium">How do I open a fake learning app?</h3>
-    <p class="text-sm text-gray-700">
-      Press ` then z, x, c, or v to open a fake learning app. Press ` again to close it.
-    </p>
+<!-- Hero -->
+<div class="relative z-10 flex flex-col items-center pt-28 pb-8 text-center px-4">
+  <img src="/imgs/image.png" alt="Paper Stars"
+       class="w-20 h-20 rounded-[22px] shadow-2xl mb-5 object-cover">
+  <h1 class="text-5xl font-bold text-white mb-2 tracking-tight">Paper Stars</h1>
+  <p class="text-white/35 text-sm tracking-wide">ctrl + d to bookmark</p>
+</div>
 
-    <ul class="text-sm text-gray-700 mt-2 list-disc ml-5">
-      <li>z = safri</li>
-      <li>x = bedrock</li>
-      <li>c = sparxmath</li>
-      <li>v = sparxscience</li>
-    </ul>
+<!-- Announcements (dynamic) -->
+<div id="announcements-section" class="relative z-10 max-w-2xl mx-auto px-4 mb-4"></div>
+
+<!-- Stats card -->
+<div class="relative z-10 max-w-2xl mx-auto px-4 mb-6">
+  <div style="background:rgba(50,20,5,0.40);border:1px solid rgba(251,146,60,0.12);border-radius:14px;padding:12px 20px;display:flex;align-items:center;gap:24px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="rgba(251,146,60,0.6)" stroke-width="2" style="width:15px;height:15px;flex-shrink:0">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <span id="data-count" style="font-size:12px;color:rgba(255,255,255,0.45)">-- GB served</span>
+    </div>
+    <div style="width:1px;height:16px;background:rgba(255,255,255,0.08)"></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="rgba(251,146,60,0.6)" stroke-width="2" style="width:15px;height:15px;flex-shrink:0">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <span id="requests-count" style="font-size:12px;color:rgba(255,255,255,0.45)">-- files loaded</span>
+    </div>
   </div>
 </div>
-</div> -->
 
-<!-- Search -->
-<div class="max-w-md mx-auto mb-6">
-  <input id="search" type="text" placeholder="Search games..."
-    class="w-full px-4 py-2 rounded-full border shadow focus:ring-2 focus:ring-blue-400">
+<!-- Favorites strip -->
+<div id="favorites-section" class="hidden relative z-10 max-w-6xl mx-auto px-4 mb-6">
+  <p class="text-xs uppercase tracking-wider mb-3" style="color:rgba(251,146,60,0.5);letter-spacing:0.12em;font-weight:600">Favorites</p>
+  <div id="favorites-list" class="flex gap-3 overflow-x-auto pb-2" style="scrollbar-width:thin;scrollbar-color:rgba(251,146,60,0.25) transparent"></div>
 </div>
 
-<!-- Advert Banner -->
-<div class="w-full mb-6 overflow-hidden rounded-2xl shadow-lg border border-slate-200 bg-white">
-  <a href="https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=K4VOssx1aU-MU9apEoB1QEYZbQ_1uANFhKIeXxaRxH5UNE9FS1BSRTk0RlpIUkRBVUpGUEpIWVE2SC4u" target="_blank">
-    <img 
-      src="/imgs/IMG_1501.jpeg"
-      alt="Advertisement"
-      class="w-full h-auto object-contain block"
-    >
-  </a>
-</div>
-  
-<!-- Favorites -->
-<div class="bg-white rounded-lg p-5 mb-6 shadow">
-  <h2 class="text-xl font-semibold mb-3">Favorites</h2>
-  <ul id="favorites-list">
-    <li class="italic text-gray-500">No favorites yet.</li>
+<!-- Games grid -->
+<div class="relative z-10 max-w-6xl mx-auto px-4 pb-24">
+  <ul id="games-list"
+      class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
+    <li class="col-span-full text-white/20 text-center py-16 text-sm">Loading…</li>
   </ul>
 </div>
 
-<!-- Games -->
-<div class="bg-white rounded-lg p-5 mb-6 shadow">
-  <h2 class="text-xl font-semibold mb-3">Games</h2>
-  <ul id="games-list">
-    <li class="italic text-gray-500">Loading games...</li>
-  </ul>
-</div>
-
-<div id="comments-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
-    <div class="flex items-center justify-between border-b px-6 py-4">
+<!-- Comments modal -->
+<div id="comments-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-[#120800] border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+    <div class="flex items-center justify-between border-b border-white/8 px-6 py-4">
       <div>
-        <h2 id="comments-modal-title" class="text-lg font-semibold text-slate-900">Comments</h2>
-        <p id="comments-count" class="text-xs text-slate-500">Select a game to view comments.</p>
+        <h2 id="comments-modal-title" class="text-base font-semibold text-white">Comments</h2>
+        <p id="comments-count" class="text-xs text-white/35">Select a game to view comments.</p>
       </div>
-      <button id="comments-close" class="text-slate-500 hover:text-slate-900 text-2xl leading-none" type="button">&times;</button>
+      <button id="comments-close" class="text-white/35 hover:text-white text-2xl leading-none" type="button">&times;</button>
     </div>
     <div class="px-6 py-4 space-y-4">
-      <div id="comments-list" class="max-h-72 overflow-y-auto space-y-3 text-slate-800">
-        <div class="text-gray-500 italic">Select a game to view comments.</div>
+      <div id="comments-list" class="max-h-72 overflow-y-auto space-y-3 text-white/80">
+        <div class="text-white/25 italic text-sm">Select a game to view comments.</div>
       </div>
-      <div id="comments-feedback" class="text-xs text-slate-500"></div>
+      <div id="comments-feedback" class="text-xs text-white/40"></div>
       <div class="space-y-3">
-        <textarea id="comments-input" rows="4" maxlength="300" class="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="Add a comment..."></textarea>
+        <textarea id="comments-input" rows="3" maxlength="300"
+          class="w-full rounded-xl border border-white/10 bg-white/4 px-4 py-3 text-white text-sm
+                 focus:outline-none focus:ring-1 focus:ring-orange-600 resize-none"
+          placeholder="Add a comment…"></textarea>
         <div class="space-y-2">
-          <input id="comments-images" type="file" accept="image/*" multiple class="w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+          <input id="comments-images" type="file" accept="image/*" multiple
+            class="w-full text-sm text-white/35 file:mr-4 file:py-1.5 file:px-3 file:rounded-full
+                   file:border-0 file:text-xs file:font-semibold file:bg-orange-900/40 file:text-orange-400
+                   hover:file:bg-orange-800/50">
           <div id="comments-image-preview" class="flex flex-wrap gap-2"></div>
         </div>
         <div class="flex items-center justify-between">
-          <span id="comments-hint" class="text-xs text-slate-500">Max 300 characters.</span>
-          <button id="comments-submit" class="bg-blue-600 text-white rounded-full px-5 py-2 hover:bg-blue-700" type="button">Submit</button>
+          <span id="comments-hint" class="text-xs text-white/25">Max 300 characters.</span>
+          <button id="comments-submit" type="button"
+            class="bg-orange-700 hover:bg-orange-600 text-white rounded-full px-5 py-1.5 text-sm font-semibold transition">
+            Submit
+          </button>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<div id="plays-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
-    <div class="flex items-center justify-between border-b px-6 py-4">
+<!-- Plays modal -->
+<div id="plays-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-[#120800] border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+    <div class="flex items-center justify-between border-b border-white/8 px-6 py-4">
       <div>
-        <h2 id="plays-modal-title" class="text-lg font-semibold text-slate-900">Play history</h2>
-        <p id="plays-modal-total" class="text-xs text-slate-500">Select a game to see play details.</p>
+        <h2 id="plays-modal-title" class="text-base font-semibold text-white">Play history</h2>
+        <p id="plays-modal-total" class="text-xs text-white/35">Select a game to see play details.</p>
       </div>
-      <button id="plays-close" class="text-slate-500 hover:text-slate-900 text-2xl leading-none" type="button">&times;</button>
+      <button id="plays-close" class="text-white/35 hover:text-white text-2xl leading-none" type="button">&times;</button>
     </div>
-    <div class="px-6 py-4 space-y-4">
-      <div id="plays-list" class="max-h-72 overflow-y-auto space-y-3 text-slate-800">
-        <div class="text-gray-500 italic">Click the controller icon to view who played it.</div>
+    <div class="px-6 py-4">
+      <div id="plays-list" class="max-h-72 overflow-y-auto space-y-3 text-white/80">
+        <div class="text-white/25 italic text-sm">Click the controller icon to view who played it.</div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Debug -->
-<div id="debug-panel" class="bg-black text-blue-400 text-xs p-3 rounded max-h-60 overflow-y-auto">
-[Debug logs]
-</div>
-<script src="htmlindex.js"></script>
-<script src="/lib/fps.js"></script>
-</body>
-</html>
+<!-- Debug panel -->
+<div id="debug-panel" class="hidden fixed bottom-0 left-0 right-0 z-50
+     bg-black text-orange-400 text-xs p-3 max-h-40 overflow-y-auto border-t border-orange-900/50"></div>
 
-<script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
 <script>
-  const targetDate = new Date("2026-06-29T00:00:00");
+// ── Wave canvas (capped at 30fps, 4 waves, time-based) ───────────────────────
+(function () {
+  const canvas = document.getElementById('wave-canvas');
+  const ctx = canvas.getContext('2d', { alpha: true });
 
-  function updateVoidiumCountdown() {
-    const now = new Date();
-    const diff = targetDate - now;
+  // 4 waves (was 6) — speeds in rad/ms so animation is frame-rate independent
+  const WAVES = [
+    { amp: 28, freq: 0.0055, speed: 0.0168, y: 0.30, alpha: 0.18 },
+    { amp: 20, freq: 0.0070, speed: 0.0132, y: 0.42, alpha: 0.13 },
+    { amp: 35, freq: 0.0042, speed: 0.0108, y: 0.55, alpha: 0.10 },
+    { amp: 15, freq: 0.0090, speed: 0.021,  y: 0.22, alpha: 0.09 },
+  ];
 
-    if (diff <= 0) {
-      document.getElementById("voidium-countdown").textContent = "Today!";
-      return;
+  let t = 0, W = 0, H = 0, lastDraw = 0;
+
+  function resize() {
+    W = canvas.width  = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize, { passive: true });
+
+  function draw(ts) {
+    requestAnimationFrame(draw);
+    const dt = ts - lastDraw;
+    if (dt < 32) return; // ~30fps cap — decorative animation doesn't need 60fps
+    lastDraw = ts;
+    t += Math.min(dt, 100); // clamp dt to avoid jump after tab switch
+
+    ctx.clearRect(0, 0, W, H);
+    for (const w of WAVES) {
+      ctx.beginPath();
+      const baseY = H * w.y;
+      for (let x = 0; x <= W; x += 4) { // x+=4 instead of x+=2 — half the path points
+        const y = baseY + Math.sin(x * w.freq + t * w.speed) * w.amp;
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = `rgba(249,115,22,${w.alpha})`;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
     }
+  }
+  requestAnimationFrame(draw);
+})();
 
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-    const minutes = Math.floor((diff / (1000 * 60)) % 60);
-    const seconds = Math.floor((diff / 1000) % 60);
+// ── Nav clock ────────────────────────────────────────────────────────────────
+(function () {
+  function tick() {
+    const d = new Date();
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    document.getElementById('nav-time').textContent = h + ':' + m;
+  }
+  tick();
+  setInterval(tick, 10000);
+})();
 
-    document.getElementById("voidium-countdown").textContent =
-      `${days}d ${hours}h ${minutes}m ${seconds}s`;
+// ── Nav weather ──────────────────────────────────────────────────────────────
+(function () {
+  const chip  = document.getElementById('nav-weather-chip');
+  const label = document.getElementById('nav-weather');
+  const dot   = document.getElementById('nav-weather-dot');
+
+  function dotColor(tempF) {
+    if (tempF <= 32)  return '#93c5fd'; // freezing — blue
+    if (tempF <= 55)  return '#67e8f9'; // cold — cyan
+    if (tempF <= 75)  return '#fdba74'; // mild — orange
+    if (tempF <= 90)  return '#fde047'; // warm — yellow
+    return '#fb923c';                   // hot — orange
   }
 
-  updateVoidiumCountdown();
-  setInterval(updateVoidiumCountdown, 1000);
+  function fetchWeather(lat, lon) {
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&temperature_unit=fahrenheit`)
+      .then(r => r.json())
+      .then(d => {
+        const tempF = Math.round(d.current_weather.temperature);
+        label.textContent = tempF + '°F';
+        dot.style.background = dotColor(tempF);
+        chip.style.display = 'flex';
+      })
+      .catch(() => {});
+  }
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      p => fetchWeather(p.coords.latitude, p.coords.longitude),
+      () => {}
+    );
+  }
+})();
+
+// ── Nav battery ──────────────────────────────────────────────────────────────
+(function () {
+  if (!navigator.getBattery) return;
+  const chip  = document.getElementById('nav-battery-chip');
+  const label = document.getElementById('nav-battery');
+
+  function update(b) {
+    const pct    = Math.round(b.level * 100);
+    const colour = pct < 20 ? '#ef4444' : pct < 40 ? '#eab308' : '#fb923c';
+    label.textContent = pct + '%';
+
+    const icon = document.getElementById('nav-battery-icon');
+    icon.innerHTML = `
+      <rect x="2" y="7" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
+      <path d="M20 11h2v3h-2" stroke="currentColor" stroke-width="2" fill="none"/>
+      <rect x="3" y="8.5" width="${Math.round(16 * b.level)}" height="8" rx="1" fill="${colour}" stroke="none"/>`;
+
+    chip.style.display = 'flex';
+  }
+
+  navigator.getBattery().then(b => {
+    update(b);
+    b.addEventListener('levelchange',    () => update(b));
+    b.addEventListener('chargingchange', () => update(b));
+  });
+})();
+
+// ── Nav ping ─────────────────────────────────────────────────────────────────
+(function () {
+  const el = document.getElementById('nav-ping');
+  function measure() {
+    const t0 = performance.now();
+    fetch('/api/ping', { cache: 'no-store' })
+      .then(() => {
+        const ms = Math.round(performance.now() - t0);
+        el.textContent = ms + ' ms';
+      })
+      .catch(() => { el.textContent = '-- ms'; });
+  }
+  measure();
+  setInterval(measure, 15000);
+})();
+
+// ── Announcements ─────────────────────────────────────────────────────────────
+(function () {
+  const TYPES = {
+    new:     { icon: `<svg viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2" style="width:16px;height:16px;flex-shrink:0;margin-top:2px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,     color: '#fb923c', bg: 'rgba(60,25,5,0.65)',  border: 'rgba(251,146,60,0.28)' },
+    info:    { icon: `<svg viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2" style="width:16px;height:16px;flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,    color: '#93c5fd', bg: 'rgba(5,20,55,0.60)',  border: 'rgba(147,197,253,0.20)' },
+    warning: { icon: `<svg viewBox="0 0 24 24" fill="none" stroke="#fde047" stroke-width="2" style="width:16px;height:16px;flex-shrink:0;margin-top:2px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`, color: '#fde047', bg: 'rgba(50,40,0,0.60)',  border: 'rgba(253,224,71,0.22)'  },
+    update:  { icon: `<svg viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2" style="width:16px;height:16px;flex-shrink:0;margin-top:2px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`, color: '#c4b5fd', bg: 'rgba(30,5,55,0.60)',  border: 'rgba(196,181,253,0.22)' },
+  };
+
+  const dismissed = new Set(JSON.parse(localStorage.getItem('dismissed_ann') || '[]'));
+  const section   = document.getElementById('announcements-section');
+
+  function dismiss(id, el) {
+    dismissed.add(id);
+    localStorage.setItem('dismissed_ann', JSON.stringify([...dismissed]));
+    el.style.cssText += 'opacity:0;transform:translateY(-4px);transition:opacity 0.2s,transform 0.2s;';
+    setTimeout(() => { el.remove(); if (!section.children.length) section.style.display = 'none'; }, 220);
+  }
+
+  fetch('/announcements.json')
+    .then(r => r.json())
+    .then(items => {
+      const visible = items.filter(a => !dismissed.has(a.id));
+      if (!visible.length) { section.style.display = 'none'; return; }
+
+      visible.forEach(ann => {
+        const s = TYPES[ann.type] || TYPES.info;
+        const el = document.createElement('div');
+        el.style.cssText = `background:${s.bg};border:1px solid ${s.border};border-radius:14px;padding:13px 16px;display:flex;align-items:flex-start;gap:11px;margin-bottom:8px;`;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.style.cssText = 'color:rgba(255,255,255,0.22);font-size:20px;line-height:1;background:none;border:none;cursor:pointer;flex-shrink:0;padding:0;margin-top:-1px;transition:color 0.15s;';
+        closeBtn.onmouseover = () => closeBtn.style.color = 'rgba(255,255,255,0.65)';
+        closeBtn.onmouseout  = () => closeBtn.style.color = 'rgba(255,255,255,0.22)';
+        closeBtn.onclick = () => dismiss(ann.id, el);
+
+        el.innerHTML = `
+          ${s.icon}
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:3px">
+              <span style="font-size:13px;font-weight:600;color:${s.color}">${ann.title}</span>
+              ${ann.date ? `<span style="font-size:11px;color:rgba(255,255,255,0.25)">${ann.date}</span>` : ''}
+            </div>
+            <p style="font-size:13px;color:rgba(255,255,255,0.55);line-height:1.5;margin:0">${ann.text}</p>
+          </div>`;
+        el.appendChild(closeBtn);
+        section.appendChild(el);
+      });
+    })
+    .catch(() => { section.style.display = 'none'; });
+})();
 </script>
+
+<script src="htmlindex.js"></script>
+
+<script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
+</body>
+</html>

@@ -76,7 +76,7 @@ async function addArrowListeners() {
             const gamesCon = parentElement.querySelectorAll('.gamesCon')[0];
 
             const leftArrow = e.target.parentNode.parentNode.querySelectorAll('.arrowCon')[0];
-            leftArrow.style += 'visibility: visible';
+            leftArrow.style.visibility = 'visible';
 
             const remainingSpace = gamesCon.scrollWidth - gamesCon.clientWidth - gamesCon.scrollLeft;
             gamesCon.scrollLeft += Math.min(remainingSpace, 1100);
