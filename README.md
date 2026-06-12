@@ -1,0 +1,8 @@
+![Built in the UK](https://shieldcn.dev/flag/gb.svg?variant=branded)
+![GitHub Stars](https://shieldcn.dev/github/stars/Olibot1107/games.svg?variant=branded)
+![GitHub Forks](https://shieldcn.dev/github/forks/Olibot1107/games.svg?variant=branded)
+![GitHub Open Issues](https://shieldcn.dev/github/open-issues/Olibot1107/games.svg?variant=branded)
+![GitHub Open PRs](https://shieldcn.dev/github/open-prs/Olibot1107/games.svg?variant=branded)
+![GitHub Contributors](https://shieldcn.dev/github/contributors/Olibot1107/games.svg?variant=branded)
+![GitHub Last Commit](https://shieldcn.dev/github/last-commit/Olibot1107/games.svg?variant=branded)
+![Stable](https://shieldcn.dev/badge/status-stable-brightgreen.svg?variant=outline)
