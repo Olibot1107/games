@@ -28,6 +28,7 @@ const plainJsonInflight = new Map();
 const THUMB_PREFIX = 'th2_';
 const THUMB_MAX_DIM = 160;
 const THUMB_QUALITY = 0.72;
+const THUMBS_READY_KEY = 'thumbs_ready_v2';
 
 function thumbKey(gameName) {
     return THUMB_PREFIX + gameName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 80);
@@ -51,6 +52,118 @@ function saveThumb(gameName, imgEl) {
     } catch (e) {
         // QuotaExceededError or tainted canvas — silently skip
     }
+}
+
+function saveThumbIdle(gameName, imgEl) {
+    if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => saveThumb(gameName, imgEl), { timeout: 3000 });
+    } else {
+        setTimeout(() => saveThumb(gameName, imgEl), 50);
+    }
+}
+
+async function preloadAllThumbnails(games, onProgress) {
+    const BATCH = 10;
+    let done = 0;
+    const total = games.length;
+    for (let i = 0; i < total; i += BATCH) {
+        const batch = games.slice(i, i + BATCH);
+        await Promise.all(batch.map(game => new Promise(resolve => {
+            const cached = loadThumb(game.name);
+            if (cached) { onProgress(++done, total, cached); resolve(); return; }
+            const img = new Image();
+            img.onload = () => {
+                saveThumb(game.name, img);
+                onProgress(++done, total, loadThumb(game.name));
+                resolve();
+            };
+            img.onerror = () => { onProgress(++done, total, null); resolve(); };
+            img.src = `/thumbnails/${game.name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 80)}.jpg`;
+        })));
+    }
+}
+
+// ── Orbit loading animation ──────────────────────────────────────────────────
+const LO_INNER_R    = 72;  // first ring radius (px)
+const LO_RING_GAP   = 42;  // px between ring centres
+const LO_ITEM_SIZE  = 32;  // thumbnail px (+ 4px gap = 36 spacing budget)
+
+let loThumbData = []; // { cell, baseAngle, r, speed }
+let loOrbitDeg  = 0;
+let loOrbitRaf  = null;
+let loStage     = null;
+
+// Returns { r, angle, speed } for slot `index`, no upper limit.
+function loGetSlot(index) {
+    let offset = 0, ri = 0;
+    while (true) {
+        const r     = LO_INNER_R + ri * LO_RING_GAP;
+        const slots = Math.max(6, Math.floor((2 * Math.PI * r) / (LO_ITEM_SIZE + 4)));
+        if (index < offset + slots) {
+            const angle = ((index - offset) / slots) * 360;
+            const speed = 1 / (1 + ri * 0.32); // outer rings spin slower
+            return { r, angle, speed };
+        }
+        offset += slots;
+        ri++;
+    }
+}
+
+function loAnimate() {
+    loOrbitDeg += 0.28;
+    const rad = Math.PI / 180;
+    for (const d of loThumbData) {
+        const deg = (d.baseAngle + loOrbitDeg * d.speed) * rad;
+        const tx  = Math.round(Math.cos(deg) * d.r * 10) / 10;
+        const ty  = Math.round(Math.sin(deg) * d.r * 10) / 10;
+        d.cell.style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`;
+    }
+    loOrbitRaf = requestAnimationFrame(loAnimate);
+}
+
+function loAddThumb(thumbUrl) {
+    if (!loStage) return;
+    const slot = loGetSlot(loThumbData.length);
+    const rad  = slot.angle * Math.PI / 180;
+    const tx   = Math.round(Math.cos(rad) * slot.r * 10) / 10;
+    const ty   = Math.round(Math.sin(rad) * slot.r * 10) / 10;
+
+    const cell = document.createElement('div');
+    cell.style.cssText = [
+        'position:absolute', 'left:50%', 'top:50%',
+        'width:30px', 'height:30px',
+        'border-radius:7px', 'overflow:hidden',
+        'border:1.5px solid rgba(251,146,60,0.28)',
+        'background:#1b0900',
+        'box-shadow:0 2px 10px rgba(0,0,0,0.65)',
+        'will-change:transform',
+        `--tx:calc(-50% + ${tx}px)`, `--ty:calc(-50% + ${ty}px)`,
+        `transform:translate(calc(-50% + ${tx}px),calc(-50% + ${ty}px))`,
+        'animation:lo-pop 0.22s ease forwards',
+    ].join(';');
+
+    if (thumbUrl) {
+        const img = document.createElement('img');
+        img.src = thumbUrl;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover';
+        cell.appendChild(img);
+    } else {
+        cell.style.background = 'rgba(251,146,60,0.07)';
+    }
+
+    loStage.appendChild(cell);
+    loThumbData.push({ cell, baseAngle: slot.angle, r: slot.r, speed: slot.speed });
+
+    if (!loOrbitRaf) loAnimate();
+}
+
+function dismissLoadingOverlay() {
+    if (loOrbitRaf) { cancelAnimationFrame(loOrbitRaf); loOrbitRaf = null; }
+    const overlay = document.getElementById('loading-overlay');
+    if (!overlay) return;
+    overlay.style.transition = 'opacity 0.4s';
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.remove(), 420);
 }
 
 // UID
@@ -364,7 +477,7 @@ function renderFavorites(){
         const cached = loadThumb(f);
         if (cached) { img.src = cached; img.style.opacity = '1'; }
         else {
-            img.onload = () => { img.style.opacity = '1'; saveThumb(f, img); };
+            img.onload = () => { img.style.opacity = '1'; saveThumbIdle(f, img); };
             img.onerror = () => {};
             img.src = `/thumbnails/${f.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 80)}.jpg`;
         }
@@ -455,7 +568,7 @@ function createGameItem(game, votes){
         img.onload = () => {
             img.style.opacity = '1';
             shimmer.remove();
-            saveThumb(game.name, img);
+            saveThumbIdle(game.name, img);
         };
         img.onerror = () => { img.remove(); shimmer.remove(); };
         img.src = `/thumbnails/${game.name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 80)}.jpg`;
@@ -1418,11 +1531,28 @@ function sendVote(game, vote){
 
 // ================= INIT =================
 fetchPlainJson('./list.json')
-.then(data=>{
+.then(async data => {
     allGames = [
         ...(data.good||[]).map(n=>({name:n,category:'good'})),
         ...(data.nova||[]).map(n=>({name:n,category:'nova'}))
     ];
+
+    const listFingerprint = allGames.map(g => g.name).sort().join(',');
+    if (localStorage.getItem(THUMBS_READY_KEY) !== listFingerprint) {
+        loStage = document.getElementById('lo-stage');
+        const pctEl = document.getElementById('lo-pct');
+        const text  = document.getElementById('loading-text');
+        await preloadAllThumbnails(allGames, (done, total, thumbUrl) => {
+            const pct = Math.round(done / total * 100);
+            if (pctEl) pctEl.textContent = pct + '%';
+            if (text)  text.textContent  = done + ' / ' + total;
+            loAddThumb(thumbUrl);
+        });
+        try { localStorage.setItem(THUMBS_READY_KEY, listFingerprint); } catch(e) {}
+        dismissLoadingOverlay();
+    } else {
+        dismissLoadingOverlay();
+    }
 
     renderFavorites();
     fetchVotes();
