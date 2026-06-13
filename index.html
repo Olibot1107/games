@@ -3,10 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Math Practice</title>
+<meta name="description" content="Paper Stars — a browser arcade with 180+ games. No installs, no sign-in.">
+<meta name="theme-color" content="#0a0500">
+<meta name="color-scheme" content="dark">
+<title>Paper Stars</title>
 <link rel="icon" type="image/png" href="/imgs/image.png">
 <link rel="preconnect" href="https://cdn.tailwindcss.com">
 <link rel="preconnect" href="https://api.open-meteo.com">
+<link rel="preconnect" href="https://ipapi.co">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   * { box-sizing: border-box; }
@@ -14,26 +18,7 @@
   body {
     background: #0a0500;
     min-height: 100vh;
-  }
-
-  /* Animated wave canvas fixed behind everything */
-  #wave-canvas {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 65vh;
-    pointer-events: none;
-    z-index: 0;
-    will-change: contents;
-  }
-
-  /* Fade the wave into the dark bg */
-  #wave-fade {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    height: 65vh;
-    background: linear-gradient(to bottom, rgba(10,5,0,0) 30%, #0a0500 100%);
-    pointer-events: none;
-    z-index: 1;
+    scroll-behavior: smooth;
   }
 
   /* Nav — one blur layer covers all chips */
@@ -61,6 +46,127 @@
     border-color: rgba(251, 146, 60, 0.35);
   }
   .nav-chip svg { width: 14px; height: 14px; opacity: 0.75; }
+
+  #nav-random { cursor: pointer; border-color: rgba(251,146,60,0.38); }
+  #nav-random:hover { border-color: rgba(251,146,60,0.7); background: rgba(80,35,5,0.70); }
+
+  /* Random Well modal */
+  /* Random Well modal */
+  #random-well {
+    position: fixed; inset: 0; z-index: 300;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(12px);
+    align-items: center; justify-content: center;
+    display: none;
+  }
+  .rw-card {
+    background: #0d0400;
+    border: 1px solid rgba(251,146,60,0.2);
+    border-radius: 24px;
+    padding: 22px 22px 18px;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 18px; width: 500px; max-width: calc(100vw - 32px);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(251,146,60,0.06);
+    position: relative;
+  }
+  .rw-header {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.4);
+    letter-spacing: 0.1em; text-transform: uppercase; width: 100%;
+  }
+  /* Horizontal drum */
+  .rw-drum-wrap {
+    position: relative; width: 100%; height: 88px;
+    overflow: hidden; border-radius: 16px;
+    background: rgba(0,0,0,0.45);
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  #rw-drum {
+    position: absolute; top: 0; bottom: 0;
+    left: 0;
+    display: flex; flex-direction: row;
+    align-items: center; padding: 0 8px;
+    will-change: transform;
+  }
+  .rw-item {
+    width: 88px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rw-item img { width: 68px; height: 68px; border-radius: 13px; object-fit: cover; display: block; }
+  .rw-item-fallback {
+    width: 68px; height: 68px; border-radius: 13px;
+    background: rgba(251,146,60,0.1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+  }
+  /* left/right fades */
+  .rw-drum-wrap::before, .rw-drum-wrap::after {
+    content: ''; position: absolute; top: 0; bottom: 0;
+    width: 110px; z-index: 10; pointer-events: none;
+  }
+  .rw-drum-wrap::before { left: 0;  background: linear-gradient(to right, #0d0400 20%, transparent); }
+  .rw-drum-wrap::after  { right: 0; background: linear-gradient(to left,  #0d0400 20%, transparent); }
+  /* center selector */
+  .rw-selector {
+    position: absolute; top: 6px; bottom: 6px;
+    left: 50%; transform: translateX(-50%);
+    width: 80px;
+    border: 1.5px solid rgba(251,146,60,0.6);
+    border-radius: 14px; pointer-events: none; z-index: 5;
+    box-shadow: 0 0 20px rgba(251,146,60,0.12) inset, 0 0 24px rgba(251,146,60,0.1);
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .rw-selector.rw-winner {
+    border-color: rgba(251,146,60,0.95);
+    box-shadow: 0 0 28px rgba(251,146,60,0.25) inset, 0 0 32px rgba(251,146,60,0.3);
+  }
+  /* winner result card */
+  #rw-result {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%; padding: 12px 16px;
+    background: rgba(251,146,60,0.06);
+    border: 1px solid rgba(251,146,60,0.16);
+    border-radius: 14px;
+    transition: opacity 0.4s, transform 0.4s;
+  }
+  #rw-winner-img {
+    width: 52px; height: 52px; border-radius: 11px; object-fit: cover; flex-shrink: 0;
+  }
+  #rw-winner-label {
+    font-size: 15px; font-weight: 700; color: rgba(255,255,255,0.9);
+    text-transform: capitalize; letter-spacing: 0.01em;
+    line-height: 1.3;
+  }
+  #rw-winner-sub {
+    font-size: 10px; color: rgba(255,255,255,0.3); text-transform: uppercase;
+    letter-spacing: 0.08em; margin-bottom: 2px;
+  }
+  .rw-stat {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 600;
+    padding: 3px 8px; border-radius: 999px;
+    border: 1px solid;
+  }
+  /* buttons */
+  .rw-actions { display: flex; gap: 8px; width: 100%; }
+  .rw-btn {
+    flex: 1; padding: 9px 0; border-radius: 999px; font-size: 13px;
+    font-weight: 600; cursor: pointer; border: 1px solid rgba(251,146,60,0.22);
+    background: rgba(55,22,5,0.55); color: rgba(255,255,255,0.65);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .rw-btn:hover { background: rgba(80,35,5,0.7); border-color: rgba(251,146,60,0.45); color: rgba(255,255,255,0.85); }
+  .rw-btn-play {
+    background: rgba(251,146,60,0.13); border-color: rgba(251,146,60,0.45);
+    color: #fb923c;
+  }
+  .rw-btn-play:hover { background: rgba(251,146,60,0.22); }
+  #rw-close-btn {
+    position: absolute; top: 16px; right: 18px;
+    background: none; border: none; cursor: pointer;
+    color: rgba(255,255,255,0.25); font-size: 17px; line-height: 1; padding: 4px;
+  }
+  #rw-close-btn:hover { color: rgba(255,255,255,0.55); }
 
   /* Game card */
   .game-card {
@@ -139,10 +245,6 @@
 }
 </style>
 
-<!-- Wave background -->
-<canvas id="wave-canvas"></canvas>
-<div id="wave-fade"></div>
-
 <!-- Fixed Top Nav -->
 <nav class="fixed top-0 left-0 right-0 z-50 flex items-center px-6 h-16">
   <!-- Logo — left -->
@@ -185,6 +287,19 @@
       </svg>
       <span id="nav-battery">--%</span>
     </div>
+
+    <!-- Random game -->
+    <button id="nav-random" class="nav-chip" title="Random game">
+      <svg viewBox="0 0 22 22" fill="none" style="width:14px;height:14px;opacity:0.8">
+        <rect x="1.5" y="1.5" width="19" height="19" rx="5" stroke="currentColor" stroke-width="1.6"/>
+        <circle cx="7.5" cy="7.5" r="1.5" fill="currentColor"/>
+        <circle cx="14.5" cy="7.5" r="1.5" fill="currentColor"/>
+        <circle cx="11" cy="11" r="1.5" fill="currentColor"/>
+        <circle cx="7.5" cy="14.5" r="1.5" fill="currentColor"/>
+        <circle cx="14.5" cy="14.5" r="1.5" fill="currentColor"/>
+      </svg>
+      Random
+    </button>
 
     <!-- Search -->
     <div class="nav-chip" style="padding:4px 12px;gap:6px">
@@ -303,61 +418,16 @@
      bg-black text-orange-400 text-xs p-3 max-h-40 overflow-y-auto border-t border-orange-900/50"></div>
 
 <script>
-// ── Wave canvas (capped at 30fps, 4 waves, time-based) ───────────────────────
-(function () {
-  const canvas = document.getElementById('wave-canvas');
-  const ctx = canvas.getContext('2d', { alpha: true });
-
-  // 4 waves (was 6) — speeds in rad/ms so animation is frame-rate independent
-  const WAVES = [
-    { amp: 28, freq: 0.0055, speed: 0.0168, y: 0.30, alpha: 0.18 },
-    { amp: 20, freq: 0.0070, speed: 0.0132, y: 0.42, alpha: 0.13 },
-    { amp: 35, freq: 0.0042, speed: 0.0108, y: 0.55, alpha: 0.10 },
-    { amp: 15, freq: 0.0090, speed: 0.021,  y: 0.22, alpha: 0.09 },
-  ];
-
-  let t = 0, W = 0, H = 0, lastDraw = 0;
-
-  function resize() {
-    W = canvas.width  = canvas.offsetWidth;
-    H = canvas.height = canvas.offsetHeight;
-  }
-  resize();
-  window.addEventListener('resize', resize, { passive: true });
-
-  function draw(ts) {
-    requestAnimationFrame(draw);
-    const dt = ts - lastDraw;
-    if (dt < 32) return; // ~30fps cap — decorative animation doesn't need 60fps
-    lastDraw = ts;
-    t += Math.min(dt, 100); // clamp dt to avoid jump after tab switch
-
-    ctx.clearRect(0, 0, W, H);
-    for (const w of WAVES) {
-      ctx.beginPath();
-      const baseY = H * w.y;
-      for (let x = 0; x <= W; x += 4) { // x+=4 instead of x+=2 — half the path points
-        const y = baseY + Math.sin(x * w.freq + t * w.speed) * w.amp;
-        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      ctx.strokeStyle = `rgba(249,115,22,${w.alpha})`;
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-    }
-  }
-  requestAnimationFrame(draw);
-})();
-
 // ── Nav clock ────────────────────────────────────────────────────────────────
 (function () {
   function tick() {
     const d = new Date();
-    const h = String(d.getHours()).padStart(2, '0');
-    const m = String(d.getMinutes()).padStart(2, '0');
-    document.getElementById('nav-time').textContent = h + ':' + m;
+    document.getElementById('nav-time').textContent =
+      String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    // schedule next tick at the start of the next minute
+    setTimeout(tick, (60 - d.getSeconds()) * 1000 - d.getMilliseconds());
   }
   tick();
-  setInterval(tick, 10000);
 })();
 
 // ── Nav weather ──────────────────────────────────────────────────────────────
@@ -386,12 +456,10 @@
       .catch(() => {});
   }
 
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      p => fetchWeather(p.coords.latitude, p.coords.longitude),
-      () => {}
-    );
-  }
+  fetch('https://ipapi.co/json/')
+    .then(r => r.json())
+    .then(d => { if (d.latitude) fetchWeather(d.latitude, d.longitude); })
+    .catch(() => {});
 })();
 
 // ── Nav battery ──────────────────────────────────────────────────────────────
@@ -490,6 +558,40 @@
     .catch(() => { section.style.display = 'none'; });
 })();
 </script>
+
+<!-- Random Well modal -->
+<div id="random-well">
+  <div class="rw-card">
+    <button id="rw-close-btn">✕</button>
+    <div class="rw-header">
+      <svg viewBox="0 0 22 22" fill="none" style="width:13px;height:13px;opacity:0.5">
+        <rect x="1.5" y="1.5" width="19" height="19" rx="5" stroke="currentColor" stroke-width="1.6"/>
+        <circle cx="7.5" cy="7.5" r="1.5" fill="currentColor"/>
+        <circle cx="14.5" cy="7.5" r="1.5" fill="currentColor"/>
+        <circle cx="11" cy="11" r="1.5" fill="currentColor"/>
+        <circle cx="7.5" cy="14.5" r="1.5" fill="currentColor"/>
+        <circle cx="14.5" cy="14.5" r="1.5" fill="currentColor"/>
+      </svg>
+      Pick a game
+    </div>
+    <div class="rw-drum-wrap">
+      <div id="rw-drum"></div>
+      <div class="rw-selector" id="rw-selector"></div>
+    </div>
+    <div id="rw-result" style="display:none;opacity:0;transform:translateY(6px)">
+      <img id="rw-winner-img" src="" alt="" style="display:none">
+      <div style="flex:1;min-width:0">
+        <div id="rw-winner-sub">You landed on</div>
+        <div id="rw-winner-label"></div>
+        <div id="rw-winner-stats" style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap"></div>
+      </div>
+    </div>
+    <div class="rw-actions">
+      <button class="rw-btn" id="rw-spin-again">↺ Spin again</button>
+      <button class="rw-btn rw-btn-play" id="rw-play" style="opacity:0;pointer-events:none">Play →</button>
+    </div>
+  </div>
+</div>
 
 <script src="htmlindex.js"></script>
 

@@ -579,7 +579,7 @@ function createGameItem(game, votes){
     const topBar = document.createElement('div');
     topBar.className = 'absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-1.5 pt-1.5';
 
-    const PILL = 'display:inline-flex;align-items:center;gap:3px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s;backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.18);';
+    const PILL = 'display:inline-flex;align-items:center;gap:3px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;cursor:pointer;transition:background 0.15s,border-color 0.15s;border:1px solid rgba(255,255,255,0.18);';
 
     const mkVoteBtn = (svg, active, activeBg, activeBorder, cb) => {
         const b = document.createElement('button');
@@ -1568,6 +1568,146 @@ fetchPlainJson('./list.json')
 
 if(searchInput){
     searchInput.addEventListener('input', renderGames);
+}
+
+// Random Well — horizontal slot machine
+const RW_SLOT_W = 88;   // px per slot (icon 68 + 10 padding + 10 gap)
+const RW_VISIBLE = 5;   // slots shown in window
+let rwRafId = null;
+let rwCurrentWinner = null;
+
+function spinRandomWell() {
+    if (!allGames.length) return;
+    const drum      = document.getElementById('rw-drum');
+    const selector  = document.getElementById('rw-selector');
+    const result    = document.getElementById('rw-result');
+    const winImg    = document.getElementById('rw-winner-img');
+    const winLabel  = document.getElementById('rw-winner-label');
+    const winStats  = document.getElementById('rw-winner-stats');
+    const playBtn   = document.getElementById('rw-play');
+
+    // Reset UI
+    result.style.display = 'none';
+    result.style.opacity = '0';
+    result.style.transform = 'translateY(6px)';
+    playBtn.style.opacity = '0';
+    playBtn.style.pointerEvents = 'none';
+    selector.classList.remove('rw-winner');
+    if (rwRafId) cancelAnimationFrame(rwRafId);
+
+    // Pick winner
+    const winnerIdx = Math.floor(Math.random() * allGames.length);
+    rwCurrentWinner = allGames[winnerIdx];
+
+    // Build item list: 3 shuffled copies → winner → 1 more copy
+    const shuffle = () => [...allGames].sort(() => Math.random() - 0.5);
+    const items = [...shuffle(), ...shuffle(), ...shuffle()];
+    const targetPos = items.length;
+    items.push(rwCurrentWinner);
+    items.push(...shuffle());
+
+    // Build drum HTML using proper thumbKey()
+    drum.innerHTML = items.map(g => {
+        const thumb = loadThumb(g.name);
+        const inner = thumb
+            ? `<img src="${thumb}" alt="${g.name}">`
+            : `<div class="rw-item-fallback">🎮</div>`;
+        return `<div class="rw-item">${inner}</div>`;
+    }).join('');
+
+    // Horizontal math:
+    // Drum width origin = the drum's left edge (translateX 0 = all items start at left of wrapper)
+    // Window center = 50% of wrapper width. Wrapper is 100%, slot is RW_SLOT_W.
+    // We want slot targetPos to be centered.
+    // slot center pos relative to drum start = targetPos * RW_SLOT_W + RW_SLOT_W/2 + 8 (left padding)
+    // translateX to center it = windowCenter - slotCenter = (wrapWidth/2) - (targetPos*RW_SLOT_W + RW_SLOT_W/2 + 8)
+    // We don't know wrapWidth at build time — use a proportion approach:
+    const wrapWidth = drum.parentElement.offsetWidth || 460;
+    const windowCenter = wrapWidth / 2;
+    const slotCenter = (pos) => pos * RW_SLOT_W + RW_SLOT_W / 2 + 8;
+    const finalX = windowCenter - slotCenter(targetPos);
+    const startX = windowCenter - slotCenter(8); // start showing slot 8
+
+    drum.style.transition = 'none';
+    drum.style.transform = `translateX(${startX}px)`;
+
+    const startTime = performance.now();
+    const duration = 2800;
+
+    function easeOutQuint(t) { return 1 - Math.pow(1 - t, 5); }
+
+    function animate(now) {
+        const t = Math.min((now - startTime) / duration, 1);
+        const x = startX + (finalX - startX) * easeOutQuint(t);
+        drum.style.transform = `translateX(${x}px)`;
+
+        if (t < 1) {
+            rwRafId = requestAnimationFrame(animate);
+        } else {
+            drum.style.transform = `translateX(${finalX}px)`;
+            // Winner reveal
+            selector.classList.add('rw-winner');
+            const thumb = loadThumb(rwCurrentWinner.name);
+            if (thumb) {
+                winImg.src = thumb;
+                winImg.style.display = 'block';
+            } else {
+                winImg.style.display = 'none';
+            }
+            winLabel.textContent = rwCurrentWinner.name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+            // Votes & playtime stats
+            const v = (voteData && voteData[rwCurrentWinner.name]) || { up: 0, down: 0 };
+            const secs = userPlayTime[rwCurrentWinner.name] || 0;
+            const statParts = [];
+            statParts.push(`<span class="rw-stat" style="color:rgba(34,197,94,0.9);border-color:rgba(34,197,94,0.2);background:rgba(34,197,94,0.07)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:11px;height:11px"><path d="M12 19V5M5 12l7-7 7 7"/></svg>${v.up}</span>`);
+            statParts.push(`<span class="rw-stat" style="color:rgba(239,68,68,0.9);border-color:rgba(239,68,68,0.2);background:rgba(239,68,68,0.07)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:11px;height:11px"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>${v.down}</span>`);
+            if (secs > 0) statParts.push(`<span class="rw-stat" style="color:rgba(251,146,60,0.85);border-color:rgba(251,146,60,0.2);background:rgba(251,146,60,0.07)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>${formatPlaytime(secs)}</span>`);
+            winStats.innerHTML = statParts.join('');
+
+            result.style.display = 'flex';
+            requestAnimationFrame(() => {
+                result.style.opacity = '1';
+                result.style.transform = 'translateY(0)';
+            });
+            playBtn.style.opacity = '1';
+            playBtn.style.pointerEvents = 'auto';
+        }
+    }
+
+    // Double rAF so the reset transform is painted before animating
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        rwRafId = requestAnimationFrame(animate);
+    }));
+}
+
+const navRandom  = document.getElementById('nav-random');
+const rwModal    = document.getElementById('random-well');
+const rwCloseBtn = document.getElementById('rw-close-btn');
+const rwSpinBtn  = document.getElementById('rw-spin-again');
+const rwPlayBtn  = document.getElementById('rw-play');
+
+if (navRandom && rwModal) {
+    navRandom.addEventListener('click', () => {
+        rwModal.style.display = 'flex';
+        spinRandomWell();
+    });
+    rwCloseBtn.addEventListener('click', () => {
+        if (rwRafId) cancelAnimationFrame(rwRafId);
+        rwModal.style.display = 'none';
+    });
+    rwModal.addEventListener('click', e => {
+        if (e.target === rwModal) {
+            if (rwRafId) cancelAnimationFrame(rwRafId);
+            rwModal.style.display = 'none';
+        }
+    });
+    rwSpinBtn.addEventListener('click', spinRandomWell);
+    rwPlayBtn.addEventListener('click', () => {
+        if (!rwCurrentWinner) return;
+        rwModal.style.display = 'none';
+        incrementPlayAndNavigate(rwCurrentWinner, `/${rwCurrentWinner.category}/${rwCurrentWinner.name}/index.html`);
+    });
 }
 
 const commentsModal = document.getElementById('comments-modal');
