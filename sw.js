@@ -233,10 +233,77 @@ async function loadViaEndpoint(request, referrerPath) {
     
   } catch (err) {
     log('error', `Load failed: ${url.pathname}`, err.message);
-    
-    const status = err.message === 'not found' ? 404 : 500;
+
+    if (err.message === 'not found') {
+      const html404 = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0500">
+<meta name="color-scheme" content="dark">
+<title>404 — Not Found</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0500;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: rgba(255,255,255,0.85);
+    text-align: center;
+    padding: 2rem;
+  }
+  .code {
+    font-size: clamp(6rem, 20vw, 10rem);
+    font-weight: 900;
+    line-height: 1;
+    color: transparent;
+    background: linear-gradient(135deg, #fb923c 0%, #f97316 50%, #ea580c 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    letter-spacing: -4px;
+    user-select: none;
+  }
+  .title { font-size: 1.5rem; font-weight: 600; color: rgba(255,255,255,0.75); margin-top: 0.75rem; }
+  .subtitle { font-size: 0.95rem; color: rgba(255,255,255,0.38); margin-top: 0.5rem; max-width: 360px; line-height: 1.5; }
+  .path {
+    margin-top: 1rem; font-size: 0.8rem; font-family: monospace;
+    color: rgba(251,146,60,0.55); background: rgba(55,22,5,0.55);
+    border: 1px solid rgba(251,146,60,0.15); border-radius: 6px;
+    padding: 0.35rem 0.75rem; word-break: break-all; max-width: 480px;
+  }
+  .back {
+    margin-top: 2rem; display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(55,22,5,0.55); border: 1px solid rgba(251,146,60,0.25);
+    border-radius: 999px; padding: 0.5rem 1.25rem; font-size: 0.9rem;
+    color: rgba(255,255,255,0.7); text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .back:hover { background: rgba(80,35,5,0.70); border-color: rgba(251,146,60,0.45); color: #fff; }
+</style>
+</head>
+<body>
+  <div class="code">404</div>
+  <div class="title">Page not found</div>
+  <div class="subtitle">The file you're looking for doesn't exist or was moved.</div>
+  <div class="path" id="p"></div>
+  <a class="back" href="/">&#8592; Back to Paper Stars</a>
+  <script>
+    const p = location.pathname;
+    if (p && p !== '/404.html') document.getElementById('p').textContent = p;
+    else document.getElementById('p').remove();
+  </script>
+</body>
+</html>`;
+      return new Response(html404, { status: 404, headers: { 'Content-Type': 'text/html' } });
+    }
+
     return new Response(err.message, {
-      status,
+      status: 500,
       headers: { 'Content-Type': 'text/plain' }
     });
   }

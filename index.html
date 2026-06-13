@@ -6,7 +6,7 @@
 <meta name="description" content="Paper Stars — a browser arcade with 180+ games. No installs, no sign-in.">
 <meta name="theme-color" content="#0a0500">
 <meta name="color-scheme" content="dark">
-<title>Math Practice</title>
+<title>Paper Stars</title>
 <link rel="icon" type="image/png" href="/imgs/image.png">
 <link rel="preconnect" href="https://cdn.tailwindcss.com">
 <link rel="preconnect" href="https://api.open-meteo.com">
@@ -269,14 +269,6 @@
       <span id="nav-weather">--°F</span>
     </div>
 
-    <!-- Ping -->
-    <div class="nav-chip">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/>
-        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/>
-      </svg>
-      <span id="nav-ping">-- ms</span>
-    </div>
 
     <!-- Battery -->
     <div class="nav-chip" id="nav-battery-chip" style="display:none">
@@ -489,21 +481,6 @@
   });
 })();
 
-// ── Nav ping ─────────────────────────────────────────────────────────────────
-(function () {
-  const el = document.getElementById('nav-ping');
-  function measure() {
-    const t0 = performance.now();
-    fetch('/api/ping', { cache: 'no-store' })
-      .then(() => {
-        const ms = Math.round(performance.now() - t0);
-        el.textContent = ms + ' ms';
-      })
-      .catch(() => { el.textContent = '-- ms'; });
-  }
-  measure();
-  setInterval(measure, 15000);
-})();
 
 // ── Announcements ─────────────────────────────────────────────────────────────
 (function () {
