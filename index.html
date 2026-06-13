@@ -117,22 +117,22 @@
     <img src="/imgs/image.png" alt=""
          style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
                 width:62px;height:62px;border-radius:17px;object-fit:cover;z-index:20;
-                box-shadow:0 0 44px rgba(251,146,60,0.32),0 6px 20px rgba(0,0,0,0.85);
-                animation:lo-pulse 2.6s ease-in-out infinite">
+                box-shadow:0 6px 20px rgba(0,0,0,0.85)">
 
-    <!-- Percentage + count, just below logo -->
-    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,42px);text-align:center;z-index:20;pointer-events:none">
-      <div id="lo-pct"       style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.55);line-height:1">0%</div>
-      <div id="loading-text" style="font-size:10px;color:rgba(255,255,255,0.18);margin-top:3px">0 / 0</div>
+    <!-- Percentage + count + bar — pinned to bottom, away from orbit -->
+    <div style="position:absolute;left:50%;bottom:32px;transform:translateX(-50%);text-align:center;z-index:20;pointer-events:none;width:160px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
+        <span id="lo-pct"       style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.8)">0%</span>
+        <span id="loading-text" style="font-size:10px;color:rgba(255,255,255,0.28)">0 / 0</span>
+      </div>
+      <div style="height:2px;border-radius:2px;background:rgba(255,255,255,0.1);overflow:hidden">
+        <div id="lo-bar" style="height:100%;width:0%;border-radius:2px;background:linear-gradient(90deg,#f97316,#fb923c);transition:width 0.2s linear"></div>
+      </div>
     </div>
   </div>
 </div>
 
 <style>
-@keyframes lo-pulse {
-  0%,100% { box-shadow:0 0 44px rgba(251,146,60,0.32),0 6px 20px rgba(0,0,0,0.85); }
-  50%      { box-shadow:0 0 70px rgba(251,146,60,0.50),0 6px 20px rgba(0,0,0,0.85); }
-}
 @keyframes lo-pop {
   from { opacity:0; transform:translate(var(--tx),var(--ty)) scale(0.4); }
   to   { opacity:1; transform:translate(var(--tx),var(--ty)) scale(1); }

@@ -697,6 +697,7 @@ function renderGames(){
             )
         );
     });
+
 }
 
 // ================= VOTES =================
@@ -1542,10 +1543,12 @@ fetchPlainJson('./list.json')
         loStage = document.getElementById('lo-stage');
         const pctEl = document.getElementById('lo-pct');
         const text  = document.getElementById('loading-text');
+        const bar   = document.getElementById('lo-bar');
         await preloadAllThumbnails(allGames, (done, total, thumbUrl) => {
             const pct = Math.round(done / total * 100);
             if (pctEl) pctEl.textContent = pct + '%';
             if (text)  text.textContent  = done + ' / ' + total;
+            if (bar)   bar.style.width   = pct + '%';
             loAddThumb(thumbUrl);
         });
         try { localStorage.setItem(THUMBS_READY_KEY, listFingerprint); } catch(e) {}
