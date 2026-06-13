@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex, nofollow">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Math Practice</title>
+    <script>
+		if (window.self === window.top) {
+		    
+		}
+	</script>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+	
+	
+	
+	
+	
+<style type="text/css">
+	body {
+	  overflow: hidden;
+	}
+</style>
+
+	<link rel="canonical" href="https://unblocked-games.s3.amazonaws.com/color-tunnel.html" />
+	
+	<script src="/assets/scripts/game.js"></script>
+
+
+	<!-- Google tag (gtag.js) -->
+	
+	<script>
+	  window.dataLayer = window.dataLayer || [];
+	  function gtag(){dataLayer.push(arguments);}
+	  gtag('js', new Date());
+
+	  gtag('config', 'G-GXS04HS5MX');
+	</script>
+	
+
+	
+	<script type="text/javascript" async>
+		!function(e, t) {
+			var a = e.createElement("script"),
+				m = e.getElementsByTagName("script")[0];
+
+			a.async = 1;
+			a.src = t;
+
+			a.onload = function() {
+				console.log("Dynamic script loaded wg");
+				if (typeof window.syncPromoManager === "function") window.syncPromoManager(false);
+				window.wgLoaded = 1;
+			};
+
+			a.onerror = function() {
+				console.error("Failed to load wg");
+				if (typeof window.syncPromoManager === "function") window.syncPromoManager(true);
+				window.wgLoaded = 2;
+			};
+
+			m.parentNode.insertBefore(a, m);
+		}(document, "https://universal.wgplayer.com/tag/?lh=" + window.location.hostname + "&wp=" + window.location.pathname + "&ws=" + window.location.search);
+	</script>
+	
+
+	<script>
+	
+	function SubmitLeaderboardScore(newScore)
+	{
+		
+	}
+	
+	function GetLeaderboardEntries()
+	{
+		
+	}
+	
+	function InitApi(_appId) 
+    {
+		var dateNow = new Date();
+		var secondsSinceEpoch = Math.round(dateNow.getTime() / 1000);
+		
+		console.log('InitApi');
+		
+		window.callTime = secondsSinceEpoch - 181;
+    }
+	
+	function InitExternEval(_appId) 
+    {
+		console.log("InitExternEval");
+		
+		ExternEval();
+    }
+    
+    function ExternEval() 
+    {
+		console.log("ExternEval");
+		
+		var dateNow = new Date();
+		var secondsSinceEpoch = Math.round(dateNow.getTime() / 1000);
+		
+		if (window.callTime != undefined && 
+			secondsSinceEpoch - window.callTime > 180)
+		{
+			console.log('ExternEval 2');
+			
+			window.callTime = secondsSinceEpoch;
+			
+			if (typeof preroll !== 'undefined')
+			{
+				if (window[preroll.config.loaderObjectName] != undefined)
+				{
+					gameInstance.SendMessage('FreezeNovaAPI', 'AdMessage', 'onOpen');
+				
+					try {
+						window[preroll.config.loaderObjectName].refetchAd(ExternEvalResumeGame);
+					}
+					catch(err) {
+						console.log(err.message);
+						gameInstance.SendMessage('FreezeNovaAPI', 'AdMessage', 'onClose');
+					}
+				}
+			}
+		}
+		
+    }
+	
+	function ExternEvalResumeGame()
+	{
+		console.log("ExternEvalResumeGame");
+	
+		gameInstance.SendMessage('FreezeNovaAPI', 'AdMessage', 'onClose');
+	}
+	
+	function PreloadRewarded() 
+	{
+		console.log("PreloadRewarded");
+	
+		if (window.rewardedCallbacks == undefined)
+		{
+			window.rewardedCallbacks = true;
+			
+			try {
+				window[window.preroll.config.loaderObjectName].registerRewardCallbacks({
+					onReady:RewardedReady, 
+					onSuccess:RewardedSuccess, 
+					onFail:RewardedFail,
+					onClose:RewardedClose
+				});
+			}
+			catch(err) {
+				console.log(err.message);
+			}
+		}
+	}
+		
+	function ShowRewarded() 
+	{
+		console.log("ShowRewarded");
+	
+		if (typeof preroll !== 'undefined')
+		{
+			if (window.rewardedCallbacks == undefined)
+			{
+				PreloadRewarded();
+			}
+		
+			if (window[preroll.config.loaderObjectName] != undefined)
+			{
+				gameInstance.SendMessage('FreezeNovaAPI', 'AdMessage', 'onOpen');
+			
+				try {
+					window[preroll.config.loaderObjectName].showRewardAd();
+				}
+				catch(err) {
+					console.log(err.message);
+					gameInstance.SendMessage('FreezeNovaAPI', 'AdMessage', 'onClose');
+				}
+			}
+		}
+	
+	}
+	
+	function RewardedReady()
+	{
+		console.log("RewardedReady");
+		
+		if (window.rewardedCount == undefined)
+		{
+			window.rewardedCount = 1;
+			window.gameInstance.SendMessage('FreezeNovaAPI', 'RewardedReady');
+		}
+		else{
+			window.rewardedCount = window.rewardedCount + 1;
+			//setTimeout(function(){ window.gameInstance.SendMessage('FreezeNovaAPI', 'RewardedReady'); }, 30000);
+			window.gameInstance.SendMessage('FreezeNovaAPI', 'RewardedReady');
+		}
+		
+	}
+	
+	function RewardedSuccess()
+	{
+		console.log("RewardedSuccess");
+		gameInstance.SendMessage('FreezeNovaAPI', 'AdMessage', 'RewardedOnRewarded');
+		//gameInstance.SendMessage('FreezeNovaAPI', 'AdMessage', 'onClose');
+	}
+	
+	function RewardedFail()
+	{
+		console.log("RewardedFail");
+		gameInstance.SendMessage('FreezeNovaAPI', 'AdMessage', 'RewardedOnFail');
+		//gameInstance.SendMessage('FreezeNovaAPI', 'AdMessage', 'onClose');
+	}
+	
+	function RewardedClose()
+	{
+		console.log("RewardedClose");
+		gameInstance.SendMessage('FreezeNovaAPI', 'AdMessage', 'onClose');
+	}
+	
+	InitApi(0);
+	
+	
+	</script>
+
+	
+	
+	
+	
+  </head>
+  <body style="overflow:hidden; margin:0; padding:0;">
+    <div id="unity-container" class="unity-desktop">
+      <canvas id="unity-canvas" width=800 height=600></canvas>
+      <div id="unity-loading-bar">
+        <div id="unity-logo">
+        	<div id="unity-text-progress"></div>
+        </div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+      </div>
+      <div id="unity-warning"> </div>
+<!--       <div id="unity-footer">
+        <div id="unity-webgl-logo"></div>
+        <div id="unity-fullscreen-button"></div>
+        <div id="unity-build-title">Color Tunnel</div>
+      </div> -->
+    </div>
+    <script>
+      var container = document.querySelector("#unity-container");
+      var canvas = document.querySelector("#unity-canvas");
+      var textProgress = document.querySelector("#unity-text-progress");
+      var loadingBar = document.querySelector("#unity-loading-bar");
+      var progressBarFull = document.querySelector("#unity-progress-bar-full");
+      var progressBarEmpty = document.querySelector("#unity-progress-bar-empty");
+      // var fullscreenButton = document.querySelector("#unity-fullscreen-button");
+      var warningBanner = document.querySelector("#unity-warning");
+
+      // Shows a temporary message banner/ribbon for a few seconds, or
+      // a permanent error message on top of the canvas if type=='error'.
+      // If type=='warning', a yellow highlight color is used.
+      // Modify or remove this function to customize the visually presented
+      // way that non-critical warnings and error messages are presented to the
+      // user.
+      function unityShowBanner(msg, type) {
+        function updateBannerVisibility() {
+          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+        }
+        var div = document.createElement('div');
+        div.innerHTML = msg;
+        warningBanner.appendChild(div);
+        if (type == 'error') div.style = 'background: red; padding: 10px;';
+        else {
+          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
+          setTimeout(function() {
+            warningBanner.removeChild(div);
+            updateBannerVisibility();
+          }, 5000);
+        }
+        updateBannerVisibility();
+      }
+
+      var buildUrl = "Build";
+      var loaderUrl = buildUrl + "/ColorTunnel-2022-v1.loader.js";
+      var config = {
+        dataUrl: buildUrl + "/ColorTunnel-2022-v1.data.unityweb",
+        frameworkUrl: buildUrl + "/ColorTunnel-2022-v1.framework.js?.unityweb",
+        codeUrl: buildUrl + "/ColorTunnel-2022-v1.wasm.unityweb",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "Color Tunnel",
+        productName: "Color Tunnel",
+        productVersion: "1.0",
+        showBanner: unityShowBanner,
+      };
+
+      // By default Unity keeps WebGL canvas render target size matched with
+      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
+      // Set this to false if you want to decouple this synchronization from
+      // happening inside the engine, and you would instead like to size up
+      // the canvas DOM size and WebGL render target sizes yourself.
+      // config.matchWebGLToCanvasSize = false;
+
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        // Mobile device style: fill the whole browser client area with the game canvas:
+
+        var meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+        document.getElementsByTagName('head')[0].appendChild(meta);
+        container.className = "unity-mobile";
+
+        // To lower canvas resolution on mobile devices to gain some
+        // performance, uncomment the following line:
+        // config.devicePixelRatio = 1;
+
+        canvas.style.width = window.innerWidth + 'px';
+        canvas.style.height = window.innerHeight + 'px';
+
+        // unityShowBanner('WebGL builds are not supported on mobile devices.');
+      } else {
+        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
+
+        canvas.style.width = window.innerWidth + 'px';
+        canvas.style.height = window.innerHeight + 'px';
+        // canvas.style.width = "800px";
+        // canvas.style.height = "600px";
+      }
+
+      window.addEventListener('resize', function() {
+      setTimeout(function() {
+        canvas.style.width = window.innerWidth + 'px';
+        canvas.style.height = window.innerHeight + 'px';
+      }, 1000);
+      }, false);
+
+      loadingBar.style.display = "block";
+
+       var showLoadingBar = false;
+
+      if(!showLoadingBar)
+        progressBarEmpty.style.display = "none";
+
+
+      const rootPath = 'TemplateData';
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+        if(progress>= 0.9 && progress<1)
+        {
+            textProgress.innerHTML = '100% - Running, Wait..' +' <img src="' + rootPath + '/gears.gif" class="spinner" width="90" height="90" align = center float :none; />';
+            progressBarEmpty.style.display = "none";        }
+        else
+        {
+            textProgress.innerHTML = 'Loading - ' + Math.floor(progress * 100) + '%' + ' <img src="' + rootPath + '/gears.gif" class="spinner" width="90" height="90" align = center float :none; />';
+        }
+
+        if(showLoadingBar)
+        progressBarFull.style.width = 100 * progress + "%";
+
+        }).then((unityInstance) => {
+          loadingBar.style.display = "none";
+          textProgress.style.display = "none";
+          // fullscreenButton.onclick = () => {
+          //   unityInstance.SetFullscreen(1);
+          // };
+        }).catch((message) => {
+          alert(message);
+        });
+      };
+      document.body.appendChild(script);
+    </script>
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"c843b8c381814d58b40d4597a1bf7962","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script src="/lib/statusbar.js"></script>
+<script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
+</body>
+</html>
