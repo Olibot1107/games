@@ -6,7 +6,7 @@
 <meta name="description" content="Paper Stars — a browser arcade with 180+ games. No installs, no sign-in.">
 <meta name="theme-color" content="#0a0500">
 <meta name="color-scheme" content="dark">
-<title>Math Practice</title>
+<title>Paper Stars</title>
 <link rel="icon" type="image/png" href="/imgs/image.png">
 <link rel="preconnect" href="https://cdn.tailwindcss.com">
 <link rel="preconnect" href="https://api.open-meteo.com">
@@ -50,7 +50,28 @@
   #nav-random { cursor: pointer; border-color: rgba(251,146,60,0.38); }
   #nav-random:hover { border-color: rgba(251,146,60,0.7); background: rgba(80,35,5,0.70); }
 
-  /* Random Well modal */
+  /* Category / sort filter chips */
+  .filter-chip, .sort-chip {
+    background: rgba(22,8,1,0.65);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 999px;
+    padding: 4px 13px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    cursor: pointer;
+    transition: color 0.13s, border-color 0.13s, background 0.13s;
+    font-family: inherit;
+  }
+  .filter-chip:hover, .sort-chip:hover {
+    color: rgba(255,255,255,0.7);
+    border-color: rgba(251,146,60,0.28);
+  }
+  .filter-chip.active, .sort-chip.active {
+    background: rgba(251,146,60,0.12);
+    border-color: rgba(251,146,60,0.42);
+    color: rgba(251,146,60,0.92);
+  }
+
   /* Random Well modal */
   #random-well {
     position: fixed; inset: 0; z-index: 300;
@@ -207,6 +228,18 @@
   }
   #search::placeholder { color: rgba(255,255,255,0.28); }
 
+  /* Scroll-to-top FAB */
+  #scroll-top-btn {
+    position: fixed; bottom: 24px; right: 22px; z-index: 200;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: rgba(251,146,60,0.82); border: none;
+    color: #fff; font-size: 16px; line-height: 1;
+    cursor: pointer; display: none; align-items: center; justify-content: center;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.55);
+    transition: background 0.15s, transform 0.15s, opacity 0.2s;
+  }
+  #scroll-top-btn:hover { background: #fb923c; transform: translateY(-2px); }
+
 </style>
 </head>
 
@@ -256,19 +289,24 @@
   <!-- Chips + search — centered -->
   <div class="flex items-center gap-2 mx-auto">
     <!-- Clock -->
-    <div class="nav-chip">
+    <div class="nav-chip" id="nav-clock-chip" style="cursor:pointer" title="Toggle 12/24h">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
       </svg>
       <span id="nav-time">--:--</span>
     </div>
 
-    <!-- Weather -->
+    <!-- Weather + sun phase -->
     <div class="nav-chip" id="nav-weather-chip" style="display:none">
-      <span id="nav-weather-dot" style="width:7px;height:7px;border-radius:50%;background:#facc15;display:inline-block;flex-shrink:0"></span>
+      <svg id="nav-sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="4"/>
+        <line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
+        <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/>
+        <line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/>
+      </svg>
       <span id="nav-weather">--°F</span>
     </div>
-
 
     <!-- Battery -->
     <div class="nav-chip" id="nav-battery-chip" style="display:none">
@@ -280,8 +318,34 @@
       <span id="nav-battery">--%</span>
     </div>
 
+    <!-- Leaderboard -->
+    <a href="/pages/leaderboard.html" class="nav-chip" id="nav-leaderboard" title="Leaderboard" style="text-decoration:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M8 21h8M12 17v4"/>
+        <path d="M17 7H7L6 13c0 2.21 2.69 4 6 4s6-1.79 6-4L17 7z"/>
+        <path d="M17 7a5 5 0 0 0 5-5H2a5 5 0 0 0 5 5"/>
+      </svg>
+      Top
+    </a>
+
+    <!-- Chat -->
+    <a href="/pages/chat.html" class="nav-chip" title="Chat" style="text-decoration:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      Chat
+    </a>
+
+    <!-- Video Chat -->
+    <a href="/pages/video.html" class="nav-chip" title="Video Chat" style="text-decoration:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+      </svg>
+      Video
+    </a>
+
     <!-- Random game -->
-    <button id="nav-random" class="nav-chip" title="Random game">
+    <button id="nav-random" class="nav-chip" title="Random game (r)">
       <svg viewBox="0 0 22 22" fill="none" style="width:14px;height:14px;opacity:0.8">
         <rect x="1.5" y="1.5" width="19" height="19" rx="5" stroke="currentColor" stroke-width="1.6"/>
         <circle cx="7.5" cy="7.5" r="1.5" fill="currentColor"/>
@@ -309,7 +373,19 @@
   <img src="/imgs/image.png" alt="Paper Stars"
        class="w-20 h-20 rounded-[22px] shadow-2xl mb-5 object-cover">
   <h1 class="text-5xl font-bold text-white mb-2 tracking-tight">Paper Stars</h1>
-  <p class="text-white/35 text-sm tracking-wide">ctrl + d to bookmark</p>
+  <p class="text-white/35 text-sm tracking-wide"><span id="hero-count"></span>ctrl + d to bookmark</p>
+  <button id="my-stats-btn" onclick="openMyStats()" style="margin-top:10px;background:rgba(251,146,60,0.10);border:1px solid rgba(251,146,60,0.22);border-radius:999px;padding:5px 16px;font-size:12px;color:rgba(251,146,60,0.8);cursor:pointer;transition:all 0.15s;font-family:inherit" onmouseover="this.style.background='rgba(251,146,60,0.18)'" onmouseout="this.style.background='rgba(251,146,60,0.10)'">My Stats</button>
+</div>
+
+<!-- Personal Stats Modal -->
+<div id="my-stats-modal" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.82);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:16px">
+  <div style="background:#0d0400;border:1px solid rgba(251,146,60,0.2);border-radius:20px;padding:24px 28px;max-width:420px;width:100%;box-shadow:0 32px 80px rgba(0,0,0,0.7)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <span style="font-size:14px;font-weight:700;color:#fff">My Stats</span>
+      <button onclick="document.getElementById('my-stats-modal').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,0.3);font-size:20px;cursor:pointer;line-height:1;padding:2px 6px">&times;</button>
+    </div>
+    <div id="my-stats-body" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
+  </div>
 </div>
 
 <!-- Announcements (dynamic) -->
@@ -338,6 +414,29 @@
 <div id="favorites-section" class="hidden relative z-10 max-w-6xl mx-auto px-4 mb-6">
   <p class="text-xs uppercase tracking-wider mb-3" style="color:rgba(251,146,60,0.5);letter-spacing:0.12em;font-weight:600">Favorites</p>
   <div id="favorites-list" class="flex gap-3 overflow-x-auto pb-2" style="scrollbar-width:thin;scrollbar-color:rgba(251,146,60,0.25) transparent"></div>
+</div>
+
+<!-- Recently Played strip -->
+<div id="recent-section" class="hidden relative z-10 max-w-6xl mx-auto px-4 mb-6">
+  <p class="text-xs uppercase tracking-wider mb-3" style="color:rgba(251,146,60,0.5);letter-spacing:0.12em;font-weight:600">Recently Played</p>
+  <div id="recent-list" class="flex gap-3 overflow-x-auto pb-2" style="scrollbar-width:thin;scrollbar-color:rgba(251,146,60,0.25) transparent"></div>
+</div>
+
+<!-- Filter + sort bar -->
+<div class="relative z-10 max-w-6xl mx-auto px-4 mb-4 flex items-center gap-3 flex-wrap">
+  <div style="display:flex;gap:5px">
+    <button class="filter-chip active" data-cat="all">All</button>
+    <button class="filter-chip" data-cat="good">Good</button>
+    <button class="filter-chip" data-cat="nova">Nova</button>
+  </div>
+  <div style="width:1px;height:14px;background:rgba(255,255,255,0.07);flex-shrink:0"></div>
+  <div style="display:flex;gap:5px">
+    <button class="sort-chip active" data-sort="top">Top</button>
+    <button class="sort-chip" data-sort="plays">Most Played</button>
+    <button class="sort-chip" data-sort="az">A–Z</button>
+  </div>
+  <div style="flex:1"></div>
+  <span id="game-count-label" style="font-size:11px;color:rgba(255,255,255,0.2)"></span>
 </div>
 
 <!-- Games grid -->
@@ -405,6 +504,24 @@
   </div>
 </div>
 
+<!-- Scroll to top -->
+<button id="scroll-top" onclick="window.scrollTo({top:0,behavior:'smooth'})"
+  style="position:fixed;bottom:24px;right:24px;z-index:100;display:none;
+         width:40px;height:40px;border-radius:50%;border:1px solid rgba(251,146,60,0.35);
+         background:rgba(30,12,3,0.82);backdrop-filter:blur(8px);cursor:pointer;
+         color:rgba(255,255,255,0.7);font-size:16px;line-height:1;
+         align-items:center;justify-content:center;
+         transition:opacity 0.2s,border-color 0.2s;">↑</button>
+<script>
+(function(){
+  const btn = document.getElementById('scroll-top');
+  window.addEventListener('scroll', function() {
+    const show = window.scrollY > 400;
+    btn.style.display = show ? 'flex' : 'none';
+  }, { passive: true });
+})();
+</script>
+
 <!-- Debug panel -->
 <div id="debug-panel" class="hidden fixed bottom-0 left-0 right-0 z-50
      bg-black text-orange-400 text-xs p-3 max-h-40 overflow-y-auto border-t border-orange-900/50"></div>
@@ -412,45 +529,96 @@
 <script>
 // ── Nav clock ────────────────────────────────────────────────────────────────
 (function () {
+  const label = document.getElementById('nav-time');
+  let use24 = localStorage.getItem('clockFmt') !== '12';
+
+  function fmt(d) {
+    if (use24) {
+      return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+    let h = d.getHours(), m = d.getMinutes();
+    const ampm = h >= 12 ? 'pm' : 'am';
+    h = h % 12 || 12;
+    return h + ':' + String(m).padStart(2, '0') + ampm;
+  }
+
   function tick() {
     const d = new Date();
-    document.getElementById('nav-time').textContent =
-      String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-    // schedule next tick at the start of the next minute
+    label.textContent = fmt(d);
     setTimeout(tick, (60 - d.getSeconds()) * 1000 - d.getMilliseconds());
   }
   tick();
+
+  document.getElementById('nav-clock-chip').addEventListener('click', () => {
+    use24 = !use24;
+    localStorage.setItem('clockFmt', use24 ? '24' : '12');
+    label.textContent = fmt(new Date());
+  });
 })();
 
-// ── Nav weather ──────────────────────────────────────────────────────────────
+// ── Nav weather + sun phase (one ipapi call) ──────────────────────────────────
 (function () {
-  const chip  = document.getElementById('nav-weather-chip');
-  const label = document.getElementById('nav-weather');
-  const dot   = document.getElementById('nav-weather-dot');
+  const chip    = document.getElementById('nav-weather-chip');
+  const label   = document.getElementById('nav-weather');
+  const sunIcon = document.getElementById('nav-sun-icon');
 
-  function dotColor(tempF) {
-    if (tempF <= 32)  return '#93c5fd'; // freezing — blue
-    if (tempF <= 55)  return '#67e8f9'; // cold — cyan
-    if (tempF <= 75)  return '#fdba74'; // mild — orange
-    if (tempF <= 90)  return '#fde047'; // warm — yellow
-    return '#fb923c';                   // hot — orange
+  const moonSvg = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
+  const sunSvg  = `<circle cx="12" cy="12" r="4"/>
+    <line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
+    <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/>
+    <line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>
+    <line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/>`;
+
+  function iconColor(tempF) {
+    if (tempF <= 32) return '#93c5fd';
+    if (tempF <= 55) return '#67e8f9';
+    if (tempF <= 75) return '#fdba74';
+    if (tempF <= 90) return '#fde047';
+    return '#fb923c';
   }
 
-  function fetchWeather(lat, lon) {
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&temperature_unit=fahrenheit`)
-      .then(r => r.json())
-      .then(d => {
-        const tempF = Math.round(d.current_weather.temperature);
-        label.textContent = tempF + '°F';
-        dot.style.background = dotColor(tempF);
-        chip.style.display = 'flex';
-      })
-      .catch(() => {});
+  let storedTempF = null;
+  let useCelsius  = localStorage.getItem('weatherUnit') === 'c';
+
+  function renderTemp() {
+    if (storedTempF === null) return;
+    if (useCelsius) {
+      const c = Math.round((storedTempF - 32) * 5 / 9);
+      label.textContent = c + '°C';
+    } else {
+      label.textContent = storedTempF + '°F';
+    }
+  }
+
+  chip.style.cursor = 'pointer';
+  chip.addEventListener('click', () => {
+    useCelsius = !useCelsius;
+    localStorage.setItem('weatherUnit', useCelsius ? 'c' : 'f');
+    renderTemp();
+  });
+
+  function fetchAll(lat, lon) {
+    const today = new Date().toISOString().slice(0, 10);
+    Promise.all([
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&temperature_unit=fahrenheit`).then(r => r.json()),
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=sunrise,sunset&timezone=auto&start_date=${today}&end_date=${today}`).then(r => r.json()),
+    ]).then(([wx, sun]) => {
+      storedTempF = Math.round(wx.current_weather.temperature);
+      const rise  = new Date(sun.daily.sunrise[0]);
+      const set   = new Date(sun.daily.sunset[0]);
+      const now   = new Date();
+      const isDay = now >= rise && now < set;
+
+      sunIcon.innerHTML = isDay ? sunSvg : moonSvg;
+      sunIcon.setAttribute('stroke', iconColor(storedTempF));
+      renderTemp();
+      chip.style.display = 'flex';
+    }).catch(() => {});
   }
 
   fetch('https://ipapi.co/json/')
     .then(r => r.json())
-    .then(d => { if (d.latitude) fetchWeather(d.latitude, d.longitude); })
+    .then(d => { if (d.latitude) fetchAll(d.latitude, d.longitude); })
     .catch(() => {});
 })();
 
@@ -570,9 +738,21 @@
   </div>
 </div>
 
+<button id="scroll-top-btn" title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
 <script src="htmlindex.js"></script>
+<script>
+(function(){
+  const btn = document.getElementById('scroll-top-btn');
+  if (!btn) return;
+  window.addEventListener('scroll', function() {
+    btn.style.display = window.scrollY > 320 ? 'flex' : 'none';
+  }, { passive: true });
+})();
+</script>
 
 <script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
 <script src="/lib/statusbar.js"></script>
+<script src="/lib/playtime.js"></script>
 </body>
 </html>
