@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
 const gamesList = document.getElementById('games-list');
 const searchInput = document.getElementById('search');
 const favoritesList = document.getElementById('favorites-list');
+const recentList = document.getElementById('recent-list');
 const debugPanel = document.getElementById('debug-panel');
 
 let allGames = [];
@@ -10,6 +11,10 @@ let voteData = {};
 let commentData = {};
 let playData = {};
 let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
+const RECENT_KEY = 'recentGames';
+const RECENT_MAX = 8;
+let categoryFilter = 'all';
+let sortMode = 'top';
 let currentCommentGame = null;
 const COMMENT_MIN_LENGTH = 1;
 const COMMENT_MAX_LENGTH = 300;
@@ -197,34 +202,26 @@ function formatPlaytime(secs) {
     return `${m}m`;
 }
 
-// Check for reload from game (tracks play duration)
-if (performance.getEntriesByType('navigation')[0].type === 'reload' && document.referrer) {
-    try {
-        const url = new URL(document.referrer);
-        const match = url.pathname.match(/^\/(good|nova)\/([^\/]+)\/index\.html$/);
-        if (match) {
-            const game = match[2];
-            const startTime = parseInt(getCookie('playStart_' + game) || '0', 10);
-            const duration = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
-            if (duration > 0) {
-                if (!userPlayTime[game]) userPlayTime[game] = 0;
-                userPlayTime[game] += duration;
-                savePlayTime();
-            }
-            setCookie('playStart_' + game, '', -1);
-            
-            fetch('/api/plays', {
-                method: 'POST',
-                headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ game, clientId })
-            }).then(() => {
-                fetchPlayCounts();
-            }).catch(() => {});
-        }
-    } catch (e) {
-        // ignore
-    }
-}
+// Re-read userPlayTime — playtime.js may have updated it while on the game page
+try { userPlayTime = JSON.parse(localStorage.getItem('userPlayTime') || '{}'); } catch (e) {}
+
+// Clear playStart_ cookies and record play counts.
+try {
+    const PREFIX = 'playStart_';
+    document.cookie.split(';').forEach(c => {
+        const eq = c.indexOf('=');
+        if (eq < 0) return;
+        const rawKey = c.slice(0, eq).trim();
+        if (!rawKey.startsWith(PREFIX)) return;
+        const game = decodeURIComponent(rawKey.slice(PREFIX.length));
+        setCookie(rawKey, '', -1);
+        fetch('/api/plays', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ game, clientId })
+        }).then(() => fetchPlayCounts()).catch(() => {});
+    });
+} catch (e) {}
 const RESOURCE_KEY = new TextEncoder().encode('games-shell-v1');
 
 function getCookie(name) {
@@ -519,6 +516,73 @@ function renderFavorites(){
     });
 }
 
+// ================= RECENTLY PLAYED =================
+function addRecentGame(gameName) {
+    let recent = [];
+    try { recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch(e) {}
+    recent = [gameName, ...recent.filter(n => n !== gameName)].slice(0, RECENT_MAX);
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch(e) {}
+}
+
+function renderRecentGames() {
+    const section = document.getElementById('recent-section');
+    if (!recentList || !section) return;
+
+    let recent = [];
+    try { recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch(e) {}
+    const valid = recent.filter(n => allGames.some(g => g.name === n));
+
+    if (!valid.length) { section.classList.add('hidden'); return; }
+    section.classList.remove('hidden');
+    recentList.innerHTML = '';
+
+    valid.forEach(name => {
+        const gameData = allGames.find(g => g.name === name);
+        if (!gameData) return;
+        const href = `/${gameData.category}/${name}/index.html`;
+        const displayName = toTitleCase(name);
+
+        const card = document.createElement('div');
+        card.style.cssText = 'position:relative;width:130px;flex-shrink:0;border-radius:12px;overflow:hidden;cursor:pointer;background:rgba(30,10,2,0.85);border:1px solid rgba(251,146,60,0.18);transition:transform 0.15s,border-color 0.15s,box-shadow 0.15s;';
+        card.onmouseover = () => { card.style.transform = 'translateY(-3px)'; card.style.borderColor = 'rgba(251,146,60,0.55)'; card.style.boxShadow = '0 6px 20px rgba(251,146,60,0.12)'; };
+        card.onmouseout  = () => { card.style.transform = ''; card.style.borderColor = 'rgba(251,146,60,0.18)'; card.style.boxShadow = ''; };
+        card.onclick = () => incrementPlayAndNavigate(gameData, href);
+
+        const imgWrap = document.createElement('div');
+        imgWrap.style.cssText = 'width:100%;height:78px;overflow:hidden;background:#120600;';
+        const img = document.createElement('img');
+        img.alt = displayName;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 0.3s;';
+        const cached = loadThumb(name);
+        if (cached) { img.src = cached; img.style.opacity = '1'; }
+        else {
+            img.onload = () => { img.style.opacity = '1'; saveThumbIdle(name, img); };
+            img.onerror = () => {};
+            img.src = `/thumbnails/${name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 80)}.jpg`;
+        }
+        imgWrap.appendChild(img);
+        card.appendChild(imgWrap);
+
+        const info = document.createElement('div');
+        info.style.cssText = 'padding:6px 8px 7px;';
+        const nameEl = document.createElement('div');
+        nameEl.textContent = displayName;
+        nameEl.style.cssText = 'font-size:11px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;';
+        info.appendChild(nameEl);
+        const recentSecs = userPlayTime[name] || 0;
+        const recentPtStr = formatPlaytime(recentSecs);
+        if (recentPtStr) {
+            const ptEl = document.createElement('div');
+            ptEl.style.cssText = 'font-size:10px;color:rgba(251,146,60,0.75);margin-top:2px;display:flex;align-items:center;gap:4px;';
+            ptEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>${recentPtStr}`;
+            info.appendChild(ptEl);
+        }
+        card.appendChild(info);
+
+        recentList.appendChild(card);
+    });
+}
+
 // ================= GAME COLOR =================
 function gameColor(name) {
     let hash = 5381;
@@ -662,19 +726,24 @@ function createGameItem(game, votes){
 function renderGames(){
     if(!gamesList) return;
 
-    const search = searchInput.value.toLowerCase();
+    const search = searchInput ? searchInput.value.toLowerCase() : '';
 
     let filtered = allGames.filter(g =>
-        g.name.toLowerCase().includes(search)
+        g.name.toLowerCase().includes(search) &&
+        (categoryFilter === 'all' || g.category === categoryFilter)
     );
 
     filtered.sort((a,b)=>{
+        if (sortMode === 'az') return a.name.localeCompare(b.name);
+
+        const aPlays = playData[a.name] || 0;
+        const bPlays = playData[b.name] || 0;
+        if (sortMode === 'plays') return bPlays - aPlays;
+
         const aV = voteData[a.name] || {up:0,down:0};
         const bV = voteData[b.name] || {up:0,down:0};
         const aComments = commentData[a.name]?.count || 0;
         const bComments = commentData[b.name]?.count || 0;
-        const aPlays = playData[a.name] || 0;
-        const bPlays = playData[b.name] || 0;
         const aUserTime = userPlayTime[a.name] || 0;
         const bUserTime = userPlayTime[b.name] || 0;
         const aScore = (aV.up - aV.down) + aComments + Math.floor(aPlays / 30) + Math.floor(aUserTime / 60);
@@ -684,8 +753,14 @@ function renderGames(){
 
     gamesList.innerHTML = '';
 
+    const countLabel = document.getElementById('game-count-label');
+    if (countLabel) countLabel.textContent = filtered.length + ' of ' + allGames.length + ' games';
+
     if(filtered.length===0){
-        gamesList.innerHTML = '<li class="col-span-full text-white/25 text-center py-12 text-sm">No games found</li>';
+        const msg = categoryFilter !== 'all' || search
+            ? 'No games match your filters'
+            : 'No games found';
+        gamesList.innerHTML = `<li class="col-span-full text-white/25 text-center py-12 text-sm">${msg}</li>`;
         return;
     }
 
@@ -767,6 +842,7 @@ function fetchPlayCounts(){
 }
 
 function incrementPlayAndNavigate(game, href){
+    addRecentGame(game.name);
     setCookie('playStart_' + game.name, Date.now());
     fetch('/api/plays', {
         method: 'POST',
@@ -1530,6 +1606,83 @@ function sendVote(game, vote){
     }).catch(e=>log(e.message));
 }
 
+// ================= PERSONAL STATS =================
+window.openMyStats = function openMyStats() {
+    const modal = document.getElementById('my-stats-modal');
+    const body  = document.getElementById('my-stats-body');
+    if (!modal || !body) return;
+
+    const totalPersonalSecs = Object.values(userPlayTime).reduce((s, v) => s + (Number(v)||0), 0);
+    const gamesPlayed = Object.keys(userPlayTime).filter(k => userPlayTime[k] > 60).length;
+    const topGame = Object.entries(userPlayTime).sort((a,b)=>b[1]-a[1])[0];
+
+    const stat = (label, value, color='rgba(251,146,60,0.9)') => {
+        const el = document.createElement('div');
+        el.style.cssText = 'background:rgba(30,10,2,0.6);border:1px solid rgba(251,146,60,0.12);border-radius:12px;padding:14px 16px;';
+        el.innerHTML = `<div style="font-size:18px;font-weight:800;color:${color};line-height:1.1">${value}</div><div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:4px;text-transform:uppercase;letter-spacing:0.08em">${label}</div>`;
+        return el;
+    };
+
+    body.innerHTML = '';
+    body.style.gridTemplateColumns = '1fr 1fr 1fr';
+    body.appendChild(stat('Time Played', formatPlaytime(totalPersonalSecs) || '0m'));
+    body.appendChild(stat('Games Played', gamesPlayed, 'rgba(255,255,255,0.85)'));
+    body.appendChild(stat('Favorites', favorites.length, 'rgba(250,204,21,0.9)'));
+
+    // Top 3 most played games
+    const topGames = Object.entries(userPlayTime).sort((a,b) => b[1]-a[1]).slice(0, 3);
+    if (topGames.length) {
+        const section = document.createElement('div');
+        section.style.cssText = 'grid-column:1/-1;display:flex;flex-direction:column;gap:7px;';
+
+        const label = document.createElement('div');
+        label.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px;';
+        label.textContent = 'Most Played';
+        section.appendChild(label);
+
+        topGames.forEach(([name, secs], i) => {
+            const row = document.createElement('div');
+            row.style.cssText = 'background:rgba(30,10,2,0.6);border:1px solid rgba(251,146,60,0.10);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color 0.15s;';
+            row.onmouseover = () => row.style.borderColor = 'rgba(251,146,60,0.3)';
+            row.onmouseout  = () => row.style.borderColor = 'rgba(251,146,60,0.10)';
+            const gameData = allGames.find(g => g.name === name);
+            if (gameData) row.onclick = () => { modal.style.display = 'none'; incrementPlayAndNavigate(gameData, `/${gameData.category}/${name}/index.html`); };
+
+            const rankEl = document.createElement('div');
+            rankEl.textContent = ['🥇','🥈','🥉'][i];
+            rankEl.style.cssText = 'font-size:16px;flex-shrink:0;';
+
+            const thumb = document.createElement('img');
+            thumb.src = loadThumb(name) || `/thumbnails/${name.replace(/[^a-zA-Z0-9]/g,'_').slice(0,80)}.jpg`;
+            thumb.style.cssText = 'width:32px;height:32px;border-radius:7px;object-fit:cover;flex-shrink:0;';
+            thumb.onerror = () => thumb.remove();
+
+            const info = document.createElement('div');
+            info.style.cssText = 'flex:1;min-width:0;';
+            info.innerHTML = `<div style="font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${toTitleCase(name)}</div><div style="font-size:10px;color:rgba(251,146,60,0.7);margin-top:1px">${formatPlaytime(secs)}</div>`;
+
+            row.appendChild(rankEl);
+            row.appendChild(thumb);
+            row.appendChild(info);
+            section.appendChild(row);
+        });
+
+        body.appendChild(section);
+    }
+
+    modal.style.display = 'flex';
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        const m = document.getElementById('my-stats-modal');
+        if (m && m.style.display === 'flex') m.style.display = 'none';
+    }
+});
+document.getElementById('my-stats-modal')?.addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+});
+
 // ================= INIT =================
 fetchPlainJson('./list.json')
 .then(async data => {
@@ -1537,6 +1690,10 @@ fetchPlainJson('./list.json')
         ...(data.good||[]).map(n=>({name:n,category:'good'})),
         ...(data.nova||[]).map(n=>({name:n,category:'nova'}))
     ];
+
+    // Update hero subtitle with live game count
+    const heroCount = document.getElementById('hero-count');
+    if (heroCount) heroCount.textContent = allGames.length + ' games · ';
 
     const listFingerprint = allGames.map(g => g.name).sort().join(',');
     if (localStorage.getItem(THUMBS_READY_KEY) !== listFingerprint) {
@@ -1558,6 +1715,7 @@ fetchPlainJson('./list.json')
     }
 
     renderFavorites();
+    renderRecentGames();
     fetchVotes();
     fetchEncryptedJsonBatch(['comments.json', 'plays.json'])
     .then(() => {
@@ -1568,7 +1726,54 @@ fetchPlainJson('./list.json')
 
 if(searchInput){
     searchInput.addEventListener('input', renderGames);
+
+    // '/' focuses search; Escape clears and blurs; 'r' opens random well
+    document.addEventListener('keydown', function(e) {
+        const tag = document.activeElement?.tagName;
+        if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+            e.preventDefault();
+            searchInput.focus();
+            searchInput.select();
+        }
+        if (e.key === 'Escape' && document.activeElement === searchInput) {
+            searchInput.value = '';
+            searchInput.blur();
+            renderGames();
+        }
+        if ((e.key === 'r' || e.key === 'R') && tag !== 'INPUT' && tag !== 'TEXTAREA' && !e.ctrlKey && !e.metaKey) {
+            if (rwModal && rwModal.style.display !== 'flex') {
+                rwModal.style.display = 'flex';
+                spinRandomWell();
+            }
+        }
+        if (e.key === 'Escape' && rwModal && rwModal.style.display === 'flex') {
+            if (rwRafId) cancelAnimationFrame(rwRafId);
+            rwModal.style.display = 'none';
+        }
+    });
 }
+
+// ── Category filter chips ──────────────────────────────────────────────────
+document.querySelectorAll('[data-cat]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        categoryFilter = btn.dataset.cat;
+        document.querySelectorAll('[data-cat]').forEach(b =>
+            b.classList.toggle('active', b === btn)
+        );
+        renderGames();
+    });
+});
+
+// ── Sort chips ─────────────────────────────────────────────────────────────
+document.querySelectorAll('[data-sort]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        sortMode = btn.dataset.sort;
+        document.querySelectorAll('[data-sort]').forEach(b =>
+            b.classList.toggle('active', b === btn)
+        );
+        renderGames();
+    });
+});
 
 // Random Well — horizontal slot machine
 const RW_SLOT_W = 88;   // px per slot (icon 68 + 10 padding + 10 gap)
@@ -1816,6 +2021,15 @@ function updateImagePreview() {
 
 updateCommentInputHint(0);
 
+function formatLargeNum(n) {
+    if (!Number.isFinite(n) || n < 0) return '??';
+    if (n >= 1e12) return (n / 1e12).toFixed(1) + 'T';
+    if (n >= 1e9)  return (n / 1e9).toFixed(1) + 'B';
+    if (n >= 1e6)  return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3)  return (n / 1e3).toFixed(1) + 'K';
+    return n.toLocaleString();
+}
+
 // Fetch and display data sent
 function fetchDataCount() {
     fetch('/api/data')
@@ -1824,26 +2038,23 @@ function fetchDataCount() {
             const gbElement = document.getElementById('data-count');
             const reqElement = document.getElementById('requests-count');
             if (gbElement) {
-                gbElement.textContent = data.totalGB + ' GB Worth of network data';
+                gbElement.textContent = data.totalGB + ' GB served';
             }
             if (reqElement) {
-                reqElement.textContent = 'Files Loaded: ' + data.totalRequests.toLocaleString();
+                reqElement.textContent = formatLargeNum(data.totalRequests) + ' files served';
             }
         })
         .catch(e => {
             const gbElement = document.getElementById('data-count');
             const reqElement = document.getElementById('requests-count');
-            if (gbElement) {
-                gbElement.textContent = 'Error';
-            }
-            if (reqElement) {
-                reqElement.textContent = 'Resources Loaded: Error';
-            }
+            if (gbElement) gbElement.textContent = '-- GB served';
+            if (reqElement) reqElement.textContent = '-- files served';
             log('Data count error: ' + e.message);
         });
 }
 
-// Fetch data count on load
+// Fetch data count on load, then refresh every 2 minutes
 fetchDataCount();
+setInterval(fetchDataCount, 2 * 60 * 1000);
 
 });

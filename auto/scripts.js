@@ -3,6 +3,7 @@ const path = require('path');
 
 // ================= SCRIPTS =================
 const STATUSBAR_SCRIPT = `<script src="/lib/statusbar.js"></script>`;
+const PLAYTIME_SCRIPT  = `<script src="/lib/playtime.js"></script>`;
 const CLIENT_SCRIPT    = `<script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>`;
 
 // scripts to strip from game pages
@@ -67,6 +68,14 @@ function processFile(fullPath) {
     updated = injectScript(updated, STATUSBAR_SCRIPT);
     if (beforeSB !== updated) {
       log(`Injected statusbar -> /lib/statusbar.js`, 'green');
+      changed = true;
+    }
+
+    // inject playtime tracker
+    const beforePT = updated;
+    updated = injectScript(updated, PLAYTIME_SCRIPT);
+    if (beforePT !== updated) {
+      log(`Injected playtime -> /lib/playtime.js`, 'green');
       changed = true;
     }
 

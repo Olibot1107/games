@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Paper Stars leaderboard — top games by plays and activity.">
+<meta name="theme-color" content="#0a0500">
+<title>Paper Stars · Leaderboard</title>
+<link rel="icon" type="image/png" href="/imgs/image.png">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0a0500;
+  color: rgba(255,255,255,0.8);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+a { text-decoration: none; color: inherit; }
+
+/* Nav */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  height: 60px;
+  background: rgba(10,5,0,0.82);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(251,146,60,0.08);
+  display: flex; align-items: center; padding: 0 20px; gap: 12px;
+}
+.nav-back {
+  display: flex; align-items: center; gap: 6px;
+  color: rgba(255,255,255,0.55); font-size: 13px;
+  background: rgba(55,22,5,0.5);
+  border: 1px solid rgba(251,146,60,0.18);
+  border-radius: 999px;
+  padding: 5px 14px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.nav-back:hover {
+  color: rgba(255,255,255,0.85);
+  border-color: rgba(251,146,60,0.4);
+  background: rgba(80,35,5,0.65);
+}
+.nav-logo {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 700; color: #fff;
+}
+.nav-logo img { width: 24px; height: 24px; border-radius: 7px; object-fit: cover; }
+.nav-title {
+  margin-left: auto; margin-right: auto;
+  font-size: 13px; font-weight: 600;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+
+/* Main */
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 90px 20px 60px;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 44px;
+}
+.page-header h1 {
+  font-size: 36px; font-weight: 800; color: #fff;
+  letter-spacing: -0.02em; margin-bottom: 8px;
+}
+.page-header p {
+  font-size: 14px; color: rgba(255,255,255,0.35);
+}
+
+/* Board grid */
+.boards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+@media (max-width: 900px) {
+  .boards { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .boards { grid-template-columns: 1fr; }
+}
+
+.board {
+  background: rgba(20,8,1,0.7);
+  border: 1px solid rgba(251,146,60,0.12);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.board-header {
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  display: flex; align-items: center; gap: 10px;
+}
+.board-icon {
+  width: 32px; height: 32px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.board-icon svg { width: 16px; height: 16px; }
+.board-icon.plays   { background: rgba(251,146,60,0.15); color: #fb923c; }
+.board-icon.votes   { background: rgba(34,197,94,0.12);  color: #4ade80; }
+.board-icon.comments { background: rgba(96,165,250,0.12); color: #60a5fa; }
+.board-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: rgba(255,255,255,0.45);
+}
+.board-body { padding: 8px 0; }
+
+/* Row */
+.row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 14px 7px 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-radius: 8px;
+  margin: 0 6px 2px;
+}
+.row:hover { background: rgba(251,146,60,0.07); }
+.rank {
+  width: 26px; text-align: center; flex-shrink: 0;
+  font-size: 11px; font-weight: 700;
+  color: rgba(255,255,255,0.2);
+  font-variant-numeric: tabular-nums;
+}
+.rank.top { font-size: 15px; color: rgba(251,146,60,0.85); }
+.thumb {
+  width: 40px; height: 40px; border-radius: 8px;
+  object-fit: cover; background: rgba(30,10,2,0.8);
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+.thumb-placeholder {
+  width: 40px; height: 40px; border-radius: 8px;
+  background: rgba(30,10,2,0.8);
+  border: 1px solid rgba(255,255,255,0.05);
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.1); font-size: 18px;
+}
+.row-info { flex: 1; min-width: 0; }
+.row-name {
+  font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.88);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  line-height: 1.3; margin-bottom: 4px;
+}
+.bar-wrap {
+  height: 3px; border-radius: 3px; background: rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%; border-radius: 3px;
+  transition: width 0.5s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.row-count {
+  font-size: 11px; font-variant-numeric: tabular-nums;
+  color: rgba(255,255,255,0.35);
+  flex-shrink: 0; white-space: nowrap;
+}
+
+/* Loading / error states */
+.skeleton-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 14px 7px 10px; margin: 0 6px 2px;
+}
+.sk { border-radius: 6px; background: rgba(255,255,255,0.05); animation: sk-pulse 1.4s ease-in-out infinite; }
+@keyframes sk-pulse {
+  0%,100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+.board-error {
+  padding: 20px 18px; font-size: 12px; color: rgba(255,100,100,0.6); text-align: center;
+}
+.board-empty {
+  padding: 20px 18px; font-size: 12px; color: rgba(255,255,255,0.2); text-align: center;
+}
+
+/* Last updated */
+.footer {
+  text-align: center; margin-top: 36px;
+  font-size: 11px; color: rgba(255,255,255,0.2);
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">
+    <img src="/imgs/image.png" alt="Paper Stars">
+    <span>Paper Stars</span>
+  </a>
+  <span class="nav-title">Leaderboard</span>
+  <button id="refresh-btn" class="nav-back" style="background:none;cursor:pointer;font-family:inherit">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px">
+      <polyline points="1 4 1 10 7 10"/>
+      <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
+    </svg>
+    Refresh
+  </button>
+  <a href="/" class="nav-back">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px">
+      <path d="M19 12H5M12 5l-7 7 7 7"/>
+    </svg>
+    Back
+  </a>
+</nav>
+
+<main>
+  <div class="page-header">
+    <h1>Leaderboard</h1>
+    <p>Top games across all players</p>
+  </div>
+
+  <div class="boards">
+    <!-- Most Played -->
+    <div class="board" id="board-plays">
+      <div class="board-header">
+        <div class="board-icon plays">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+        </div>
+        <div>
+          <div class="board-label">Most Played</div>
+        </div>
+      </div>
+      <div class="board-body" id="plays-body">
+        <!-- skeleton -->
+        <div class="skeleton-row"><div class="sk" style="width:22px;height:12px"></div><div class="sk" style="width:40px;height:40px;border-radius:8px"></div><div style="flex:1"><div class="sk" style="height:10px;width:80%;margin-bottom:6px"></div><div class="sk" style="height:3px;width:100%"></div></div></div>
+        <div class="skeleton-row"><div class="sk" style="width:22px;height:12px"></div><div class="sk" style="width:40px;height:40px;border-radius:8px"></div><div style="flex:1"><div class="sk" style="height:10px;width:70%;margin-bottom:6px"></div><div class="sk" style="height:3px;width:100%"></div></div></div>
+        <div class="skeleton-row"><div class="sk" style="width:22px;height:12px"></div><div class="sk" style="width:40px;height:40px;border-radius:8px"></div><div style="flex:1"><div class="sk" style="height:10px;width:75%;margin-bottom:6px"></div><div class="sk" style="height:3px;width:100%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Most Voted -->
+    <div class="board" id="board-votes">
+      <div class="board-header">
+        <div class="board-icon votes">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+            <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+          </svg>
+        </div>
+        <div>
+          <div class="board-label">Most Liked</div>
+        </div>
+      </div>
+      <div class="board-body" id="votes-body">
+        <div class="skeleton-row"><div class="sk" style="width:22px;height:12px"></div><div class="sk" style="width:40px;height:40px;border-radius:8px"></div><div style="flex:1"><div class="sk" style="height:10px;width:80%;margin-bottom:6px"></div><div class="sk" style="height:3px;width:100%"></div></div></div>
+        <div class="skeleton-row"><div class="sk" style="width:22px;height:12px"></div><div class="sk" style="width:40px;height:40px;border-radius:8px"></div><div style="flex:1"><div class="sk" style="height:10px;width:70%;margin-bottom:6px"></div><div class="sk" style="height:3px;width:100%"></div></div></div>
+        <div class="skeleton-row"><div class="sk" style="width:22px;height:12px"></div><div class="sk" style="width:40px;height:40px;border-radius:8px"></div><div style="flex:1"><div class="sk" style="height:10px;width:65%;margin-bottom:6px"></div><div class="sk" style="height:3px;width:100%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Most Commented -->
+    <div class="board" id="board-comments">
+      <div class="board-header">
+        <div class="board-icon comments">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="board-label">Most Discussed</div>
+        </div>
+      </div>
+      <div class="board-body" id="comments-body">
+        <div class="skeleton-row"><div class="sk" style="width:22px;height:12px"></div><div class="sk" style="width:40px;height:40px;border-radius:8px"></div><div style="flex:1"><div class="sk" style="height:10px;width:80%;margin-bottom:6px"></div><div class="sk" style="height:3px;width:100%"></div></div></div>
+        <div class="skeleton-row"><div class="sk" style="width:22px;height:12px"></div><div class="sk" style="width:40px;height:40px;border-radius:8px"></div><div style="flex:1"><div class="sk" style="height:10px;width:70%;margin-bottom:6px"></div><div class="sk" style="height:3px;width:100%"></div></div></div>
+        <div class="skeleton-row"><div class="sk" style="width:22px;height:12px"></div><div class="sk" style="width:40px;height:40px;border-radius:8px"></div><div style="flex:1"><div class="sk" style="height:10px;width:60%;margin-bottom:6px"></div><div class="sk" style="height:3px;width:100%"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer" id="updated-at"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  function toTitleCase(str) {
+    return str.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function thumbSrc(name) {
+    return '/thumbnails/' + name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 80) + '.jpg';
+  }
+
+  function fmtCount(n) {
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return n.toString();
+  }
+
+  // Build a list of game rows sorted by count, top N
+  function renderBoard(bodyId, entries, barColor, labelFn, urlFn) {
+    const body = document.getElementById(bodyId);
+    if (!body) return;
+
+    if (!entries || entries.length === 0) {
+      body.innerHTML = '<div class="board-empty">No data yet.</div>';
+      return;
+    }
+
+    const top = entries.slice(0, 10);
+    const maxCount = top[0][1];
+    body.innerHTML = '';
+
+    top.forEach(([name, count], i) => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.onclick = () => { window.location.href = urlFn(name); };
+      row.title = toTitleCase(name);
+
+      const rank = document.createElement('div');
+      rank.className = 'rank' + (i < 3 ? ' top' : '');
+      rank.textContent = ['🥇','🥈','🥉'][i] ?? (i + 1);
+
+      const img = document.createElement('img');
+      img.className = 'thumb';
+      img.alt = toTitleCase(name);
+      img.loading = 'lazy';
+      img.onerror = function () {
+        const ph = document.createElement('div');
+        ph.className = 'thumb-placeholder';
+        ph.textContent = '★';
+        this.parentNode.replaceChild(ph, this);
+      };
+      img.src = thumbSrc(name);
+
+      const info = document.createElement('div');
+      info.className = 'row-info';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'row-name';
+      nameEl.textContent = toTitleCase(name);
+
+      const barWrap = document.createElement('div');
+      barWrap.className = 'bar-wrap';
+      const barFill = document.createElement('div');
+      barFill.className = 'bar-fill';
+      barFill.style.background = barColor;
+      barFill.style.width = '0%';
+      barWrap.appendChild(barFill);
+      setTimeout(() => {
+        barFill.style.width = Math.round((count / maxCount) * 100) + '%';
+      }, 50 + i * 30);
+
+      info.appendChild(nameEl);
+      info.appendChild(barWrap);
+
+      const countEl = document.createElement('div');
+      countEl.className = 'row-count';
+      countEl.textContent = labelFn(count);
+
+      row.appendChild(rank);
+      row.appendChild(img);
+      row.appendChild(info);
+      row.appendChild(countEl);
+      body.appendChild(row);
+    });
+  }
+
+  function setError(bodyId, msg) {
+    const body = document.getElementById(bodyId);
+    if (body) body.innerHTML = '<div class="board-error">' + msg + '</div>';
+  }
+
+  // We need the game list to get categories for URLs
+  let gameList = null;
+
+  function gameUrl(name) {
+    if (!gameList) return '/';
+    const g = gameList.find(x => x.name === name);
+    return g ? '/' + g.category + '/' + g.name + '/index.html' : '/';
+  }
+
+  function loadAll() {
+    // Fetch game list for URL building + thumbnail paths
+    const listPromise = fetch('/list.json').then(r => r.json()).catch(() => null);
+    const playsPromise = fetch('/api/plays').then(r => r.json()).catch(() => null);
+    const votesPromise = fetch('/votes.json').then(r => r.json()).catch(() => null);
+    const commentsPromise = fetch('/api/comments').then(r => r.json()).catch(() => null);
+
+    Promise.all([listPromise, playsPromise, votesPromise, commentsPromise])
+      .then(([list, plays, votes, comments]) => {
+        gameList = Array.isArray(list) ? list : [];
+
+        // Plays board
+        if (plays && plays.counts) {
+          const sorted = Object.entries(plays.counts)
+            .filter(([, n]) => n > 0)
+            .sort((a, b) => b[1] - a[1]);
+          renderBoard(
+            'plays-body', sorted,
+            'linear-gradient(90deg,#fb923c,#f97316)',
+            n => fmtCount(n) + ' plays',
+            name => gameUrl(name)
+          );
+        } else {
+          setError('plays-body', 'Could not load play data.');
+        }
+
+        // Votes board — net score (up minus down)
+        if (votes && typeof votes === 'object') {
+          const scoreMap = {};
+          Object.entries(votes).forEach(([game, userVotes]) => {
+            if (!userVotes || typeof userVotes !== 'object') return;
+            let up = 0, down = 0;
+            Object.values(userVotes).forEach(v => {
+              if (v === 'up') up++;
+              else if (v === 'down') down++;
+            });
+            scoreMap[game] = up - down;
+          });
+          const sorted = Object.entries(scoreMap)
+            .filter(([, s]) => s > 0)
+            .sort((a, b) => b[1] - a[1]);
+          renderBoard(
+            'votes-body', sorted,
+            'linear-gradient(90deg,#4ade80,#22c55e)',
+            n => '+' + fmtCount(n) + ' net',
+            name => gameUrl(name)
+          );
+        } else {
+          setError('votes-body', 'Could not load vote data.');
+        }
+
+        // Comments board
+        if (comments && comments.counts) {
+          const sorted = Object.entries(comments.counts)
+            .filter(([, n]) => n > 0)
+            .sort((a, b) => b[1] - a[1]);
+          renderBoard(
+            'comments-body', sorted,
+            'linear-gradient(90deg,#60a5fa,#3b82f6)',
+            n => fmtCount(n) + (n === 1 ? ' comment' : ' comments'),
+            name => gameUrl(name)
+          );
+        } else {
+          setError('comments-body', 'Could not load comment data.');
+        }
+
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const el = document.getElementById('updated-at');
+        if (el) el.textContent = 'Updated at ' + timeStr;
+      });
+  }
+
+  loadAll();
+
+  const refreshBtn = document.getElementById('refresh-btn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      const skelRow = `<div class="skeleton-row"><div class="sk" style="width:26px;height:14px"></div><div class="sk" style="width:40px;height:40px;border-radius:8px"></div><div style="flex:1"><div class="sk" style="height:10px;width:80%;margin-bottom:6px"></div><div class="sk" style="height:3px;width:100%"></div></div></div>`;
+      ['plays-body','votes-body','comments-body'].forEach(id => {
+        const b = document.getElementById(id);
+        if (b) b.innerHTML = skelRow + skelRow + skelRow;
+      });
+      loadAll();
+      refreshBtn.textContent = '✓ Done';
+      setTimeout(() => {
+        refreshBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg> Refresh`;
+      }, 1600);
+    });
+  }
+})();
+</script>
+
+<script src="/lib/statusbar.js"></script>
+<script src="/lib/playtime.js"></script>
+<script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
+</body>
+</html>
