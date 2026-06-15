@@ -51,54 +51,6 @@ function registerSocialRoutes(app) {
         res.json({ success: true });
     });
 
-    app.get('/api/comments', (req, res) => {
-        const comments = readComments();
-        const game = req.query.game;
-
-        if (game) {
-            return res.json({ comments: comments[game] || [] });
-        }
-
-        const counts = Object.keys(comments).reduce((acc, key) => {
-            acc[key] = Array.isArray(comments[key]) ? comments[key].length : 0;
-            return acc;
-        }, {});
-
-        res.json({ counts });
-    });
-
-    app.get('/api/plays', (req, res) => {
-        const plays = readPlays();
-        const game = req.query.game;
-
-        if (game) {
-            const gameRecord = plays[game];
-            if (!gameRecord) {
-                return res.json({ total: 0, detail: {} });
-            }
-
-            if (typeof gameRecord === 'number') {
-                return res.json({ total: gameRecord, detail: {} });
-            }
-
-            const detail = gameRecord.clients || {};
-            const total = Number(gameRecord.total) || Object.values(detail).reduce((sum, value) => sum + Number(value), 0);
-
-            return res.json({ total, detail });
-        }
-
-        const counts = Object.keys(plays).reduce((acc, key) => {
-            const gameRecord = plays[key];
-            if (typeof gameRecord === 'number') {
-                acc[key] = Number(gameRecord);
-            } else {
-                acc[key] = Number(gameRecord.total) || Object.values(gameRecord.clients || {}).reduce((sum, value) => sum + Number(value), 0);
-            }
-            return acc;
-        }, {});
-        res.json({ counts });
-    });
-
     app.post('/api/plays', (req, res) => {
         const data = parseJsonBody(req);
         if (!data || !data.game || !data.clientId) {

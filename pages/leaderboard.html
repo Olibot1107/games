@@ -400,18 +400,27 @@ main {
 
   function loadAll() {
     // Fetch game list for URL building + thumbnail paths
-    const listPromise = fetch('/list.json').then(r => r.json()).catch(() => null);
-    const playsPromise = fetch('/api/plays').then(r => r.json()).catch(() => null);
-    const votesPromise = fetch('/votes.json').then(r => r.json()).catch(() => null);
-    const commentsPromise = fetch('/api/comments').then(r => r.json()).catch(() => null);
+    const listPromise     = fetch('/list.json').then(r => r.json()).catch(() => null);
+    const playsPromise    = fetch('/plays.json').then(r => r.json()).catch(() => null);
+    const votesPromise    = fetch('/votes.json').then(r => r.json()).catch(() => null);
+    const commentsPromise = fetch('/comments.json').then(r => r.json()).catch(() => null);
 
     Promise.all([listPromise, playsPromise, votesPromise, commentsPromise])
-      .then(([list, plays, votes, comments]) => {
+      .then(([list, playsRaw, votes, commentsRaw]) => {
         gameList = Array.isArray(list) ? list : [];
 
-        // Plays board
-        if (plays && plays.counts) {
-          const sorted = Object.entries(plays.counts)
+        // Plays board — compute totals from raw plays.json
+        if (playsRaw && typeof playsRaw === 'object') {
+          const counts = {};
+          Object.entries(playsRaw).forEach(([game, value]) => {
+            if (typeof value === 'number') {
+              counts[game] = value;
+            } else if (value && typeof value === 'object') {
+              counts[game] = Number(value.total) ||
+                Object.values(value.clients || {}).reduce((s, v) => s + Number(v || 0), 0);
+            }
+          });
+          const sorted = Object.entries(counts)
             .filter(([, n]) => n > 0)
             .sort((a, b) => b[1] - a[1]);
           renderBoard(
@@ -449,9 +458,13 @@ main {
           setError('votes-body', 'Could not load vote data.');
         }
 
-        // Comments board
-        if (comments && comments.counts) {
-          const sorted = Object.entries(comments.counts)
+        // Comments board — count arrays from raw comments.json
+        if (commentsRaw && typeof commentsRaw === 'object') {
+          const counts = {};
+          Object.entries(commentsRaw).forEach(([game, list]) => {
+            counts[game] = Array.isArray(list) ? list.length : 0;
+          });
+          const sorted = Object.entries(counts)
             .filter(([, n]) => n > 0)
             .sort((a, b) => b[1] - a[1]);
           renderBoard(
