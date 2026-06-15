@@ -19,5 +19,19 @@
     "title": "added random game button",
     "text": "press the random button on the nav bar to play a random gamew",
     "date": "Jun 13 2026"
+  },
+  {
+    "id": "4",
+    "type": "new",
+    "title": "added light theme",
+    "text": "press the moon/sun icon at the top bar to toggle",
+    "date": "Jun 15 2026"
+  },
+  {
+    "id": "5",
+    "type": "update",
+    "title": "fixed serch bar",
+    "text": "make the serch bar fucking work ant not be a piece of shit",
+    "date": "Jun 15 2026"
   }
 ]

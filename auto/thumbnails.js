@@ -3,7 +3,7 @@ const path = require('path');
 
 const CACHE_DIR = path.resolve(__dirname, '../thumbnails');
 const LIST_FILE = path.resolve(__dirname, '../list.json');
-const CONCURRENCY = 1;
+const CONCURRENCY = 4;
 
 const c = {
     reset: '\x1b[0m', bold: '\x1b[1m',

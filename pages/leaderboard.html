@@ -5,8 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Paper Stars leaderboard — top games by plays and activity.">
 <meta name="theme-color" content="#0a0500">
+<meta name="color-scheme" content="dark">
 <title>Math Practice</title>
 <link rel="icon" type="image/png" href="/imgs/image.png">
+<script>
+  (function(){var t=localStorage.getItem('ps-theme')||'dark';document.documentElement.setAttribute('data-theme',t);if(t==='light'){document.querySelector('meta[name="theme-color"]').content='#fdf8f2';document.querySelector('meta[name="color-scheme"]').content='light';}})();
+</script>
+<link rel="stylesheet" href="/lib/theme.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -195,6 +200,18 @@ main {
     <span>Paper Stars</span>
   </a>
   <span class="nav-title">Leaderboard</span>
+  <button id="theme-toggle" class="nav-back" title="Toggle light/dark mode" style="cursor:pointer;padding:5px 10px">
+    <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px">
+      <circle cx="12" cy="12" r="5"/>
+      <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+      <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+    </svg>
+    <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;display:none">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+  </button>
   <button id="refresh-btn" class="nav-back" style="background:none;cursor:pointer;font-family:inherit">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px">
       <polyline points="1 4 1 10 7 10"/>
@@ -474,6 +491,7 @@ main {
 })();
 </script>
 
+<script src="/lib/theme.js"></script>
 <script src="/lib/statusbar.js"></script>
 <script src="/lib/playtime.js"></script>
 <script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
