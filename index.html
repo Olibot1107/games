@@ -750,7 +750,29 @@
   }, { passive: true });
 })();
 </script>
+<script>
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) {
+        return parts.pop().split(';').shift();
+    }
+    return null;
+}
 
+const cookieName = "wow";
+
+if (!getCookie(cookieName)) {
+    // Create cookie that expires in 20 minutes
+    const expires = new Date(Date.now() + 20 * 60 * 1000).toUTCString();
+    document.cookie = `${cookieName}=1; expires=${expires}; path=/`;
+
+    // Reload after 5 seconds
+    setTimeout(() => {
+        location.reload();
+    }, 5000);
+}
+</script>
 <script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
 <script src="/lib/statusbar.js"></script>
 <script src="/lib/playtime.js"></script>
