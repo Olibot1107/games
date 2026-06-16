@@ -10,8 +10,6 @@
   
   A modern browser-based gaming platform featuring a collection of fun and engaging games.
   
-  <a href="https://help.voidium.uk"><strong>Visit Site »</strong></a>
-  
   <br />
   <br />
 </div>
@@ -29,10 +27,6 @@ LP2 is a web-based gaming platform that brings together a variety of browser gam
 - Free to use and open source
 
 ## Getting Started
-
-### Visit Online
-
-Simply visit [help.voidium.uk](https://help.voidium.uk) to play
 
 ## Built in and use
 ![GitHub](https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white)
@@ -64,18 +58,8 @@ cd games
 
 3. run
 ```bash
-npm i && node main.js
+npm i && node index.js
 ```
-   
-## Contributing
-
-Contributions are welcome! Feel free to:
-
-1. Fork the project
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ## License
 
