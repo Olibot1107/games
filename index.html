@@ -855,3 +855,13 @@
 <script src="lib/home/random.js"
   onload="window.__ok&&__ok()"
   onerror="(window.__reload||function(){location.reload()})('random.js')"></script>
+
+<script>
+  setTimeout(() => {
+    const loadingText = document.getElementById('loading-text');
+
+    if (loadingText && loadingText.textContent.replace(/\s+/g, ' ').trim() === '0 / 0') {
+        location.reload();
+    }
+}, 8000);
+</script>
