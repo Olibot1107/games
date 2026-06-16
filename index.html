@@ -547,7 +547,7 @@
   <img src="/imgs/image.png" alt="Paper Stars"
        class="w-20 h-20 rounded-[22px] shadow-2xl mb-5 object-cover">
   <h1 class="text-5xl font-bold text-white mb-2 tracking-tight">Paper Stars</h1>
-  <p class="text-white/35 text-sm tracking-wide"><span id="hero-count"></span>/ search &nbsp;·&nbsp; r random &nbsp;·&nbsp; t theme &nbsp;·&nbsp; ctrl+d bookmark</p>
+  <p class="text-white/35 text-sm tracking-wide"><span id="hero-count"></span><button onclick="document.getElementById('shortcuts-modal').style.display='flex'" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:1px 8px;font-size:12px;color:rgba(255,255,255,0.45);cursor:pointer;font-family:inherit;vertical-align:middle;transition:all 0.15s" onmouseover="this.style.background='rgba(251,146,60,0.15)';this.style.borderColor='rgba(251,146,60,0.35)';this.style.color='rgba(251,146,60,0.85)'" onmouseout="this.style.background='rgba(255,255,255,0.07)';this.style.borderColor='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.45)'">H keybinds</button></p>
   <button id="my-stats-btn" onclick="openMyStats()" style="margin-top:10px;background:rgba(251,146,60,0.10);border:1px solid rgba(251,146,60,0.22);border-radius:999px;padding:5px 16px;font-size:12px;color:rgba(251,146,60,0.8);cursor:pointer;transition:all 0.15s;font-family:inherit" onmouseover="this.style.background='rgba(251,146,60,0.18)'" onmouseout="this.style.background='rgba(251,146,60,0.10)'">My Stats</button>
 </div>
 
@@ -728,6 +728,42 @@
 </div>
 
 <button id="scroll-top-btn" title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+<!-- Keyboard shortcuts modal -->
+<div id="shortcuts-modal" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.82);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:16px">
+  <div style="background:#1a0a00;border:1px solid rgba(251,146,60,0.25);border-radius:16px;padding:28px 32px;max-width:380px;width:100%;position:relative">
+    <button onclick="document.getElementById('shortcuts-modal').style.display='none'" style="position:absolute;top:12px;right:14px;background:none;border:none;color:rgba(255,255,255,0.3);font-size:20px;cursor:pointer;line-height:1;padding:2px 6px">&times;</button>
+    <h2 style="margin:0 0 20px;font-size:16px;font-weight:600;color:rgba(255,255,255,0.9)">Keyboard Shortcuts</h2>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:10px 20px;align-items:center;font-size:13px">
+      <kbd style="font-family:monospace;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 9px;color:rgba(251,146,60,0.9);white-space:nowrap">/</kbd>
+      <span style="color:rgba(255,255,255,0.65)">Focus search</span>
+      <kbd style="font-family:monospace;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 9px;color:rgba(251,146,60,0.9);white-space:nowrap">T</kbd>
+      <span style="color:rgba(255,255,255,0.65)">Toggle light / dark theme</span>
+      <kbd style="font-family:monospace;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 9px;color:rgba(251,146,60,0.9);white-space:nowrap">R</kbd>
+      <span style="color:rgba(255,255,255,0.65)">Open random game picker</span>
+      <kbd style="font-family:monospace;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 9px;color:rgba(251,146,60,0.9);white-space:nowrap">H</kbd>
+      <span style="color:rgba(255,255,255,0.65)">Show this shortcuts overlay</span>
+      <kbd style="font-family:monospace;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 9px;color:rgba(251,146,60,0.9);white-space:nowrap">Esc</kbd>
+      <span style="color:rgba(255,255,255,0.65)">Close any open modal / clear search</span>
+      <div style="grid-column:1/-1;margin:8px 0 4px;border-top:1px solid rgba(255,255,255,0.07)"></div>
+      <span style="color:rgba(255,255,255,0.3);font-size:11px;grid-column:1/-1">Sort games</span>
+      <kbd style="font-family:monospace;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 9px;color:rgba(251,146,60,0.9);white-space:nowrap">1</kbd>
+      <span style="color:rgba(255,255,255,0.65)">Top</span>
+      <kbd style="font-family:monospace;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 9px;color:rgba(251,146,60,0.9);white-space:nowrap">2</kbd>
+      <span style="color:rgba(255,255,255,0.65)">Most Played</span>
+      <kbd style="font-family:monospace;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 9px;color:rgba(251,146,60,0.9);white-space:nowrap">3</kbd>
+      <span style="color:rgba(255,255,255,0.65)">My Time</span>
+      <kbd style="font-family:monospace;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 9px;color:rgba(251,146,60,0.9);white-space:nowrap">4</kbd>
+      <span style="color:rgba(255,255,255,0.65)">A – Z</span>
+      <div style="grid-column:1/-1;margin:8px 0 4px;border-top:1px solid rgba(255,255,255,0.07)"></div>
+      <span style="color:rgba(255,255,255,0.3);font-size:11px;grid-column:1/-1">Inside a game</span>
+      <kbd style="font-family:monospace;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 9px;color:rgba(251,146,60,0.9);white-space:nowrap">/</kbd>
+      <span style="color:rgba(255,255,255,0.65)">Go back to home page</span>
+      <kbd style="font-family:monospace;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 9px;color:rgba(251,146,60,0.9);white-space:nowrap">`</kbd>
+      <span style="color:rgba(255,255,255,0.65)">Toggle fullscreen</span>
+    </div>
+  </div>
+</div>
 
 <script src="https://plain-vanessa-ojdaw-24d55416.koyeb.app/client_script.js"></script>
 <script src="/lib/statusbar.js"></script>
