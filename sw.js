@@ -234,7 +234,10 @@ async function loadViaEndpoint(request, referrerPath) {
   } catch (err) {
     log('error', `Load failed: ${url.pathname}`, err.message);
 
-    if (err.message === 'not found') {
+    if (
+  err.message === 'not found' ||
+  err.message.includes('Cloudflare Tunnel error')
+) {
       const html404 = `<!DOCTYPE html>
 <html lang="en">
 <head>
